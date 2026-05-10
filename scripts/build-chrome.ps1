@@ -52,11 +52,42 @@ function Add-LocalOverrideHostPermissions([string]$ManifestPath, [string]$Config
     }
 }
 
+function Get-ConfigStringValue([string]$ConfigText, [string]$Key) {
+    $pattern = '(?m)\b' + [regex]::Escape($Key) + '\s*:\s*["'']([^"'']+)["'']'
+    $match = [regex]::Match($ConfigText, $pattern)
+    if ($match.Success) { return $match.Groups[1].Value.Trim() }
+    return ''
+}
+
+function Write-ReleaseConfigStatus([string]$DestConfig) {
+    $configText = Get-Content $DestConfig -Raw
+    $libraryUrl = Get-ConfigStringValue -ConfigText $configText -Key 'LIVE_LIBRARY_TRENDS_URL'
+
+    if ($libraryUrl) {
+        try {
+            $hostName = ([Uri]$libraryUrl).Host
+            Write-Host "Library occupancy endpoint included for Chrome build: $hostName"
+        } catch {
+            Write-Host "Library occupancy endpoint included for Chrome build."
+        }
+        return
+    }
+
+    $message = 'LIVE_LIBRARY_TRENDS_URL is empty; Library occupancy graph/counts will be unavailable in this Chrome build.'
+    if ($env:DTU_AFTER_DARK_REQUIRE_LIBRARY_TRENDS -eq '1') {
+        throw $message
+    }
+    Write-Warning $message
+}
+
 function Copy-BuildConfig([string]$RepoRoot, [string]$DestConfig, [string]$ManifestPath) {
     $baseConfig = Join-Path $RepoRoot 'config.js'
     $localConfig = Join-Path $RepoRoot 'config.local.js'
     Copy-Item $baseConfig $DestConfig
-    if (-not (Test-Path $localConfig)) { return }
+    if (-not (Test-Path $localConfig)) {
+        Write-ReleaseConfigStatus -DestConfig $DestConfig
+        return
+    }
 
     $localText = Get-Content $localConfig -Raw
     if ($localText -match '\b(const|let|var)\s+CONFIG\b') {
@@ -66,6 +97,7 @@ function Copy-BuildConfig([string]$RepoRoot, [string]$DestConfig, [string]$Manif
         Add-Content -Path $DestConfig -Value $localText
     }
     Add-LocalOverrideHostPermissions -ManifestPath $ManifestPath -ConfigText $localText
+    Write-ReleaseConfigStatus -DestConfig $DestConfig
 }
 
 New-Item -ItemType Directory -Force -Path $dist | Out-Null
@@ -79,6 +111,32 @@ $files = @(
     'background.js',
     'config.js',
     'darkmode.js',
+    'darkmode.dark-engine.js',
+    'darkmode.learn-accent-shell.js',
+    'darkmode.smart-room-linker.js',
+    'darkmode.book-finder.js',
+    'darkmode.learn-nav.js',
+    'darkmode.learn-shell.js',
+    'darkmode.settings.js',
+    'darkmode.bus.js',
+    'darkmode.campusnet-gpa.js',
+    'darkmode.content-shortcut.js',
+    'darkmode.deadlines.js',
+    'darkmode.host-shells.js',
+    'darkmode.kurser-course-eval.js',
+    'darkmode.kurser-textbooks.js',
+    'darkmode.kurser-widgets.js',
+    'darkmode.library.js',
+    'darkmode.lessons-bulk.js',
+    'darkmode.participant-intel-backfill.js',
+    'darkmode.participant-intel-core.js',
+    'darkmode.participant-intel-host.js',
+    'darkmode.participant-intel-scoring.js',
+    'darkmode.participant-intel-ui.js',
+    'darkmode.semester-twins.js',
+    'darkmode.studyplanner-shell.js',
+    'darkmode.studyplan-runtime.js',
+    'darkmode.studyplan-exams.js',
     'darkmode.css'
 )
 foreach ($f in $files) {

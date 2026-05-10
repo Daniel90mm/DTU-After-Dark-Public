@@ -32,22 +32,18 @@ Chrome Web Store: https://chromewebstore.google.com/detail/dtu-after-dark/hemonf
 ### CampusNet
 
 - GPA toolkit on the Grades page: weighted GPA, projected GPA simulation, ECTS progress, and ignore/restore controls for official grade rows.
-- Participant intelligence features: course composition, shared course history, Semester Twins, and Retention Radar.
+- Participant intelligence features: course composition, shared course history, Semester Twins with expandable shared-course matching, and a visible Retention Radar summary on CampusNet participant pages.
 - Dark mode and accent cleanup across Grades, courses, groups, participant pages, and other student-facing CampusNet views.
 
 ### Study Planner
 
-- `Exam Schedule & Gaps` widget that maps planned courses to DTU exam dates and surfaces tight exam clusters.
-- Exam-choice resolver and modal editor for switching valid exam slots, adding manual entries, or removing bad matches without losing the main timeline.
-- Grade-deadline badges based on DTU's 20-workday grading window after each exam.
 - Accent-aware cleanup for the top bar, planning tables, and navigation elements.
 
 ### kurser.dtu.dk and course info
 
-- Grade statistics panel with pass-rate and grade-distribution data.
-- Course evaluation summary panel with satisfaction/workload snapshots and a link to the full evaluation.
+- Grade statistics panel with pass-rate and grade-distribution data in a flatter dashboard-style course insight panel.
+- Course evaluation summary panel with satisfaction/workload snapshots and a link to the full evaluation, using the same calmer course-insight layout.
 - MyLine curriculum badges such as `Mandatory`, `Core`, `Elective pool`, and `Approved elective`.
-- Room Finder row with room/location enrichment plus MazeMap deep links.
 - Textbook Links that parse course literature sections and add direct library and book-source links.
 - Smart room linking for recognizable building/room mentions on supported pages.
 
@@ -104,10 +100,17 @@ Information shown by the extension, including exam dates, deadlines, grades, roo
 Build artifacts are written to `dist/`.
 Public source builds work as-is with the tracked safe `config.js`.
 For local-only overrides, create an untracked `config.local.js`; the build scripts will overlay it into the packaged `config.js` and add the extra local host permission only to those private build artifacts.
+The public branch now uses a whitelist `.gitignore`, so local-only files such as `data/`, `dist/`, `infra/`, assistant notes, private changelogs, and scratch artifacts stay out of GitHub by default.
+Optional local datasets can still be kept beside the repo for private experiments, but they are intentionally not part of the public source/build surface.
+Shared library occupancy/crowding now requires a configured `LIVE_LIBRARY_TRENDS_URL`. Without that local/private override, the library panel still shows links, news, and events, but not live crowding.
+For release builds that must include live library crowding, set `DTU_AFTER_DARK_REQUIRE_LIBRARY_TRENDS=1` before running the build scripts. The build will then fail if the packaged `config.js` does not contain `LIVE_LIBRARY_TRENDS_URL`; otherwise it prints the included endpoint host.
+A local release override can append values to the safe defaults, for example `globalThis.CONFIG = Object.assign(globalThis.CONFIG || {}, { LIVE_LIBRARY_TRENDS_URL: 'https://your-worker.example/v1/library/trends', LIVE_TRANSIT_API_BASE: 'https://your-worker.example' });`.
 
 ## Notes
 
 Future ideas are tracked in `docs/IDEAS.md`.
+Codebase/runtime orientation for maintainers and AI agents lives in `docs/CODEBASE.md`.
+If you keep private repo-local handoff notes for local agent workflows, keep them untracked and make sure `docs/CODEBASE.md` stays sufficient for the public repo on its own.
 
 ## License
 

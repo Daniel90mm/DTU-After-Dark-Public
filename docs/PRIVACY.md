@@ -48,16 +48,16 @@ The public extension operates locally in your browser and stores settings/caches
   - FindIt availability cache (7d)
   - MyLine curriculum cache (7d)
   - Library events/news cache (6h)
-  - Legacy library occupancy/crowding cache entries when those features are used
+  - Shared library crowding cache (1m) when a shared library trends endpoint is configured
 - Participant Intelligence dataset (if enabled), including:
   - Participant names, s-numbers, program labels
   - Course overlap/history metadata
   - Enrollment snapshots for retention charts
   - Size caps in code: max 5000 student records and max 20 retention snapshots per course
 
-### Site `localStorage` and cookie (origin-scoped)
+### Site `localStorage` (origin-scoped)
 
-- Dark mode preference (`localStorage`) and `.dtu.dk` cookie mirror.
+- Dark mode preference (`localStorage`) plus extension storage. Older `.dtu.dk` dark-mode cookies are cleared best-effort by current builds.
 - Bus widget preferences and quota counters.
 - Deadlines widget cache/state.
 - GPA simulator entries and some UI state flags.

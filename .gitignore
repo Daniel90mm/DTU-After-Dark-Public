@@ -1,31 +1,90 @@
-# Build outputs
-dist/
-*.zip
+# Public repo whitelist: ignore everything by default.
+# Add new public files here intentionally when they are ready for GitHub.
+/*
 
-# Secrets and API keys
-config.local.js
-.env
-.env.*
-*.env
-*.env.local
-secrets.json
+# Root-level public source files
+!/.gitignore
+!/LICENSE
+!/README.md
+!/background.js
+!/changes.md
+!/config.js
+!/darkmode.css
+!/darkmode.js
+!/darkmode.book-finder.js
+!/darkmode.bus.js
+!/darkmode.campusnet-gpa.js
+!/darkmode.content-shortcut.js
+!/darkmode.deadlines.js
+!/darkmode.dark-engine.js
+!/darkmode.host-shells.js
+!/darkmode.learn-accent-shell.js
+!/darkmode.learn-nav.js
+!/darkmode.learn-shell.js
+!/darkmode.settings.js
+!/darkmode.smart-room-linker.js
+!/darkmode.studyplanner-shell.js
+!/darkmode.kurser-course-eval.js
+!/darkmode.kurser-textbooks.js
+!/darkmode.library.js
+!/darkmode.kurser-widgets.js
+!/darkmode.lessons-bulk.js
+!/darkmode.participant-intel-backfill.js
+!/darkmode.participant-intel-core.js
+!/darkmode.participant-intel-host.js
+!/darkmode.participant-intel-scoring.js
+!/darkmode.participant-intel-ui.js
+!/darkmode.semester-twins.js
+!/darkmode.studyplan-exams.js
+!/darkmode.studyplan-runtime.js
+!/manifest.json
+!/manifest_chrome.json
 
-# AI assistant context (keep locally only)
-CLAUDE.md
-memory/
+# Public documentation
+!/docs/
+/docs/*
+!/docs/CODEBASE.md
+!/docs/IDEAS.md
+!/docs/PRIVACY.md
 
-# Private changelog (worker backend / internal notes — never commit)
-PRIVATE_changes.md
+# Public assets
+!/images/
+/images/*
+!/images/Corp_White_Transparent.png
+!/images/Corp_White_Transparent.svg
+!/images/dtuaften.jpg
+!/images/icon_128.png
+!/images/icon_128_black.png
+!/images/icon_48.png
+!/images/logo_dark.png
+!/images/mazemap_favicon.ico
+!/images/mojangles_text.png
+!/images/mojangles_text_darkmode_off.png
 
-# OS files
-Thumbs.db
-.DS_Store
+# Public scripts
+!/scripts/
+/scripts/*
+!/scripts/audit-unused-functions.mjs
+!/scripts/build-chrome.ps1
+!/scripts/build-firefox.ps1
+!/scripts/instrument-function-hits.mjs
+!/scripts/make-chrome-webstore-screenshots.ps1
 
-# Local dev artifacts
-chrome-unpacked-temp/
-dtu_recon_output/
-.claude/
-*.log
-worker-deps-*.json
-node_modules/
-data/
+# Local-only/private items stay ignored by default:
+# AGENTS.md
+# CLAUDE.md
+# PRIVATE_changes.md
+# .claude/
+# config.local.js
+# data/
+# dist/
+# infra/
+# memory/
+# node_modules/
+# *.env
+# *.log
+# chrome-unpacked-temp/
+# dtu_recon_output/
+# secrets.json
+# temp_library_styles_v3.css
+# worker-deps-*.json
