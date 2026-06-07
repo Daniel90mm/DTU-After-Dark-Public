@@ -351,6 +351,23 @@ tr:hover,
   background-color: #3d3d3d !important;
 }
 
+/* D2L grid-LAYOUT tables (d_gl, with d_gd cells) are used for page layout, not
+   tabular data — e.g. the Announcements view lays out the title/body/attachment
+   in one. They inherited the data-table grey above and showed as grey boxes
+   behind the content. Keep them transparent so they blend with the page. */
+.d_gl,
+.d_gl > tbody,
+.d_gl > tbody > tr,
+.d_gl tr,
+.d_gl td,
+.d_gl th,
+td.d_gd {
+  background-color: transparent !important;
+}
+.d_gl tr:hover {
+  background-color: transparent !important;
+}
+
 /* Navigation tabs (All, Pinned, 2026 SPRING, etc.) */
 .d2l-tabs,
 .d2l-tab,
