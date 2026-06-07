@@ -326,10 +326,18 @@ textarea::placeholder {
 /* Dropdowns and menus */
 .d2l-dropdown,
 .d2l-menu,
-.d2l-dropdown-content,
+.d2l-dropdown-content {
+  background-color: #2d2d2d !important;
+  color: #e0e0e0 !important;
+}
+
+/* Plain lists must not carry a solid panel background — let them inherit the
+   page base (dark 1). A grey here showed as grey boxes behind list-based
+   layouts (e.g. the announcements search-options "Posted In" list). Real
+   dropdown/menu panels above keep their grey. */
 ul,
 ol {
-  background-color: #2d2d2d !important;
+  background-color: transparent !important;
   color: #e0e0e0 !important;
 }
 
