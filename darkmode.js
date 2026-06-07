@@ -335,7 +335,7 @@
                 color: var(--dtu-ad-accent) !important;
                 text-decoration: none;
             }
-            
+
             a:hover {
                 color: var(--dtu-ad-accent-hover) !important;
             }

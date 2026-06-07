@@ -1124,7 +1124,6 @@
         targetList.appendChild(li);
     }
 
-    
 const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
     const REJSEPLANEN_API = 'https://www.rejseplanen.dk/api';
     const REJSEPLANEN_KEY = getRuntimeConfig().REJSEPLANEN_API_KEY || '';

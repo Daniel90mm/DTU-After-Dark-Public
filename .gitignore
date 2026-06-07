@@ -4,6 +4,7 @@
 
 # Root-level public source files
 !/.gitignore
+!/.gitattributes
 !/LICENSE
 !/README.md
 !/background.js
