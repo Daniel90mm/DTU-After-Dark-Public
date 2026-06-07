@@ -382,7 +382,10 @@
         }
 
         var scope = (rootNode && rootNode.querySelectorAll) ? rootNode : document;
-        var dark2 = '#2d2d2d';
+        // Transparent so these legacy layout cells/links (search header, folder
+        // names/dates, "Show Search Options") inherit the page base (dark 1)
+        // instead of a solid grey box.
+        var legacyBg = 'transparent';
         var selectors = getDTULearnLegacyLmsToolDarkSelectors();
 
         selectors.forEach(function (selector) {
@@ -394,10 +397,31 @@
             }
             nodes.forEach(function (el) {
                 if (!el || !el.style) return;
-                el.style.setProperty('background-color', dark2, 'important');
-                el.style.setProperty('background', dark2, 'important');
+                el.style.setProperty('background-color', legacyBg, 'important');
+                el.style.setProperty('background', legacyBg, 'important');
                 el.style.setProperty('background-image', 'none', 'important');
             });
+        });
+        styleLegacySortButtonShadows(scope);
+    }
+
+    // On legacy heavy pages the dark engine skips Brightspace shadow-DOM
+    // processing, so sortable column headers (<d2l-table-col-sort-button>) keep
+    // their light hover/focus background (white-on-white text). Inject a small
+    // dark-hover style straight into each one's shadow root.
+    function styleLegacySortButtonShadows(scope) {
+        var root = (scope && scope.querySelectorAll) ? scope : document;
+        var hosts;
+        try { hosts = root.querySelectorAll('d2l-table-col-sort-button'); } catch (e) { return; }
+        hosts.forEach(function (host) {
+            var sr = host && host.shadowRoot;
+            if (!sr || sr.getElementById('dtu-dark-sortbtn')) return;
+            var style = document.createElement('style');
+            style.id = 'dtu-dark-sortbtn';
+            style.textContent =
+                'button{background-color:transparent !important;color:#e0e0e0 !important;}'
+                + 'button:hover,button:focus,button:active{background-color:#3d3d3d !important;color:#e0e0e0 !important;}';
+            sr.appendChild(style);
         });
     }
 

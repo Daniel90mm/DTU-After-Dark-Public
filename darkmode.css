@@ -334,6 +334,9 @@ ol {
 }
 
 /* Tables */
+/* No solid table background: let tables/cells inherit the page base (#1a1a1a /
+   "dark 1") instead of the lighter "dark 2" grey, which was showing as grey
+   boxes/bands on layout tables (search options, legacy LMS tools, etc.). */
 table,
 .d2l-table,
 thead,
@@ -341,7 +344,6 @@ tbody,
 tr,
 td,
 th {
-  background-color: #2d2d2d !important;
   color: #e0e0e0 !important;
   border-color: #404040 !important;
 }
@@ -1601,7 +1603,10 @@ a.d2l-link.d2l-link-inline[href*="/d2l/lms/dropbox/user/folders_history.d2l"],
 a.d2l-link.d2l-link-inline[onclick*="EmailUser("],
 a.d2l-link.d2l-link-inline[onclick*="ToggleSearch("],
 a.d2l-link.d2l-link-inline#z_eh {
-  background-color: #2d2d2d !important;
+  /* No background: these legacy-LMS layout cells/links ("Show Search Options",
+     folder names/dates, etc.) should stay transparent (dark 1), not the dark-2
+     grey. The matching JS strips the inline grey; this keeps the stylesheet from
+     re-adding it. */
 }
 
 /* Show All Announcements link - dark 2 */

@@ -934,6 +934,24 @@
                         color: #ffffff !important;
                     }
                 `;
+            } else if (tagName === 'd2l-table-col-sort-button') {
+                // Sortable column headers ("Title", "Start Date"): the inner
+                // <button> gets a light hover/focus background from D2L's adopted
+                // stylesheet, giving white-on-white text. Force it dark.
+                styleId = 'dark-mode-shadow-styles-col-sort';
+                styleText = `
+                    :host { color: ${DARK_TEXT} !important; }
+                    button {
+                        background-color: transparent !important;
+                        color: ${DARK_TEXT} !important;
+                    }
+                    button:hover,
+                    button:focus,
+                    button:active {
+                        background-color: #3d3d3d !important;
+                        color: ${DARK_TEXT} !important;
+                    }
+                `;
             }
         }
 
