@@ -900,6 +900,40 @@
                         background-color: transparent !important;
                     }
                 `;
+            } else if (tagName === 'd2l-calendar') {
+                // Mini-month date grid renders as <button class="d2l-calendar-date">
+                // inside this shadow root, so the page stylesheet can't reach it
+                // (cells stayed white). Darken the cells here.
+                styleId = 'dark-mode-shadow-styles-calendar';
+                styleText = `
+                    :host { color: ${DARK_TEXT} !important; }
+                    table, thead, tbody, tr, th, td {
+                        background-color: transparent !important;
+                        color: ${DARK_TEXT} !important;
+                        border-color: ${DARK_BORDER} !important;
+                    }
+                    th, .d2l-calendar-title { color: ${DARK_TEXT} !important; }
+                    button.d2l-calendar-date,
+                    .d2l-calendar-date {
+                        background-color: ${DARK_BG} !important;
+                        background-image: none !important;
+                        color: ${DARK_TEXT} !important;
+                        border-color: ${DARK_BORDER} !important;
+                    }
+                    .d2l-calendar-date:hover,
+                    .d2l-calendar-date:focus {
+                        background-color: #3d3d3d !important;
+                    }
+                    .d2l-calendar-date-today {
+                        outline: 2px solid var(--dtu-ad-accent, #cc1f3b) !important;
+                        outline-offset: -2px;
+                    }
+                    .d2l-calendar-date-selected,
+                    .d2l-calendar-date[aria-selected="true"] {
+                        background-color: var(--dtu-ad-accent, #cc1f3b) !important;
+                        color: #ffffff !important;
+                    }
+                `;
             }
         }
 

@@ -566,9 +566,12 @@ svg,
 }
 
 /* Box layout - dark 2 */
+/* No background: these are generic layout wrappers (e.g. the page-title/header
+   box on Discussions). A solid colour here produced a partial-width grey band
+   behind headings. Keep it transparent so it inherits the dark page. */
 .d2l-box-layout,
 .d2l-box.d2l-box-v {
-  background-color: #2d2d2d !important;
+  background-color: transparent !important;
   color: #e0e0e0 !important;
 }
 
@@ -771,10 +774,18 @@ li.d2l-datalist-item.d2l-datalist-item-actionable {
 
 /* Panels and page backgrounds */
 .d2l-panel,
-[class*="d2l-panel"],
+[class*="d2l-panel"] {
+  background-color: #2d2d2d !important;
+  color: #e0e0e0 !important;
+  border-color: #404040 !important;
+}
+
+/* Page/column background layers: match the html base (#1a1a1a) instead of the
+   lighter panel grey, so they don't show as gray rectangles below short content
+   (seen at the bottom of the Calendar page). */
 .d2l-page-bg,
 .d2l-column-side-bg {
-  background-color: #2d2d2d !important;
+  background-color: #1a1a1a !important;
   color: #e0e0e0 !important;
   border-color: #404040 !important;
 }
@@ -1198,6 +1209,21 @@ ul[id*="$control"] input,
 input.d2l-edit {
   background-color: #3d3d3d !important;
   color: #e0e0e0 !important;
+  border-color: #505050 !important;
+}
+
+/* Inline-editable fields (e.g. the calendar "Add a task..." box) render as div
+   widgets, not <input>, so they kept a light background. */
+.d2l-editable,
+.d2l-editable-padding,
+.d2l-editable-target {
+  background-color: #3d3d3d !important;
+  color: #e0e0e0 !important;
+  border-color: #505050 !important;
+}
+.d2l-editable-placeholder {
+  background-color: #3d3d3d !important;
+  color: #a0a0a0 !important;
   border-color: #505050 !important;
 }
 
@@ -2715,15 +2741,22 @@ nav {
 }
 
 /* ===== D2L Tool Areas (Discussions sidebar) - dark 2 ===== */
+/* No background on the tab strip / items / selected tab: a solid colour here
+   added to the grey band under the heading. Selection is shown by the link
+   styling / underline, so transparent is enough. */
+.d2l-tool-areas-list,
+ul.d2l-tool-areas-list {
+  background-color: transparent !important;
+}
 .d2l-tool-areas-item,
 li.d2l-tool-areas-item {
-  background-color: #2d2d2d !important;
+  background-color: transparent !important;
   color: #e0e0e0 !important;
 }
 
 .d2l-tool-areas-item-selected,
 li.d2l-tool-areas-item-selected {
-  background-color: #2d2d2d !important;
+  background-color: transparent !important;
   color: #e0e0e0 !important;
 }
 
