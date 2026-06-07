@@ -653,9 +653,6 @@
         * {
             color: ${DARK_TEXT} !important;
         }
-        [slot="outside-control-container"],
-        :host([current]),
-        :host([current]) [slot="outside-control-container"],
         .co-content,
         .title-container,
         .title,
@@ -682,6 +679,25 @@
         }
         a {
             color: #66b3ff !important;
+        }
+        /* Nav buttons (e.g. "Course information") render their label with D2L's
+           own dark text (rgb(32,33,34)) even in dark mode, and that color wins
+           over our light-text override. Forcing these containers dark made the
+           dark-on-dark text invisible. Instead, give them a fixed light pill
+           background in BOTH hover and non-hover states so the dark text stays
+           legible. This also overrides D2L's regolith/celestine "current"
+           background; the celestine border is left untouched. */
+        [slot="outside-control-container"],
+        ::slotted([slot="outside-control-container"]),
+        :host([current]),
+        :host([current]) [slot="outside-control-container"],
+        [slot="outside-control-container"]:hover,
+        ::slotted([slot="outside-control-container"]):hover,
+        :host([current]):hover,
+        :host([current]) [slot="outside-control-container"]:hover {
+            background-color: rgb(224, 224, 244) !important;
+            background: rgb(224, 224, 244) !important;
+            background-image: none !important;
         }
         [slot="supporting-info"],
         [slot="content"],
