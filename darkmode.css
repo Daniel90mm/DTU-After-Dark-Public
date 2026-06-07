@@ -1902,7 +1902,9 @@ span.click {
 h2.d2l-heading,
 h2.vui-heading-4,
 h2.d2l-heading.vui-heading-4 {
-  background-color: #2d2d2d !important;
+  /* Transparent so the heading blends with its container instead of showing a
+     grey box behind the text (seen on calendar "Next 7 days", announcements). */
+  background-color: transparent !important;
   color: #e0e0e0 !important;
 }
 

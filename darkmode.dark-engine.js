@@ -1606,6 +1606,21 @@
         if (el.closest && el.closest('[data-dtu-ext]')) return;
         if (el.closest && el.closest('.dtu-bus-departures')) return;
         if (el.matches && el.matches('.dtu-bus-departures')) return;
+        // The calendar's title/iterator header bar (and its child controls like
+        // the prev/next arrows) should match the page base (#1a1a1a), not the
+        // lighter panel grey. Exclude the "All Calendars" dropdown popup so it
+        // keeps its panel styling. Guard against re-setting (which would
+        // retrigger the mutation observer and loop), mirroring the general guard.
+        if (el.id === 'TitlePlaceholderId'
+            || (el.closest && el.closest('#TitlePlaceholderId') && !el.closest('d2l-dropdown-content'))) {
+            if (inlineStyleHasDarkFill(el, '#1a1a1a', 'rgb(26,26,26)')
+                && (el.tagName === 'A' || inlineStyleHasTextColor(el, '#e0e0e0', 'rgb(224,224,224)'))) return;
+            el.style.setProperty('background', '#1a1a1a', 'important');
+            el.style.setProperty('background-color', '#1a1a1a', 'important');
+            el.style.setProperty('background-image', 'none', 'important');
+            if (el.tagName !== 'A') el.style.setProperty('color', '#e0e0e0', 'important');
+            return;
+        }
         if (isDTULearnQuizSubmissionsPage() && el.matches) {
             if (el.matches('img.d2l-histogram-barblue, td.d2l-histogram-disback1, td.d2l-histogram-disyimg2, td.d2l-histogram-xside2')) return;
         }
