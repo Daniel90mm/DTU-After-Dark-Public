@@ -340,7 +340,15 @@
             'a.d2l-link.d2l-link-inline[href*="/d2l/lms/dropbox/user/folders_history.d2l"]',
             'a.d2l-link.d2l-link-inline[onclick*="EmailUser("]',
             'a.d2l-link.d2l-link-inline[onclick*="ToggleSearch("]',
-            'a.d2l-link.d2l-link-inline#z_eh'
+            'a.d2l-link.d2l-link-inline#z_eh',
+            'table.d2l-table',
+            'table.d2l-table thead',
+            'table.d2l-table tbody',
+            'table.d2l-table tr',
+            'table.d2l-table th',
+            'table.d2l-table td',
+            'th.d_hch',
+            'td.d_gd'
         ];
     }
 
