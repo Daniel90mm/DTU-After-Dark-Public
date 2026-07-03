@@ -35,7 +35,7 @@ A static audit of `manifest.json`, `manifest_chrome.json`, `background.js`, `dar
 
 DTU After Dark does **not** sell personal data and does **not** send personal data to advertising, analytics, or telemetry vendors.
 
-The public extension operates locally in your browser and stores settings/caches needed for features. It does not send heartbeat or usage telemetry. If you enable Participant Intelligence, the extension stores participant metadata locally for overlap and history features.
+The public extension operates locally in your browser and stores settings/caches needed for features. It does not send heartbeat or usage telemetry. Participant Intelligence is disabled by default. If you enable it in Settings, the extension stores participant metadata locally for overlap and history features; nothing is collected while it is off.
 
 ## What Is Stored Locally
 
