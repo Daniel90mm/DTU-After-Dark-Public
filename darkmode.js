@@ -3778,9 +3778,12 @@
     });
 
     // Lightweight safety-net for late-created Brightspace shadow roots.
-    if (darkModeEnabled && IS_TOP_WINDOW && shouldUseBrightspaceShadowDomProcessing()) {
+    // NOTE: the engine loads after this script, so the shadow-processing gate
+    // must be evaluated inside the tick, not at registration time.
+    if (darkModeEnabled && IS_TOP_WINDOW) {
         setInterval(function () {
             if (document.hidden) return;
+            if (!shouldUseBrightspaceShadowDomProcessing()) return;
             sweepForLateShadowRoots();
         }, 15000);
     }

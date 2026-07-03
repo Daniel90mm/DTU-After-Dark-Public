@@ -973,6 +973,31 @@
 
     const _pendingShadowHostRetry = new WeakMap();
     const _shadowHostRetryCount = new WeakMap();
+    const _watchedUndefinedTags = new Set();
+    let _definitionSweepTimer = null;
+
+    // Custom-element upgrades attach shadow roots without any observable
+    // mutation. whenDefined() is the only reliable signal, so re-sweep
+    // (debounced) whenever a d2l-* tag we saw in the DOM gets defined.
+    function scheduleDefinitionSweep() {
+        if (_definitionSweepTimer) return;
+        _definitionSweepTimer = setTimeout(function () {
+            _definitionSweepTimer = null;
+            if (!isDarkModeEnabled()) return;
+            if (!shouldUseBrightspaceShadowDomProcessing()) return;
+            sweepForLateShadowRoots();
+        }, 120);
+    }
+
+    function watchTagDefinition(tagName) {
+        if (!tagName || _watchedUndefinedTags.has(tagName)) return;
+        if (!window.customElements || typeof customElements.whenDefined !== 'function') return;
+        try {
+            if (customElements.get(tagName)) return;
+            _watchedUndefinedTags.add(tagName);
+            customElements.whenDefined(tagName).then(scheduleDefinitionSweep).catch(function () { });
+        } catch (eDefWatch) { }
+    }
     const _observedShadowRoots = new WeakSet();
     const SHADOW_HOST_RETRY_DELAY_MS = 350;
     const SHADOW_HOST_MAX_RETRIES = 20;
@@ -993,6 +1018,7 @@
             injectStylesIntoShadowRoot(element.shadowRoot, element);
             return;
         }
+        watchTagDefinition(element.tagName.toLowerCase());
         if (_pendingShadowHostRetry.has(element)) return;
         var retryCount = _shadowHostRetryCount.get(element) || 0;
         if (retryCount >= SHADOW_HOST_MAX_RETRIES) return;
@@ -1988,6 +2014,11 @@
         enforcePageBackground();
         pollOverrideDynamicStyles();
         function initialize() {
+            // Immediate pass: styles whatever is already upgraded and registers
+            // whenDefined watchers/retries for everything that is not.
+            if (shouldUseBrightspaceShadowDomProcessing() && document.body) {
+                processElement(document.body);
+            }
             waitForCustomElements().then(function () {
                 if (shouldUseBrightspaceShadowDomProcessing() && document.body) {
                     processElement(document.body);
