@@ -1205,7 +1205,7 @@
     }
 
     function styleQuizSubmissionHistogram(rootNode) {
-        var api = getBusUiApi();
+        var api = getBusApi();
         if (api && typeof api.styleQuizSubmissionHistogram === 'function') {
             return api.styleQuizSubmissionHistogram(rootNode);
         }
@@ -3664,12 +3664,20 @@
                 if (roots.length === 0) return;
                 roots = dedupeMutationRoots(roots);
                 if (roots.length > MAX_ROOTS_PER_FLUSH) {
-                    roots = roots.slice(roots.length - MAX_ROOTS_PER_FLUSH);
+                    // Too many distinct roots to process individually. A full
+                    // sweep is cheaper than 48 subtree walks and, unlike
+                    // dropping roots, cannot silently strand a subtree whose
+                    // later rendering happens inside a shadow root.
+                    runDarkModeChecks();
+                    runTopWindowFeatureChecks(null, false);
+                    try { runLessonsBulkDownloadChecks(); } catch (eLbdF) { }
+                    return;
                 }
 
                 if (darkModeEnabled) {
                     roots.forEach(root => {
-                        runDarkModeChecks(root);
+                        // One root failing must not strand the remaining roots.
+                        try { runDarkModeChecks(root); } catch (eRootCheck) { }
                     });
                     // Some hosts (CampusNet / Studyplanner) render logos late; apply per-mutation-root
                     // so we catch late-added header DOM without relying on `src` changes.
@@ -3778,9 +3786,11 @@
     });
 
     // Lightweight safety-net for late-created Brightspace shadow roots.
+    // Runs in iframes as well: Lessons/Content SPAs render in same-origin
+    // frames whose shadow trees the top-window sweep cannot reach.
     // NOTE: the engine loads after this script, so the shadow-processing gate
     // must be evaluated inside the tick, not at registration time.
-    if (darkModeEnabled && IS_TOP_WINDOW) {
+    if (darkModeEnabled) {
         setInterval(function () {
             if (document.hidden) return;
             if (!shouldUseBrightspaceShadowDomProcessing()) return;

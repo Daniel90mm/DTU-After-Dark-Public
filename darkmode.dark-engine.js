@@ -877,6 +877,24 @@
             } else if (tagName === 'd2l-expand-collapse-content' || tagName === 'd2l-lti-launch') {
                 styleId = 'dark-mode-shadow-styles-expand-collapse';
                 styleText = expandCollapseStyles;
+            } else if (tagName === 'd2l-list-item-nav') {
+                // Redesigned Lessons TOC (smart-curriculum app). The current /
+                // hovered item paints a near-white fill on the slotted
+                // outside-control-container div; force the dark-2 panel color
+                // and keep idle rows transparent.
+                styleId = 'dark-mode-shadow-styles-list-item-nav';
+                styleText = `
+                    [slot="outside-control-container"] {
+                        background-color: transparent !important;
+                        border-color: #404040 !important;
+                    }
+                    :host([current]) [slot="outside-control-container"],
+                    :host([_child-current]) [slot="outside-control-container"],
+                    :host(:hover) [slot="outside-control-container"],
+                    :host([_focusing]) [slot="outside-control-container"] {
+                        background-color: #2d2d2d !important;
+                    }
+                `;
             } else if (tagName === 'd2l-menu' || tagName === 'd2l-menu-item' || tagName === 'd2l-menu-item-link') {
                 styleId = 'dark-mode-shadow-styles-menu';
                 styleText = menuStyles;
@@ -1938,8 +1956,12 @@
     async function waitForCustomElements() {
         const elementsToWait = ['d2l-enrollment-card', 'd2l-card', 'd2l-html-block', 'd2l-icon'];
         const promises = elementsToWait.map(function (tagName) {
-            if (customElements.get(tagName)) return Promise.resolve();
-            return customElements.whenDefined(tagName).catch(function () { return Promise.resolve(); });
+            // customElements can be null in sandboxed frames; never throw here.
+            try {
+                if (!window.customElements || typeof customElements.whenDefined !== 'function') return Promise.resolve();
+                if (customElements.get(tagName)) return Promise.resolve();
+                return customElements.whenDefined(tagName).catch(function () { return Promise.resolve(); });
+            } catch (eCeNull) { return Promise.resolve(); }
         });
         return Promise.race([
             Promise.all(promises),
@@ -1963,8 +1985,8 @@
             if (useBrightspaceShadowDom) {
                 processElement(rootNode);
                 sweepForLateShadowRoots(rootNode);
-                replaceLogoImage(rootNode);
-                styleQuizSubmissionHistogram(rootNode);
+                try { replaceLogoImage(rootNode); } catch (eLogoRc) { }
+                try { styleQuizSubmissionHistogram(rootNode); } catch (eQuizRc) { }
             } else {
                 preserveTypeboxColors(rootNode);
             }
@@ -1977,8 +1999,8 @@
             pollOverrideDynamicStyles();
             if (document.body) processElement(document.body);
             sweepForLateShadowRoots();
-            replaceLogoImage();
-            styleQuizSubmissionHistogram();
+            try { replaceLogoImage(); } catch (eLogoRf) { }
+            try { styleQuizSubmissionHistogram(); } catch (eQuizRf) { }
         }
         preserveTypeboxColors();
     }

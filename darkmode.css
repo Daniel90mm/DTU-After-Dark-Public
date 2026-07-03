@@ -4426,3 +4426,14 @@ main.main.arc-row>section.main__content {
     grid-template-columns: minmax(0, 1fr) !important;
   }
 }
+
+/* Lessons (smart-curriculum) redesign: panel overlay + new-content toast */
+.panel-overlay.collapsable {
+    background-color: #1a1a1a !important;
+}
+
+.new-content-alert {
+    background-color: #2d2d2d !important;
+    color: #e0e0e0 !important;
+    border-color: #404040 !important;
+}
