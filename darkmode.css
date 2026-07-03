@@ -4437,3 +4437,22 @@ main.main.arc-row>section.main__content {
     color: #e0e0e0 !important;
     border-color: #404040 !important;
 }
+
+/* DTU evaluation nag modal (#nagModal): keep the native translucent scrim so
+   the page stays visible behind it; the content card gets the dark-2 panel
+   treatment. The engine's .modal inline-dark selector excludes #nagModal. */
+#nagModal.modal {
+  background: rgba(0, 0, 0, 0.65) !important;
+  background-color: rgba(0, 0, 0, 0.65) !important;
+}
+
+#nagModal .modal-content {
+  background-color: #2d2d2d !important;
+  color: #e0e0e0 !important;
+  border: 1px solid #404040 !important;
+}
+
+#nagModal .close {
+  color: #e0e0e0 !important;
+  background-color: transparent !important;
+}

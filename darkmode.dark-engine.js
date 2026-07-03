@@ -1250,7 +1250,7 @@
         .dropdown,
         .dropdown__list,
         .dropdown__list-item,
-        .modal,
+        .modal:not(#nagModal),
         .modal__dialog,
         .modal__content,
         .modal__header,
