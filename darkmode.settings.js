@@ -224,14 +224,6 @@
         callDep('insertParticipantIntelligence', [], null);
     }
 
-    function insertCampusnetSemesterTwinWidget() {
-        callDep('insertCampusnetSemesterTwinWidget', [], null);
-    }
-
-    function removeDTULearnSemesterTwinWidget() {
-        callDep('removeDTULearnSemesterTwinWidget', [], null);
-    }
-
     function insertKurserMyLineBadge() {
         callDep('insertKurserMyLineBadge', [], null);
     }
@@ -343,18 +335,6 @@
         if (featureKey === featureKeys.participantIntel) {
             if (window.location.hostname === 'campusnet.dtu.dk') {
                 insertParticipantIntelligence();
-                insertCampusnetSemesterTwinWidget();
-            }
-            if (window.location.hostname === 'learn.inside.dtu.dk') {
-                removeDTULearnSemesterTwinWidget();
-            }
-        }
-        if (featureKey === featureKeys.participantIntelSemesterTwins) {
-            if (window.location.hostname === 'campusnet.dtu.dk') {
-                insertCampusnetSemesterTwinWidget();
-            }
-            if (window.location.hostname === 'learn.inside.dtu.dk') {
-                removeDTULearnSemesterTwinWidget();
             }
         }
         if (featureKey === featureKeys.kurserMyLineBadges && window.location.hostname === 'kurser.dtu.dk') {
@@ -928,7 +908,6 @@
             { id: 'feature-participant-intel-toggle', key: featureKeys.participantIntel },
             { id: 'feature-participant-intel-demographics-toggle', key: featureKeys.participantIntelDemographics },
             { id: 'feature-participant-intel-shared-history-toggle', key: featureKeys.participantIntelSharedHistory },
-            { id: 'feature-participant-intel-semester-twins-toggle', key: featureKeys.participantIntelSemesterTwins },
             { id: 'feature-participant-intel-retention-toggle', key: featureKeys.participantIntelRetention },
             { id: 'feature-kurser-grade-stats-toggle', key: featureKeys.kurserGradeStats },
             { id: 'feature-book-finder-toggle', key: featureKeys.bookFinder },
@@ -993,7 +972,6 @@
                     { tid: 'feature-participant-intel-toggle', title: 'Participant Intelligence', desc: 'Master switch for the whole suite' },
                     { tid: 'feature-participant-intel-demographics-toggle', title: 'Course Composition', desc: 'Program breakdown on CampusNet participant pages', subToggleOf: 'feature-participant-intel-toggle' },
                     { tid: 'feature-participant-intel-shared-history-toggle', title: 'Shared Course History', desc: 'Badges on participant lists + profile history card', subToggleOf: 'feature-participant-intel-toggle' },
-                    { tid: 'feature-participant-intel-semester-twins-toggle', title: 'Semester Twins', desc: 'Widget on the CampusNet frontpage', subToggleOf: 'feature-participant-intel-toggle' },
                     { tid: 'feature-participant-intel-retention-toggle', title: 'Retention Radar', desc: 'Tracks Users enrollment count over time', subToggleOf: 'feature-participant-intel-toggle' }
                 ]
             },

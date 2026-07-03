@@ -49,7 +49,7 @@
     },
     {
       "matches": ["*://learn.inside.dtu.dk/*"],
-      "js": ["darkmode.book-finder.js", "darkmode.learn-nav.js", "darkmode.learn-shell.js", "darkmode.settings.js", "darkmode.bus.js", "darkmode.content-shortcut.js", "darkmode.participant-intel-host.js", "darkmode.participant-intel-core.js", "darkmode.participant-intel-scoring.js", "darkmode.library.js", "darkmode.deadlines.js", "darkmode.lessons-bulk.js", "darkmode.semester-twins.js"],
+      "js": ["darkmode.book-finder.js", "darkmode.learn-nav.js", "darkmode.learn-shell.js", "darkmode.settings.js", "darkmode.bus.js", "darkmode.content-shortcut.js", "darkmode.participant-intel-host.js", "darkmode.participant-intel-core.js", "darkmode.library.js", "darkmode.deadlines.js", "darkmode.lessons-bulk.js"],
       "run_at": "document_start",
       "all_frames": false
     },
@@ -116,7 +116,7 @@
     },
     {
       "matches": ["*://campusnet.dtu.dk/*"],
-      "js": ["darkmode.host-shells.js", "darkmode.participant-intel-host.js", "darkmode.participant-intel-core.js", "darkmode.participant-intel-scoring.js", "darkmode.campusnet-gpa.js", "darkmode.participant-intel-ui.js", "darkmode.participant-intel-backfill.js", "darkmode.semester-twins.js"],
+      "js": ["darkmode.host-shells.js", "darkmode.participant-intel-host.js", "darkmode.participant-intel-core.js", "darkmode.campusnet-gpa.js", "darkmode.participant-intel-ui.js", "darkmode.participant-intel-backfill.js"],
       "run_at": "document_start",
       "all_frames": false
     },

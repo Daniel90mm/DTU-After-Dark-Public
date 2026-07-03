@@ -207,45 +207,6 @@
         });
     })();
 
-    function loadSemesterTwinPrefs(cb) {
-        var deps = getDeps();
-        if (!deps) {
-            if (cb) cb({ hideOwnProgram: false, rowLimit: 5, scope: 'semester' });
-            return;
-        }
-        deps.storageLocalGet({ [deps.semesterTwinPrefsKey]: null }, function (result) {
-            var raw = result[deps.semesterTwinPrefsKey];
-            if (!raw || typeof raw !== 'object') raw = {};
-            var limit = parseInt(raw.rowLimit, 10);
-            if (limit !== 5 && limit !== 10) limit = 5;
-            var scope = (raw.scope === 'all') ? 'all' : 'semester';
-            cb({
-                hideOwnProgram: raw.hideOwnProgram === true,
-                rowLimit: limit,
-                scope: scope
-            });
-        });
-    }
-
-    function saveSemesterTwinPrefs(prefs) {
-        var deps = getDeps();
-        if (!deps) return;
-        deps.storageLocalSet({ [deps.semesterTwinPrefsKey]: prefs || {} });
-    }
-
-    function updateSemesterTwinPrefs(patch, cb) {
-        loadSemesterTwinPrefs(function (prev) {
-            var next = Object.assign({}, prev || {}, patch || {});
-            next.hideOwnProgram = next.hideOwnProgram === true;
-            var limit = parseInt(next.rowLimit, 10);
-            if (limit !== 5 && limit !== 10) limit = 5;
-            next.rowLimit = limit;
-            next.scope = (next.scope === 'all') ? 'all' : 'semester';
-            saveSemesterTwinPrefs(next);
-            if (cb) cb(next);
-        });
-    }
-
     function ensureCampusnetParticipantsPageSizeMax() {
         var deps = getDeps();
         if (!deps || !deps.isCampusnetParticipantPage()) return false;
@@ -614,9 +575,6 @@
         collapseCourseEntriesByCode: collapseCourseEntriesByCode,
         loadParticipantIntel: loadParticipantIntel,
         saveParticipantIntel: saveParticipantIntel,
-        loadSemesterTwinPrefs: loadSemesterTwinPrefs,
-        saveSemesterTwinPrefs: saveSemesterTwinPrefs,
-        updateSemesterTwinPrefs: updateSemesterTwinPrefs,
         ensureCampusnetParticipantsPageSizeMax: ensureCampusnetParticipantsPageSizeMax,
         parseParticipantList: parseParticipantList,
         collectParticipantData: collectParticipantData,

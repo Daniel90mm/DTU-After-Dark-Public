@@ -73,9 +73,6 @@ This repo is still centered around a large content script, but the runtime bound
 - `darkmode.studyplan-runtime.js`
   - Study Planner exam parsing/timeline runtime module.
   - Owns course extraction, exam-calendar matching, timeline overrides, and render scheduling/state.
-- `darkmode.semester-twins.js`
-  - Extracted Semester Twins UI shell for DTU Learn and CampusNet.
-  - Owns widget placement, rendering, theming, and CampusNet frontpage retry logic.
 - `darkmode.participant-intel-ui.js`
   - Extracted CampusNet participant-intelligence UI shell.
   - Owns demographics, shared-history badges, profile history, and Retention Radar rendering.
@@ -84,13 +81,10 @@ This repo is still centered around a large content script, but the runtime bound
   - Owns archive-page parsing, participant-page fetch/backfill flow, progress state, and archive widget rendering.
 - `darkmode.participant-intel-core.js`
   - Extracted shared participant-intelligence storage and parsing core.
-  - Owns browser-storage persistence, course-history deduping, Semester Twins prefs, participant-page collection, and self-detection.
+  - Owns browser-storage persistence, course-history deduping, participant-page collection, and self-detection.
 - `darkmode.participant-intel-host.js`
   - Extracted CampusNet participant-intel host/runtime helper module.
   - Owns CampusNet page detection, semester/course parsing, course-title filtering, and participant-list DOM helpers.
-- `darkmode.participant-intel-scoring.js`
-  - Extracted Semester Twins scoring/runtime analytics module.
-  - Owns overlap scoring, study-line-specific course detection, and match ranking for DTU Learn and CampusNet twins.
 - `darkmode.campusnet-gpa.js`
   - Extracted CampusNet GPA/ECTS/simulator feature shell and table logic.
   - Owns grade-table parsing, weighted GPA row, ECTS bar, and hypothetical-grade simulator UI.
@@ -161,9 +155,6 @@ This repo is still centered around a large content script, but the runtime bound
 - Study Planner exam-cluster UI shell:
   - `darkmode.studyplan-exams.js`
   - Timeline rendering, choice modal/editor, and grade-countdown decoration.
-- Semester Twins UI shell:
-  - `darkmode.semester-twins.js`
-  - DTU Learn homepage widget, CampusNet frontpage widget shell, shared card rendering, filter-menu integration, and retry placement logic.
 - Participant-intelligence UI shell:
   - `darkmode.participant-intel-ui.js`
   - CampusNet participant-page demographics, shared-history badges, profile history cards, and Retention Radar rendering.
@@ -172,13 +163,10 @@ This repo is still centered around a large content script, but the runtime bound
   - CampusNet archive-page parsing, remote participant-list fetches, backfill progress state, and Course History Scanner widget.
 - Participant-intelligence shared core:
   - `darkmode.participant-intel-core.js`
-  - Storage, participant-course deduping, Semester Twins preferences, participant-page collection, and self-detection.
+  - Storage, participant-course deduping, participant-page collection, and self-detection.
 - Participant-intelligence host helpers:
   - `darkmode.participant-intel-host.js`
   - CampusNet page detection, semester/course parsing, course-title filtering, and participant-list DOM helpers.
-- Participant-intelligence scoring:
-  - `darkmode.participant-intel-scoring.js`
-  - Semester Twins overlap scoring, study-line-specific course detection, and ranking logic.
 - DTU Learn library data/model/charting:
   - `darkmode.js`
   - Shared occupancy fetch wiring, chart/heatmap rendering, trend math.
@@ -193,7 +181,7 @@ This repo is still centered around a large content script, but the runtime bound
   - Shared ISBN helpers, course-page detection, insight theme helpers, and other remaining kurser utilities.
 - CampusNet tools:
   - `darkmode.js`
-  - Semester Twins data/scoring and shared CampusNet helpers.
+  - Shared CampusNet helpers.
 - Study Planner:
   - `darkmode.js`
   - Exam data parsing, season-aware mapping, and request orchestration.
@@ -296,10 +284,6 @@ When editing `darkmode.js`, start with `rg` on the feature entrypoint instead of
   - `insertCampusnetArchiveBackfillWidget`
   - `collectParticipantData`
   - `loadParticipantIntel`
-  - `updateSemesterTwinPrefs`
-  - `darkmode.semester-twins.js`
-  - `insertSemesterTwinWidget`
-  - `insertCampusnetSemesterTwinWidget`
 - Study Planner exams:
   - `darkmode.studyplan-runtime.js`
   - Course parsing, exam-date matching, timeline state, and refresh scheduling.
@@ -347,10 +331,8 @@ For most feature work:
    - `node --check darkmode.participant-intel-backfill.js` when touching archive backfill/history-scanner code
    - `node --check darkmode.participant-intel-core.js` when touching participant-intelligence storage/parser code
    - `node --check darkmode.participant-intel-host.js` when touching CampusNet participant-intel page parsing/detection helpers
-   - `node --check darkmode.participant-intel-scoring.js` when touching Semester Twins scoring/ranking logic
    - `node --check darkmode.participant-intel-ui.js` when touching participant-intelligence UI
    - `node --check darkmode.studyplan-exams.js` when touching the Study Planner exam UI shell
-   - `node --check darkmode.semester-twins.js` when touching the Semester Twins UI shell
    - `node --check background.js`
    - browser build script if manifests/content-script lists changed
 

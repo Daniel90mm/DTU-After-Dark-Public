@@ -456,7 +456,6 @@
     const FEATURE_PARTICIPANT_INTEL_KEY = 'dtuAfterDarkFeatureParticipantIntel';
     const FEATURE_PARTICIPANT_INTEL_DEMOGRAPHICS_KEY = 'dtuAfterDarkFeatureParticipantIntelDemographics';
     const FEATURE_PARTICIPANT_INTEL_SHARED_HISTORY_KEY = 'dtuAfterDarkFeatureParticipantIntelSharedHistory';
-    const FEATURE_PARTICIPANT_INTEL_SEMESTER_TWINS_KEY = 'dtuAfterDarkFeatureParticipantIntelSemesterTwins';
     const FEATURE_PARTICIPANT_INTEL_RETENTION_KEY = 'dtuAfterDarkFeatureParticipantIntelRetention';
     const FEATURE_LIBRARY_DROPDOWN_KEY = 'dtuAfterDarkFeatureLibraryDropdown';
     const FEATURE_LEARN_LESSONS_BULK_DOWNLOAD_KEY = 'dtuAfterDarkFeatureLearnLessonsBulkDownload';
@@ -464,7 +463,6 @@
     const PARTICIPANT_INTEL_STORAGE_KEY = 'dtuParticipantIntel';
     const PARTICIPANT_INTEL_MAX_STUDENTS = 5000;
     const PARTICIPANT_INTEL_MAX_RETENTION = 20;
-    const SEMESTER_TWIN_PREFS_KEY = 'dtuAfterDarkSemesterTwinPrefsV1';
 
     const FEATURE_FLAG_DEFAULTS = {
         [FEATURE_BOOK_FINDER_KEY]: true,
@@ -484,7 +482,6 @@
         [FEATURE_PARTICIPANT_INTEL_KEY]: true,
         [FEATURE_PARTICIPANT_INTEL_DEMOGRAPHICS_KEY]: true,
         [FEATURE_PARTICIPANT_INTEL_SHARED_HISTORY_KEY]: true,
-        [FEATURE_PARTICIPANT_INTEL_SEMESTER_TWINS_KEY]: true,
         [FEATURE_PARTICIPANT_INTEL_RETENTION_KEY]: true,
         [FEATURE_LIBRARY_DROPDOWN_KEY]: true,
         [FEATURE_LEARN_LESSONS_BULK_DOWNLOAD_KEY]: true,
@@ -1016,6 +1013,12 @@
             if (cb) cb(_featureFlags);
             return;
         }
+        try {
+            var _twinCleanupStorage = getExtensionStorageArea();
+            if (_twinCleanupStorage) {
+                _twinCleanupStorage.area.remove(['dtuAfterDarkFeatureParticipantIntelSemesterTwins', 'dtuAfterDarkSemesterTwinPrefsV1']);
+            }
+        } catch (eTwinCleanup) { }
         storageLocalGet(FEATURE_FLAG_DEFAULTS, function (flags) {
             _featureFlags = Object.assign({}, FEATURE_FLAG_DEFAULTS, flags || {});
             _featureFlagsLoaded = true;
@@ -1054,12 +1057,6 @@
                 _featureFlags[key] = next;
                 touched = true;
             });
-
-            if (Object.prototype.hasOwnProperty.call(changes, SEMESTER_TWIN_PREFS_KEY)) {
-                touched = true;
-                _participantIntelSemesterTwinLastTs = 0;
-                _participantIntelSemesterTwinCampusnetLastTs = 0;
-            }
 
             if (!touched) return;
             if (_featureFlagStorageChangeTimer) return;
@@ -1470,7 +1467,6 @@
                     contentShortcut: FEATURE_CONTENT_SHORTCUT_KEY,
                     learnNavResourceLinks: FEATURE_LEARN_NAV_RESOURCE_LINKS_KEY,
                     participantIntel: FEATURE_PARTICIPANT_INTEL_KEY,
-                    participantIntelSemesterTwins: FEATURE_PARTICIPANT_INTEL_SEMESTER_TWINS_KEY,
                     kurserMyLineBadges: FEATURE_KURSER_MYLINE_BADGES_KEY,
                     libraryDropdown: FEATURE_LIBRARY_DROPDOWN_KEY,
                     learnLessonsBulkDownload: FEATURE_LEARN_LESSONS_BULK_DOWNLOAD_KEY,
@@ -1524,8 +1520,6 @@
             insertDTULearnNavResourceLinks: insertDTULearnNavResourceLinks,
             removeDTULearnNavResourceLinks: removeDTULearnNavResourceLinks,
             insertParticipantIntelligence: insertParticipantIntelligence,
-            insertCampusnetSemesterTwinWidget: insertCampusnetSemesterTwinWidget,
-            removeDTULearnSemesterTwinWidget: removeDTULearnSemesterTwinWidget,
             insertKurserMyLineBadge: insertKurserMyLineBadge,
             insertLibraryNavDropdown: insertLibraryNavDropdown,
             removeLibraryNavDropdown: removeLibraryNavDropdown,
@@ -1894,15 +1888,9 @@
 
     // ===== PARTICIPANT INTELLIGENCE (campusnet.dtu.dk) =====
     // Scrapes participant lists locally to build demographics, shared-history
-    // badges, semester-twin detection and retention tracking.
+    // badges and retention tracking.
     // All data stays in browser.storage.local -- nothing leaves the browser.
     var _participantIntelAnnotateTimer = null;
-    var _participantIntelSemesterTwinLastTs = 0;
-    var _participantIntelSemesterTwinCampusnetLastTs = 0;
-    var _campusnetSemesterTwinRetryTimer = null;
-    var _campusnetSemesterTwinRetryAttempts = 0;
-    var _campusnetSemesterTwinRepositionTimer = null;
-    var _campusnetSemesterTwinRepositionAttempts = 0;
 
     function getParticipantIntelHostApi() {
         try { return globalThis.DTUAfterDarkParticipantIntelHost || null; } catch (e0) { return null; }
@@ -1950,7 +1938,6 @@
         storageLocalGet: storageLocalGet,
         storageLocalSet: storageLocalSet,
         participantIntelStorageKey: PARTICIPANT_INTEL_STORAGE_KEY,
-        semesterTwinPrefsKey: SEMESTER_TWIN_PREFS_KEY,
         participantIntelMaxStudents: PARTICIPANT_INTEL_MAX_STUDENTS,
         insertParticipantIntelligence: function () { insertParticipantIntelligence(); }
     };
@@ -1980,27 +1967,6 @@
         var api = getParticipantIntelCoreApi();
         if (!api || typeof api.saveParticipantIntel !== 'function') return;
         return api.saveParticipantIntel(data);
-    }
-
-    function loadSemesterTwinPrefs(cb) {
-        var api = getParticipantIntelCoreApi();
-        if (!api || typeof api.loadSemesterTwinPrefs !== 'function') {
-            if (cb) cb({ hideOwnProgram: false, rowLimit: 5, scope: 'semester' });
-            return;
-        }
-        return api.loadSemesterTwinPrefs(cb);
-    }
-
-    function saveSemesterTwinPrefs(prefs) {
-        var api = getParticipantIntelCoreApi();
-        if (!api || typeof api.saveSemesterTwinPrefs !== 'function') return;
-        return api.saveSemesterTwinPrefs(prefs);
-    }
-
-    function updateSemesterTwinPrefs(patch, cb) {
-        var api = getParticipantIntelCoreApi();
-        if (!api || typeof api.updateSemesterTwinPrefs !== 'function') return;
-        return api.updateSemesterTwinPrefs(patch, cb);
     }
 
     // -- Page detection helpers --
@@ -2190,573 +2156,6 @@
         return api.insertParticipantDemographics();
     }
 
-    // ---- Feature 2: Semester Twin (DTU Learn dashboard) ----
-
-    function getParticipantIntelScoringApi() {
-        try { return globalThis.DTUAfterDarkParticipantIntelScoring || null; } catch (e0) { return null; }
-    }
-
-    try {
-        globalThis.DTUAfterDarkParticipantIntelScoringDeps = {
-            normalizeProgramLabel: normalizeProgramLabel,
-            normalizeIntelCourseCode: normalizeIntelCourseCode,
-            isCampusnetLikelyAcademicCourse: isCampusnetLikelyAcademicCourse,
-            getCurrentDTUSemester: getCurrentDTUSemester
-        };
-    } catch (eTwinScoringDeps) { }
-
-    function computeSemesterTwinData(intel, prefs) {
-        var api = getParticipantIntelScoringApi();
-        if (api && typeof api.computeSemesterTwinData === 'function') {
-            return api.computeSemesterTwinData(intel, prefs);
-        }
-        return {
-            twins: [],
-            myTotal: 0,
-            meta: {
-                showingClosest: false,
-                includingClosest: false,
-                includesLowOverlap: false,
-                includesZeroOverlap: false,
-                twinCount: 0,
-                emptyMessage: 'Semester Twins scoring is unavailable.',
-                hideOwnProgram: false,
-                selfProgram: '',
-                courseNames: (intel && intel.courseNames) ? intel.courseNames : {},
-                rowLimit: (prefs && prefs.rowLimit === 10) ? 10 : 5,
-                scope: (prefs && prefs.scope === 'all') ? 'all' : 'semester',
-                historyTotal: 0,
-                currentTotal: 0,
-                currentVerifiedTotal: 0,
-                currentSeededTotal: 0,
-                myTotalBeforeLineSpecific: 0,
-                myTotalAfterLineSpecific: 0,
-                lineSpecificCourseCount: 0,
-                lineSpecificCourses: [],
-                lineSpecificSuppressed: 0,
-                lineSpecificNote: ''
-            }
-        };
-    }
-    function getSemesterTwinsApi() {
-        return globalThis.DTUAfterDarkSemesterTwinsUi || null;
-    }
-
-    globalThis.DTUAfterDarkSemesterTwinsDeps = {
-        isTopWindow: IS_TOP_WINDOW,
-        isDTULearnHomepage: isDTULearnHomepage,
-        isCampusnetFrontpageDTU: isCampusnetFrontpageDTU,
-        isFeatureFlagEnabled: isFeatureFlagEnabled,
-        featureParticipantIntelKey: FEATURE_PARTICIPANT_INTEL_KEY,
-        featureParticipantIntelSemesterTwinsKey: FEATURE_PARTICIPANT_INTEL_SEMESTER_TWINS_KEY,
-        isDarkMode: function () { return !!darkModeEnabled; },
-        markExt: markExt,
-        loadParticipantIntel: loadParticipantIntel,
-        loadSemesterTwinPrefs: loadSemesterTwinPrefs,
-        computeSemesterTwinData: computeSemesterTwinData,
-        normalizeWhitespace: normalizeWhitespace,
-        updateSemesterTwinPrefs: updateSemesterTwinPrefs,
-        buildTwinFilterDropdown: buildTwinFilterDropdown,
-        seedActiveFrontpageCourses: seedActiveFrontpageCourses,
-        requestLearnRender: function () { insertSemesterTwinWidget(); },
-        requestCampusnetRender: function () { insertCampusnetSemesterTwinWidget(); },
-        getState: function () {
-            return {
-                participantIntelSemesterTwinLastTs: _participantIntelSemesterTwinLastTs,
-                participantIntelSemesterTwinCampusnetLastTs: _participantIntelSemesterTwinCampusnetLastTs,
-                campusnetSemesterTwinRetryTimer: _campusnetSemesterTwinRetryTimer,
-                campusnetSemesterTwinRetryAttempts: _campusnetSemesterTwinRetryAttempts
-            };
-        },
-        setState: function (patch) {
-            if (!patch || typeof patch !== 'object') return;
-            if (Object.prototype.hasOwnProperty.call(patch, 'participantIntelSemesterTwinLastTs')) {
-                _participantIntelSemesterTwinLastTs = Number(patch.participantIntelSemesterTwinLastTs) || 0;
-            }
-            if (Object.prototype.hasOwnProperty.call(patch, 'participantIntelSemesterTwinCampusnetLastTs')) {
-                _participantIntelSemesterTwinCampusnetLastTs = Number(patch.participantIntelSemesterTwinCampusnetLastTs) || 0;
-            }
-            if (Object.prototype.hasOwnProperty.call(patch, 'campusnetSemesterTwinRetryTimer')) {
-                _campusnetSemesterTwinRetryTimer = patch.campusnetSemesterTwinRetryTimer || null;
-            }
-            if (Object.prototype.hasOwnProperty.call(patch, 'campusnetSemesterTwinRetryAttempts')) {
-                _campusnetSemesterTwinRetryAttempts = Number(patch.campusnetSemesterTwinRetryAttempts) || 0;
-            }
-        }
-    };
-
-    function removeDTULearnSemesterTwinWidget() {
-        var api = getSemesterTwinsApi();
-        if (api && typeof api.removeDTULearnSemesterTwinWidget === 'function') {
-            return api.removeDTULearnSemesterTwinWidget();
-        }
-        document.querySelectorAll('[data-dtu-semester-twin]').forEach(function (el) { el.remove(); });
-    }
-
-    function insertSemesterTwinWidget() {
-        var api = getSemesterTwinsApi();
-        if (!api || typeof api.insertSemesterTwinWidget !== 'function') return;
-        return api.insertSemesterTwinWidget();
-    }
-
-    // --- Shared: build filter dropdown panel for Semester Twins ---
-    function buildTwinFilterDropdown(isDark, prefs, selfProgram, lineSpecificCourseCount, opts) {
-        var hasCampusnetControls = !!(opts && opts.campusnet);
-
-        var wrap = document.createElement('div');
-        markExt(wrap);
-        wrap.setAttribute('data-dtu-semester-twin-filterpanel', '1');
-        wrap.style.cssText = 'position:relative;flex:0 0 auto;align-self:flex-start;';
-
-        // Filter icon button
-        var btn = document.createElement('button');
-        markExt(btn);
-        btn.setAttribute('data-dtu-semester-twin-filterbtn', '1');
-        btn.setAttribute('aria-label', 'Filters');
-        var filterSvg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-        filterSvg.setAttribute('width', '16');
-        filterSvg.setAttribute('height', '16');
-        filterSvg.setAttribute('viewBox', '0 0 16 16');
-        filterSvg.setAttribute('fill', 'none');
-        var filterPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-        filterPath.setAttribute('d', 'M1 3h14M3 8h10M5 13h6');
-        filterPath.setAttribute('stroke', 'currentColor');
-        filterPath.setAttribute('stroke-width', '1.5');
-        filterPath.setAttribute('stroke-linecap', 'round');
-        filterSvg.appendChild(filterPath);
-        btn.appendChild(filterSvg);
-        btn.style.cssText = 'display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;'
-            + 'cursor:pointer;border:none;outline:none;transition:all 0.18s ease;';
-        btn.style.setProperty('background', isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', 'important');
-        btn.style.setProperty('background-color', isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)', 'important');
-        btn.style.setProperty('color', isDark ? '#ccc' : '#555', 'important');
-        wrap.appendChild(btn);
-
-        // Dropdown panel
-        var panel = document.createElement('div');
-        markExt(panel);
-        panel.setAttribute('data-dtu-semester-twin-filterdrop', '1');
-        panel.style.cssText = 'position:absolute;right:0;top:100%;margin-top:8px;width:min(286px,calc(100vw - 32px));min-width:244px;z-index:200;'
-            + 'padding:13px 14px 14px;border-radius:12px;display:none;';
-        panel.style.setProperty('background', isDark ? '#2d2d2d' : '#ffffff', 'important');
-        panel.style.setProperty('background-color', isDark ? '#2d2d2d' : '#ffffff', 'important');
-        panel.style.setProperty('border', '1px solid ' + (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(148,163,184,0.22)'), 'important');
-        panel.style.setProperty('box-shadow', isDark ? '0 16px 38px rgba(0,0,0,0.34)' : '0 16px 38px rgba(15,23,42,0.16)', 'important');
-        panel.style.setProperty('color', isDark ? '#e0e0e0' : '#333', 'important');
-
-        function makeLabel(text) {
-            var l = document.createElement('div');
-            markExt(l);
-            l.textContent = text;
-            l.style.cssText = 'font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:5px;';
-            l.style.setProperty('color', isDark ? '#999' : '#888', 'important');
-            return l;
-        }
-
-        function makeSelect(attr, options, value) {
-            var sel = document.createElement('select');
-            markExt(sel);
-            sel.setAttribute(attr, '1');
-            sel.style.cssText = 'height:36px;font-size:12px;font-weight:600;padding:6px 10px;border-radius:9px;cursor:pointer;outline:none;width:100%;box-sizing:border-box;';
-            sel.style.setProperty('background', isDark ? '#1a1a1a' : '#f3f3f3', 'important');
-            sel.style.setProperty('background-color', isDark ? '#1a1a1a' : '#f3f3f3', 'important');
-            sel.style.setProperty('color', isDark ? '#e0e0e0' : '#222', 'important');
-            sel.style.setProperty('border', '1px solid ' + (isDark ? 'rgba(255,255,255,0.10)' : 'rgba(148,163,184,0.28)'), 'important');
-            options.forEach(function (o) {
-                var opt = document.createElement('option');
-                opt.value = o.value;
-                opt.textContent = o.label;
-                sel.appendChild(opt);
-            });
-            sel.value = value;
-            return sel;
-        }
-
-        // Scope (CampusNet only)
-        if (hasCampusnetControls) {
-            panel.appendChild(makeLabel('Scope'));
-            var scopeSel = makeSelect('data-dtu-campusnet-semester-twin-scope-select',
-                [{ value: 'semester', label: 'This semester' }, { value: 'all', label: 'All time' }],
-                prefs.scope || 'semester');
-            panel.appendChild(scopeSel);
-
-            var spacer1 = document.createElement('div');
-            spacer1.style.cssText = 'height:10px;';
-            panel.appendChild(spacer1);
-
-            // Show
-            panel.appendChild(makeLabel('Show'));
-            var limitSel = makeSelect('data-dtu-campusnet-semester-twin-limit-select',
-                [{ value: '5', label: '5 matches' }, { value: '10', label: '10 matches' }],
-                String(prefs.rowLimit || 5));
-            panel.appendChild(limitSel);
-
-            var spacer2 = document.createElement('div');
-            spacer2.style.cssText = 'height:10px;';
-            panel.appendChild(spacer2);
-        }
-
-        // Hide my study line checkbox (both platforms)
-        panel.appendChild(makeLabel('Study Line'));
-        var filterRow = document.createElement('label');
-        markExt(filterRow);
-        filterRow.style.cssText = 'display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;font-size:12px;line-height:1.35;';
-
-        var filterInput = document.createElement('input');
-        filterInput.type = 'checkbox';
-        filterInput.setAttribute(hasCampusnetControls ? 'data-dtu-campusnet-semester-twin-filter-input' : 'data-dtu-semester-twin-filter-input', '1');
-        markExt(filterInput);
-        filterInput.checked = !!(prefs && prefs.hideOwnProgram);
-        filterInput.disabled = !selfProgram;
-        filterInput.style.cssText = 'width:16px;height:16px;cursor:pointer;accent-color:var(--dtu-ad-accent);';
-        filterInput.title = selfProgram
-            ? ('When enabled, only show students from other study lines.'
-                + (lineSpecificCourseCount ? (' Also hides students who share your study-line-specific courses (' + lineSpecificCourseCount + ' detected).') : ''))
-            : 'Your study line is unknown yet. Visit a CampusNet participant page first.';
-
-        var filterText = document.createElement('span');
-        markExt(filterText);
-        filterText.textContent = 'Hide my study line';
-        filterText.style.cssText = 'font-size:12px;font-weight:600;';
-        filterText.style.setProperty('color', isDark ? '#e0e0e0' : '#333', 'important');
-
-        filterRow.appendChild(filterInput);
-        filterRow.appendChild(filterText);
-        panel.appendChild(filterRow);
-
-        // Course History Scanner (integrated)
-        var scanSpacer = document.createElement('div');
-        scanSpacer.style.cssText = 'height:10px;';
-        panel.appendChild(scanSpacer);
-
-        var scanDivider = document.createElement('div');
-        markExt(scanDivider);
-        scanDivider.style.cssText = 'height:1px;margin-bottom:10px;';
-        scanDivider.style.setProperty('background', isDark ? 'rgba(255,255,255,0.08)' : 'rgba(148,163,184,0.20)', 'important');
-        panel.appendChild(scanDivider);
-
-        panel.appendChild(makeLabel('Course History'));
-
-        var scanStatus = document.createElement('div');
-        markExt(scanStatus);
-        scanStatus.setAttribute('data-dtu-twin-scan-status', '1');
-        scanStatus.textContent = 'Scan your past courses to find more matches.';
-        scanStatus.style.cssText = 'font-size:11px;margin-bottom:10px;line-height:1.4;';
-        scanStatus.style.setProperty('color', isDark ? '#a8adb5' : '#64748b', 'important');
-        panel.appendChild(scanStatus);
-
-        var scanBtnRow = document.createElement('div');
-        markExt(scanBtnRow);
-        scanBtnRow.style.cssText = 'display:flex;gap:8px;align-items:center;';
-
-        var scanBtn = document.createElement('button');
-        markExt(scanBtn);
-        scanBtn.setAttribute('data-dtu-twin-scan-btn', '1');
-        scanBtn.textContent = 'Scan course history';
-        scanBtn.style.cssText = 'flex:1;min-height:36px;padding:8px 12px;border-radius:9px;font-size:12px;font-weight:700;'
-            + 'cursor:pointer;border:none;outline:none;text-align:center;transition:all 0.18s ease;';
-        scanBtn.style.setProperty('background', 'var(--dtu-ad-accent)', 'important');
-        scanBtn.style.setProperty('background-color', 'var(--dtu-ad-accent)', 'important');
-        scanBtn.style.setProperty('color', '#fff', 'important');
-
-        var scanStopBtn = document.createElement('button');
-        markExt(scanStopBtn);
-        scanStopBtn.setAttribute('data-dtu-twin-scan-stop', '1');
-        scanStopBtn.textContent = 'Stop';
-        scanStopBtn.style.cssText = 'min-height:36px;padding:8px 10px;border-radius:9px;font-size:11px;font-weight:700;'
-            + 'cursor:pointer;border:none;outline:none;display:none;transition:all 0.18s ease;';
-        scanStopBtn.style.setProperty('background', isDark ? 'rgba(255,255,255,0.06)' : 'rgba(241,245,249,0.95)', 'important');
-        scanStopBtn.style.setProperty('background-color', isDark ? 'rgba(255,255,255,0.06)' : 'rgba(241,245,249,0.95)', 'important');
-        scanStopBtn.style.setProperty('border', '1px solid ' + (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(148,163,184,0.20)'), 'important');
-        scanStopBtn.style.setProperty('color', isDark ? '#e0e0e0' : '#334155', 'important');
-
-        scanBtnRow.appendChild(scanBtn);
-        scanBtnRow.appendChild(scanStopBtn);
-        panel.appendChild(scanBtnRow);
-
-        // If a scan is already running, show progress immediately
-        if (isCampusnetArchiveBackfillRunning()) {
-            scanBtn.disabled = true;
-            scanBtn.textContent = 'Scanning...';
-            scanStopBtn.style.display = 'block';
-            var initPoll = setInterval(function () {
-                if (!isCampusnetArchiveBackfillRunning()) {
-                    clearInterval(initPoll);
-                    var p = getCampusnetArchiveBackfillProgress();
-                    scanStatus.textContent = p ? ('Done! Scanned ' + p.ok + ' courses' + (p.failed ? (', ' + p.failed + ' failed') : '') + '.') : 'Scan complete.';
-                    scanBtn.disabled = false;
-                    scanBtn.textContent = 'Scan course history';
-                    scanStopBtn.style.display = 'none';
-                    _participantIntelSemesterTwinLastTs = 0;
-                    _participantIntelSemesterTwinCampusnetLastTs = 0;
-                    try { insertSemesterTwinWidget(); } catch (e1) { }
-                    try { insertCampusnetSemesterTwinWidget(); } catch (e2) { }
-                    return;
-                }
-                var p2 = getCampusnetArchiveBackfillProgress();
-                if (p2) scanStatus.textContent = 'Scanning: ' + p2.done + '/' + p2.total + ' (OK ' + p2.ok + (p2.failed ? ', ' + p2.failed + ' failed' : '') + ')';
-            }, 500);
-        }
-
-        // Scan logic: fetch archive page remotely, then run the backfill
-        scanBtn.addEventListener('click', function (e) {
-            e.stopPropagation();
-            if (isCampusnetArchiveBackfillRunning()) return;
-            scanBtn.disabled = true;
-            scanBtn.textContent = 'Fetching course list...';
-            scanStatus.textContent = 'Loading your archived courses...';
-
-            fetchAndParseArchivedElements().then(function (items) {
-                var courseItems = items.filter(function (it) {
-                    return !!it.codeHint && isCampusnetLikelyAcademicCourse(it.codeHint, it.title, { title: it.title });
-                });
-                if (!courseItems.length) {
-                    scanStatus.textContent = 'No archived courses found.';
-                    scanBtn.disabled = false;
-                    scanBtn.textContent = 'Scan course history';
-                    return;
-                }
-
-                loadParticipantIntel(function (intel) {
-                    // If self is unknown, try to detect from CampusNet page header
-                    if (!intel.self || !intel.self.sNumber) {
-                        try {
-                            var headerSNum = null;
-                            // Check for s-number in header/username area
-                            var hdrCandidates = [
-                                document.querySelector('.user-name, .header__user-name, [data-user-name], .masthead .profile-name'),
-                                document.querySelector('header'),
-                                document.querySelector('.header, #header, .masthead')
-                            ];
-                            for (var hci = 0; hci < hdrCandidates.length; hci++) {
-                                var hEl = hdrCandidates[hci];
-                                if (!hEl) continue;
-                                var sM = (hEl.textContent || '').match(/\b(s\d{6})\b/i);
-                                if (sM) { headerSNum = sM[1].toLowerCase(); break; }
-                            }
-                            if (headerSNum) {
-                                intel.self = { sNumber: headerSNum, name: '', program: '', courses: [] };
-                                saveParticipantIntel(intel);
-                            }
-                        } catch (eSelfDetect) { }
-                    }
-
-                    // Seed own course history from archive list
-                    try {
-                        if (intel && intel.self && intel.self.sNumber) {
-                            if (!intel.self.courses) intel.self.courses = [];
-                            for (var si = 0; si < courseItems.length; si++) {
-                                var it0 = courseItems[si];
-                                if (!it0 || !it0.codeHint) continue;
-                                if (!isCampusnetLikelyAcademicCourse(it0.codeHint, it0.title, { title: it0.title })) continue;
-                                var sem0 = it0.semesterHint;
-                                if (!sem0) continue; // Don't guess semester; backfill will resolve it
-                                var has0 = intel.self.courses.some(function (c) { return c && c.code === it0.codeHint && c.semester === sem0; });
-                                if (!has0) intel.self.courses.push({ code: it0.codeHint, semester: sem0, archived: true });
-                            }
-                            saveParticipantIntel(intel);
-                        }
-                    } catch (eSeed) { }
-
-                    var scanned = (intel.backfill && intel.backfill.scanned) ? intel.backfill.scanned : {};
-                    var queue = courseItems.filter(function (it) { return !scanned[it.elementId]; });
-
-                    if (!queue.length) {
-                        scanStatus.textContent = 'All ' + courseItems.length + ' courses already scanned. Nothing new to do.';
-                        scanBtn.disabled = false;
-                        scanBtn.textContent = 'Scan course history';
-                        return;
-                    }
-
-                    scanStatus.textContent = 'Scanning: 0/' + queue.length + ' courses...';
-                    scanStopBtn.style.display = 'block';
-
-                    // Use the existing backfill engine
-                    runCampusnetArchiveBackfill(queue, intel);
-
-                    // Poll progress
-                    var pollTimer = setInterval(function () {
-                        if (!isCampusnetArchiveBackfillRunning()) {
-                            clearInterval(pollTimer);
-                            var p = getCampusnetArchiveBackfillProgress();
-                            if (p) {
-                                scanStatus.textContent = 'Done! Scanned ' + p.ok + ' courses' + (p.failed ? (', ' + p.failed + ' failed') : '') + '.';
-                            } else {
-                                scanStatus.textContent = 'Scan complete.';
-                            }
-                            scanBtn.disabled = false;
-                            scanBtn.textContent = 'Scan course history';
-                            scanStopBtn.style.display = 'none';
-                            // Refresh the widget
-                            _participantIntelSemesterTwinLastTs = 0;
-                            _participantIntelSemesterTwinCampusnetLastTs = 0;
-                            try { insertSemesterTwinWidget(); } catch (e1) { }
-                            try { insertCampusnetSemesterTwinWidget(); } catch (e2) { }
-                            return;
-                        }
-                        var p2 = getCampusnetArchiveBackfillProgress();
-                        if (p2) {
-                            scanStatus.textContent = 'Scanning: ' + p2.done + '/' + p2.total
-                                + ' (OK ' + p2.ok + (p2.failed ? ', ' + p2.failed + ' failed' : '') + ')';
-                        }
-                    }, 500);
-                });
-            }).catch(function (err) {
-                scanStatus.textContent = 'Failed to load archive page. Are you logged into CampusNet?';
-                scanBtn.disabled = false;
-                scanBtn.textContent = 'Scan course history';
-            });
-        });
-
-        scanStopBtn.addEventListener('click', function (e) {
-            e.stopPropagation();
-            stopCampusnetArchiveBackfill();
-            scanStopBtn.style.display = 'none';
-            scanBtn.disabled = false;
-            scanBtn.textContent = 'Scan course history';
-        });
-
-        wrap.appendChild(panel);
-
-        // Toggle dropdown
-        var isOpen = false;
-        btn.addEventListener('click', function (e) {
-            e.stopPropagation();
-            isOpen = !isOpen;
-            panel.style.display = isOpen ? 'block' : 'none';
-        });
-        // Close on outside click
-        document.addEventListener('click', function (e) {
-            if (isOpen && !wrap.contains(e.target)) {
-                isOpen = false;
-                panel.style.display = 'none';
-            }
-        }, true);
-
-        return wrap;
-    }
-
-    function insertCampusnetSemesterTwinWidget() {
-        var api = getSemesterTwinsApi();
-        if (!api || typeof api.insertCampusnetSemesterTwinWidget !== 'function') return;
-        return api.insertCampusnetSemesterTwinWidget();
-    }
-
-    // Detect active (non-archived) courses from the CampusNet frontpage DOM and seed them
-    // into participant intel so they count as "current" courses for Semester Twins.
-    // Keep this conservative: only seed links that look like real course titles
-    // (course code at start), to avoid group/project links polluting "This semester".
-    function seedActiveFrontpageCourses(intel) {
-        if (!isCampusnetFrontpageDTU()) return false;
-        if (!intel || typeof intel !== 'object') return false;
-
-        function detectSelfSNumberFromHeader() {
-            try {
-                var root = document.querySelector('header, .header, #header, .masthead') || document.body;
-                if (!root) return '';
-                var txt = normalizeWhitespace(root.textContent || '');
-                var m = txt.match(/\b(s\d{6})\b/i);
-                return m ? String(m[1]).toLowerCase() : '';
-            } catch (e0) { return ''; }
-        }
-
-        if (!intel.self || typeof intel.self !== 'object') intel.self = null;
-        if (!intel.self || !intel.self.sNumber) {
-            var guessedSelf = detectSelfSNumberFromHeader();
-            if (!guessedSelf) return false;
-            intel.self = intel.self || {};
-            intel.self.sNumber = guessedSelf;
-            if (!intel.self.name) intel.self.name = '';
-            if (!intel.self.program) intel.self.program = '';
-            if (!intel.self.courses || !Array.isArray(intel.self.courses)) intel.self.courses = [];
-        }
-        if (!intel.self.courses) intel.self.courses = [];
-
-        var currentSem = getCurrentDTUSemester();
-        var codeRe = /^\s*((?:\d{5}|KU\d{3}))(?=\s|$|[-:,(])/i;
-        var seeded = false;
-
-        // Prefer links inside the explicit "Courses" section of "My courses and groups".
-        // This avoids picking Projects/Groups/Shortcuts noise.
-        var links = [];
-        try {
-            var sections = document.querySelectorAll('.group-menu__item.group-menu__item-burger');
-            sections.forEach(function (sec) {
-                if (!sec || !sec.querySelector) return;
-                var titleEl = sec.querySelector('h2.item__title');
-                var sectionTitle = normalizeWhitespace(titleEl ? titleEl.textContent : '').toLowerCase();
-                // English + Danish
-                if (!/^(courses|kurser)$/.test(sectionTitle)) return;
-                sec.querySelectorAll('a[href*="/cnnet/element/"]').forEach(function (a) { links.push(a); });
-            });
-        } catch (eLinks) { }
-
-        // Fallback: broad scan if the Courses section is not present in DOM yet.
-        if (!links.length) {
-            try {
-                document.querySelectorAll('a[href*="/cnnet/element/"]').forEach(function (a) { links.push(a); });
-            } catch (eLinks2) { }
-        }
-
-        for (var i = 0; i < links.length; i++) {
-            var a = links[i];
-            if (!a || !a.textContent) continue;
-            // Skip links inside our own extension widgets
-            if (a.closest && (a.closest('[data-dtu-ext]') || a.closest('[data-dtu-campusnet-semester-twin]'))) continue;
-            // Skip links inside archived elements sections
-            if (a.closest && a.closest('.archived-element')) continue;
-            // Skip links inside non-course sections in header/dropdowns when detectable.
-            try {
-                var section = a.closest('.group-menu__item, section');
-                var titleEl = section ? section.querySelector('.item__title') : null;
-                var sectionTitle = normalizeWhitespace(titleEl ? titleEl.textContent : '').toLowerCase();
-                if (sectionTitle && (sectionTitle.indexOf('project') > -1 || sectionTitle.indexOf('group') > -1 || sectionTitle.indexOf('shortcut') > -1)) {
-                    continue;
-                }
-            } catch (eSec) { }
-
-            var text = normalizeWhitespace(a.textContent);
-            var m = text.match(codeRe);
-            if (!m) continue;
-            var code = m[1].toUpperCase();
-            if (!isCampusnetLikelyAcademicCourse(code, text, { title: text, linkText: text })) continue;
-
-            // Try to extract semester from the link text; default to current semester for frontpage active courses
-            var sem = parseDTUSemesterFromText(text) || currentSem;
-
-            // Only seed if not already present (avoid overwriting archived flag on existing entries)
-            var existing = null;
-            for (var c = 0; c < intel.self.courses.length; c++) {
-                var ec = intel.self.courses[c];
-                if (ec && ec.code === code && ec.semester === sem) { existing = ec; break; }
-            }
-            if (!existing) {
-                intel.self.courses.push({ code: code, semester: sem, source: 'frontpage' }); // No archived flag = active
-                seeded = true;
-            } else {
-                // If this course/semester exists but was archived (or unknown source),
-                // frontpage "Courses" section proves it is currently active.
-                var touched = false;
-                if (existing.archived) {
-                    delete existing.archived;
-                    touched = true;
-                }
-                if (!existing.source || String(existing.source).toLowerCase() === 'frontpage') {
-                    if (existing.source !== 'frontpage') {
-                        existing.source = 'frontpage';
-                        touched = true;
-                    }
-                }
-                if (touched) seeded = true;
-            }
-        }
-
-        if (seeded) {
-            try { saveParticipantIntel(intel); } catch (e) { }
-        }
-        return seeded;
-    }
-
     // ---- Feature 3: Contextual Memory ("Where do I know you from?") ----
 
     function annotateParticipantHistory() {
@@ -2799,7 +2198,6 @@
         isFeatureFlagEnabled: isFeatureFlagEnabled,
         featureParticipantIntelKey: FEATURE_PARTICIPANT_INTEL_KEY,
         featureParticipantIntelSharedHistoryKey: FEATURE_PARTICIPANT_INTEL_SHARED_HISTORY_KEY,
-        featureParticipantIntelSemesterTwinsKey: FEATURE_PARTICIPANT_INTEL_SEMESTER_TWINS_KEY,
         markExt: markExt,
         isDarkMode: function () { return !!darkModeEnabled; },
         participantIntelMaxStudents: PARTICIPANT_INTEL_MAX_STUDENTS
@@ -2872,7 +2270,6 @@
 
         var demographicsEnabled = isFeatureFlagEnabled(FEATURE_PARTICIPANT_INTEL_DEMOGRAPHICS_KEY);
         var sharedHistoryEnabled = isFeatureFlagEnabled(FEATURE_PARTICIPANT_INTEL_SHARED_HISTORY_KEY);
-        var semesterTwinsEnabled = isFeatureFlagEnabled(FEATURE_PARTICIPANT_INTEL_SEMESTER_TWINS_KEY);
         var retentionEnabled = isFeatureFlagEnabled(FEATURE_PARTICIPANT_INTEL_RETENTION_KEY);
 
         if (isCampusnetParticipantPage()) {
@@ -2895,7 +2292,7 @@
 
             // Prefer showing all users on one page (max page size is typically 1500).
             // This makes composition + history badges accurate without requiring manual pagination.
-            if (demographicsEnabled || sharedHistoryEnabled || semesterTwinsEnabled) {
+            if (demographicsEnabled || sharedHistoryEnabled) {
                 if (ensureCampusnetParticipantsPageSizeMax()) {
                     // Retention uses the header "Users (N)" count, so it can still run immediately.
                     if (retentionEnabled) recordRetentionSnapshot();
@@ -2912,7 +2309,7 @@
                     pageSizeAdjustTs = Number(coreApi.getParticipantIntelPageSizeAdjustTs()) || 0;
                 }
             } catch (ePageTs) { pageSizeAdjustTs = 0; }
-            if ((demographicsEnabled || sharedHistoryEnabled || semesterTwinsEnabled)
+            if ((demographicsEnabled || sharedHistoryEnabled)
                 && pageSizeAdjustTs && (Date.now() - pageSizeAdjustTs) < 5500) {
                 var totalUsers = getCampusnetUsersCountFromPage();
                 var loadedUsers = getCampusnetUsersParticipantElements().length;
@@ -2933,7 +2330,7 @@
                 } catch (ePageReset) { }
             }
 
-            if (sharedHistoryEnabled || semesterTwinsEnabled) collectParticipantData();
+            if (sharedHistoryEnabled) collectParticipantData();
             if (demographicsEnabled) insertParticipantDemographics();
             if (sharedHistoryEnabled) {
                 // Delay slightly so the storage write from collectParticipantData has time to settle.
@@ -3935,7 +3332,6 @@
             }
             // Settings are accessible through the injected Learn nav Settings button.
             insertDeadlinesHomepageWidget();
-            removeDTULearnSemesterTwinWidget();
             if (refreshBus && isDTULearnHomepage()) {
                 updateBusDepartures();
             }
@@ -3947,7 +3343,6 @@
             insertGPASimulator();
             syncCampusnetActualGradeExclusionControls();
             insertParticipantIntelligence();
-            insertCampusnetSemesterTwinWidget();
         }
         if (host === 'studieplan.dtu.dk') {
             scheduleStudyplanExamCluster(refreshBus ? 260 : 760);

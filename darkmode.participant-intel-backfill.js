@@ -455,8 +455,7 @@
         }
 
         var sharedHistoryEnabled = deps.isFeatureFlagEnabled(deps.featureParticipantIntelSharedHistoryKey);
-        var semesterTwinsEnabled = deps.isFeatureFlagEnabled(deps.featureParticipantIntelSemesterTwinsKey);
-        if (!deps.isFeatureFlagEnabled(deps.featureParticipantIntelKey) || (!sharedHistoryEnabled && !semesterTwinsEnabled)) {
+        if (!deps.isFeatureFlagEnabled(deps.featureParticipantIntelKey) || !sharedHistoryEnabled) {
             if (existing) existing.remove();
             return;
         }
@@ -593,7 +592,7 @@
 
                 var note = document.createElement('div');
                 deps.markExt(note);
-                note.textContent = 'Scans your past courses to find classmates for Semester Twins. Data is stored locally on your device.';
+                note.textContent = 'Scans your past courses to build your local shared-course history. Data is stored locally on your device.';
                 note.style.cssText = 'font-size:11px;opacity:0.6;margin-top:10px;line-height:1.35;';
                 widget.appendChild(note);
 

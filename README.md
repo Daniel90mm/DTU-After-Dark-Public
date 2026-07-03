@@ -32,7 +32,7 @@ Chrome Web Store: https://chromewebstore.google.com/detail/dtu-after-dark/hemonf
 ### CampusNet
 
 - GPA toolkit on the Grades page: weighted GPA, projected GPA simulation, ECTS progress, and ignore/restore controls for official grade rows.
-- Participant intelligence features: course composition, shared course history, Semester Twins with expandable shared-course matching, and a visible Retention Radar summary on CampusNet participant pages.
+- Participant intelligence features (opt-in): course composition, shared course history, and a visible Retention Radar summary on CampusNet participant pages.
 - Dark mode and accent cleanup across Grades, courses, groups, participant pages, and other student-facing CampusNet views.
 
 ### Study Planner
