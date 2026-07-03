@@ -21,9 +21,6 @@ This repo is still centered around a large content script, but the runtime bound
 - `darkmode.library.js`
   - Extracted DTU Learn library nav/panel shell.
   - Owns the Library nav item, modal open/close flow, quick links, and events/news list UI.
-- `darkmode.book-finder.js`
-  - Extracted DTU Learn book-finder shell.
-  - Owns ISBN/title detection on course pages and link-bar rendering for library/bookshop/marketplace searches.
 - `darkmode.learn-nav.js`
   - Extracted DTU Learn nav shell.
   - Owns `Student Resources` quick-link injection/reordering, `Help` removal, and the `Settings` nav item insertion.
@@ -61,9 +58,9 @@ This repo is still centered around a large content script, but the runtime bound
 - `darkmode.kurser-course-eval.js`
   - Extracted `kurser.dtu.dk` course-evaluation shell.
   - Owns evaluation discovery, retry logic, fetch/render flow, and the evaluation panel UI.
-- `darkmode.kurser-textbooks.js`
-  - Extracted `kurser.dtu.dk` textbook-linker shell.
-  - Owns literature detection, citation parsing, FindIt/Google Books link injection, and rollback/rehydration of literature sections.
+- `darkmode.textbooks.js`
+  - Shared textbook-links module for `kurser.dtu.dk` and DTU Learn.
+  - Owns kurser literature detection, citation parsing, FindIt/Google Books link injection, and the Learn course-page ISBN/title book-finder bars, behind one feature flag.
 - `darkmode.lessons-bulk.js`
   - Extracted DTU Learn Lessons bulk-download runtime module.
   - Owns the control lifecycle, section-tree parsing, legacy/API fallback resolution, file discovery, and bundled/native download flow.
@@ -107,9 +104,6 @@ This repo is still centered around a large content script, but the runtime bound
 - DTU Learn library panel shell:
   - `darkmode.library.js`
   - Nav insertion, modal lifecycle, quick links, events/news panels.
-- DTU Learn book finder:
-  - `darkmode.book-finder.js`
-  - Course-page ISBN/title detection and injected search-link bars.
 - DTU Learn nav shell:
   - `darkmode.learn-nav.js`
   - Student Resources quick-link injection/reordering, Help-menu removal, and Settings-nav insertion.
@@ -146,9 +140,9 @@ This repo is still centered around a large content script, but the runtime bound
 - Kurser course-evaluation shell:
   - `darkmode.kurser-course-eval.js`
   - Evaluation link discovery, retry/backoff flow, and evaluation panel rendering.
-- Kurser textbook-linker shell:
-  - `darkmode.kurser-textbooks.js`
-  - Literature section detection, citation parsing, FindIt/Google Books action rendering, and section restructuring/rollback.
+- Textbook links (kurser + Learn):
+  - `darkmode.textbooks.js`
+  - Literature section detection, citation parsing, FindIt/Google Books action rendering, section restructuring/rollback, and Learn book-finder bars.
 - DTU Learn Lessons bulk-download runtime:
   - `darkmode.lessons-bulk.js`
   - Lessons-page mount logic, section discovery, legacy/API fallback resolution, and bundled/native download flow.
@@ -254,10 +248,11 @@ When editing `darkmode.js`, start with `rg` on the feature entrypoint instead of
 - Kurser course evaluation:
   - `darkmode.kurser-course-eval.js`
   - `insertKurserCourseEvaluation`
-- Kurser textbook linker:
-  - `darkmode.kurser-textbooks.js`
+- Textbook links:
+  - `darkmode.textbooks.js`
   - `insertKurserTextbookLinks`
   - `scheduleKurserTextbookLinker`
+  - `insertBookFinderLinks`
 - Bus:
   - `updateBusDepartures`
   - `showBusSetupPrompt`
@@ -311,7 +306,6 @@ For most feature work:
 3. Check `README.md` and `changes.md` before finishing.
 4. Run a focused syntax/build verification:
    - `node --check darkmode.js`
-   - `node --check darkmode.book-finder.js` when touching the DTU Learn book-finder shell
    - `node --check darkmode.learn-nav.js` when touching the DTU Learn nav shell
    - `node --check darkmode.learn-accent-shell.js` when touching DTU Learn accent-band or legacy LMS shell styling
    - `node --check darkmode.learn-shell.js` when touching the DTU Learn shell extras
@@ -324,7 +318,7 @@ For most feature work:
    - `node --check darkmode.library.js` when touching the library shell
    - `node --check darkmode.deadlines.js` when touching the deadlines widget shell
    - `node --check darkmode.kurser-course-eval.js` when touching the kurser course-evaluation shell
-   - `node --check darkmode.kurser-textbooks.js` when touching the kurser textbook-linker shell
+   - `node --check darkmode.textbooks.js` when touching the shared textbook-links module
    - `node --check darkmode.kurser-widgets.js` when touching the kurser course-widget shell
    - `node --check darkmode.studyplan-runtime.js` when touching Study Planner exam parsing/timeline runtime
    - `node --check darkmode.lessons-bulk.js` when touching the Lessons bulk-download runtime

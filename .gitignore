@@ -12,7 +12,6 @@
 !/config.js
 !/darkmode.css
 !/darkmode.js
-!/darkmode.book-finder.js
 !/darkmode.bus.js
 !/darkmode.campusnet-gpa.js
 !/darkmode.content-shortcut.js
@@ -26,16 +25,14 @@
 !/darkmode.smart-room-linker.js
 !/darkmode.studyplanner-shell.js
 !/darkmode.kurser-course-eval.js
-!/darkmode.kurser-textbooks.js
+!/darkmode.textbooks.js
 !/darkmode.library.js
 !/darkmode.kurser-widgets.js
 !/darkmode.lessons-bulk.js
 !/darkmode.participant-intel-backfill.js
 !/darkmode.participant-intel-core.js
 !/darkmode.participant-intel-host.js
-!/darkmode.participant-intel-scoring.js
 !/darkmode.participant-intel-ui.js
-!/darkmode.semester-twins.js
 !/darkmode.studyplan-exams.js
 !/darkmode.studyplan-runtime.js
 !/manifest.json

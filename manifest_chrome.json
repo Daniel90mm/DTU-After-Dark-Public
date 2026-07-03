@@ -58,7 +58,7 @@
     },
     {
       "matches": ["*://learn.inside.dtu.dk/*"],
-      "js": ["darkmode.book-finder.js", "darkmode.learn-nav.js", "darkmode.learn-shell.js", "darkmode.settings.js", "darkmode.bus.js", "darkmode.content-shortcut.js", "darkmode.participant-intel-host.js", "darkmode.participant-intel-core.js", "darkmode.library.js", "darkmode.deadlines.js", "darkmode.lessons-bulk.js"],
+      "js": ["darkmode.textbooks.js", "darkmode.learn-nav.js", "darkmode.learn-shell.js", "darkmode.settings.js", "darkmode.bus.js", "darkmode.content-shortcut.js", "darkmode.participant-intel-host.js", "darkmode.participant-intel-core.js", "darkmode.library.js", "darkmode.deadlines.js", "darkmode.lessons-bulk.js"],
       "run_at": "document_start",
       "all_frames": false
     },
@@ -101,7 +101,7 @@
     },
     {
       "matches": ["*://kurser.dtu.dk/*"],
-      "js": ["darkmode.studyplanner-shell.js", "darkmode.kurser-widgets.js", "darkmode.kurser-course-eval.js", "darkmode.kurser-textbooks.js"],
+      "js": ["darkmode.studyplanner-shell.js", "darkmode.kurser-widgets.js", "darkmode.kurser-course-eval.js", "darkmode.textbooks.js"],
       "run_at": "document_start",
       "all_frames": false
     },

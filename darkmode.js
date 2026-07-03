@@ -439,9 +439,8 @@
 
     // ===== FEATURE FLAGS (extension-wide) =====
     // These toggles live in extension storage so they apply across all DTU domains.
-    const FEATURE_BOOK_FINDER_KEY = 'dtuAfterDarkFeatureBookFinder';
     const FEATURE_KURSER_GRADE_STATS_KEY = 'dtuAfterDarkFeatureKurserGradeStats';
-    const FEATURE_KURSER_TEXTBOOK_LINKER_KEY = 'dtuAfterDarkFeatureKurserTextbookLinker';
+    const FEATURE_TEXTBOOK_LINKS_KEY = 'dtuAfterDarkFeatureKurserTextbookLinker';
     const FEATURE_CONTENT_SHORTCUT_KEY = 'dtuAfterDarkFeatureContentShortcut';
     const FEATURE_CAMPUSNET_GPA_TOOLS_KEY = 'dtuAfterDarkFeatureCampusnetGpaTools';
     const FEATURE_STUDYPLAN_EXAM_CLUSTER_KEY = 'dtuAfterDarkFeatureStudyplanExamCluster';
@@ -465,9 +464,8 @@
     const PARTICIPANT_INTEL_MAX_RETENTION = 20;
 
     const FEATURE_FLAG_DEFAULTS = {
-        [FEATURE_BOOK_FINDER_KEY]: true,
         [FEATURE_KURSER_GRADE_STATS_KEY]: true,
-        [FEATURE_KURSER_TEXTBOOK_LINKER_KEY]: true,
+        [FEATURE_TEXTBOOK_LINKS_KEY]: true,
         [FEATURE_CONTENT_SHORTCUT_KEY]: true,
         [FEATURE_CAMPUSNET_GPA_TOOLS_KEY]: true,
         [FEATURE_STUDYPLAN_EXAM_CLUSTER_KEY]: false,
@@ -1019,6 +1017,15 @@
                 _twinCleanupStorage.area.remove(['dtuAfterDarkFeatureParticipantIntelSemesterTwins', 'dtuAfterDarkSemesterTwinPrefsV1']);
             }
         } catch (eTwinCleanup) { }
+        storageLocalGet({ dtuAfterDarkFeatureBookFinder: null }, function (legacyBf) {
+            if (legacyBf && legacyBf.dtuAfterDarkFeatureBookFinder === false) {
+                setFeatureFlagEnabled(FEATURE_TEXTBOOK_LINKS_KEY, false);
+            }
+            try {
+                var _bfCleanupStorage = getExtensionStorageArea();
+                if (_bfCleanupStorage) _bfCleanupStorage.area.remove('dtuAfterDarkFeatureBookFinder');
+            } catch (eBfCleanup) { }
+        });
         storageLocalGet(FEATURE_FLAG_DEFAULTS, function (flags) {
             _featureFlags = Object.assign({}, FEATURE_FLAG_DEFAULTS, flags || {});
             _featureFlagsLoaded = true;
@@ -1454,10 +1461,9 @@
             applyAfterDarkAdminMenuThemeVars: applyAfterDarkAdminMenuThemeVars,
             getFeatureKeys: function () {
                 return {
-                    bookFinder: FEATURE_BOOK_FINDER_KEY,
                     campusnetGpaTools: FEATURE_CAMPUSNET_GPA_TOOLS_KEY,
                     kurserGradeStats: FEATURE_KURSER_GRADE_STATS_KEY,
-                    kurserTextbookLinker: FEATURE_KURSER_TEXTBOOK_LINKER_KEY,
+                    textbookLinks: FEATURE_TEXTBOOK_LINKS_KEY,
                     studyplanExamCluster: FEATURE_STUDYPLAN_EXAM_CLUSTER_KEY,
                     kurserCourseEval: FEATURE_KURSER_COURSE_EVAL_KEY,
                     kurserRoomFinder: FEATURE_KURSER_ROOM_FINDER_KEY,
@@ -2617,26 +2623,8 @@
         return (sum + last) % 11 === 0;
     }
 
-    function getBookFinderApi() {
-        try { return globalThis.DTUAfterDarkBookFinderUi || null; } catch (e0) { return null; }
-    }
-
-    try {
-        globalThis.DTUAfterDarkBookFinderDeps = {
-            isTopWindow: function () { return IS_TOP_WINDOW; },
-            isFeatureFlagEnabled: isFeatureFlagEnabled,
-            isDTULearnCoursePage: isDTULearnCoursePage,
-            isDarkModeEnabled: isDarkModeEnabled,
-            normalizeISBN: normalizeISBN,
-            isValidISBN13: isValidISBN13,
-            isValidISBN10: isValidISBN10,
-            isNotesOnlyLiterature: isNotesOnlyLiterature,
-            featureBookFinderKey: FEATURE_BOOK_FINDER_KEY
-        };
-    } catch (eBookFinderDeps) { }
-
     function insertBookFinderLinks() {
-        var api = getBookFinderApi();
+        var api = getTextbooksApi();
         if (api && typeof api.insertBookFinderLinks === 'function') {
             api.insertBookFinderLinks();
         }
@@ -2655,36 +2643,37 @@
         return false;
     }
 
-    // ===== TEXTBOOK LINKER (kurser.dtu.dk Course literature) =====
-    function getKurserTextbooksApi() {
-        try { return globalThis.DTUAfterDarkKurserTextbooksUi || null; } catch (e0) { return null; }
+    // ===== TEXTBOOK LINKS (kurser.dtu.dk Course literature + Learn Book Finder) =====
+    function getTextbooksApi() {
+        try { return globalThis.DTUAfterDarkTextbooksUi || null; } catch (e0) { return null; }
     }
 
     try {
-        globalThis.DTUAfterDarkKurserTextbooksDeps = {
+        globalThis.DTUAfterDarkTextbooksDeps = {
             sendRuntimeMessage: sendRuntimeMessage,
             markExt: markExt,
             isTopWindow: function () { return IS_TOP_WINDOW; },
             isFeatureFlagEnabled: isFeatureFlagEnabled,
             isKurserCoursePage: isKurserCoursePage,
+            isDTULearnCoursePage: isDTULearnCoursePage,
             isDarkModeEnabled: isDarkModeEnabled,
             normalizeISBN: normalizeISBN,
             isValidISBN13: isValidISBN13,
             isValidISBN10: isValidISBN10,
             isNotesOnlyLiterature: isNotesOnlyLiterature,
-            featureKurserTextbookLinkerKey: FEATURE_KURSER_TEXTBOOK_LINKER_KEY
+            featureTextbookLinksKey: FEATURE_TEXTBOOK_LINKS_KEY
         };
-    } catch (eKurserTextbooksDeps) { }
+    } catch (eTextbooksDeps) { }
 
     function insertKurserTextbookLinks() {
-        var api = getKurserTextbooksApi();
+        var api = getTextbooksApi();
         if (api && typeof api.insertKurserTextbookLinks === 'function') {
             api.insertKurserTextbookLinks();
         }
     }
 
     function scheduleKurserTextbookLinker(delayMs) {
-        var api = getKurserTextbooksApi();
+        var api = getTextbooksApi();
         if (api && typeof api.scheduleKurserTextbookLinker === 'function') {
             api.scheduleKurserTextbookLinker(delayMs);
         }
@@ -3251,7 +3240,7 @@
 
     function scheduleBookFinderScan(delayMs) {
         if (!IS_TOP_WINDOW || !isDTULearnCoursePage()) return;
-        if (!isFeatureFlagEnabled(FEATURE_BOOK_FINDER_KEY)) return;
+        if (!isFeatureFlagEnabled(FEATURE_TEXTBOOK_LINKS_KEY)) return;
         if (_bookFinderTimer) return;
         _bookFinderTimer = setTimeout(function () {
             _bookFinderTimer = null;

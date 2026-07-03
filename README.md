@@ -26,7 +26,7 @@ Chrome Web Store: https://chromewebstore.google.com/detail/dtu-after-dark/hemonf
 - Library panel with live occupancy, crowding trends, upcoming events, news, and quick-access links.
 - Course-card `Content` shortcut with per-course override management.
 - Course content download tools for Lessons pages, including section picking and optional single-ZIP bundling.
-- Book Finder that detects textbook references on Learn pages and links out to relevant sources.
+- Textbook Links that detect textbook references on Learn pages and link out to relevant sources (shared with the kurser.dtu.dk literature linker).
 - Smart Room Links that turn room mentions into click-to-resolve MazeMap links.
 
 ### CampusNet
@@ -44,7 +44,7 @@ Chrome Web Store: https://chromewebstore.google.com/detail/dtu-after-dark/hemonf
 - Grade statistics panel with pass-rate and grade-distribution data in a flatter dashboard-style course insight panel.
 - Course evaluation summary panel with satisfaction/workload snapshots and a link to the full evaluation, using the same calmer course-insight layout.
 - MyLine curriculum badges such as `Mandatory`, `Core`, `Elective pool`, and `Approved elective`.
-- Textbook Links that parse course literature sections and add direct library and book-source links.
+- Textbook Links that parse course literature sections and add direct library and book-source links (same module and toggle as the Learn book finder).
 - Smart room linking for recognizable building/room mentions on supported pages.
 
 ### Integrations and data sources

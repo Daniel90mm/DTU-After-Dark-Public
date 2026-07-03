@@ -275,14 +275,19 @@
 
     function applyFeatureToggleImmediately(featureKey, enabled) {
         var featureKeys = getFeatureKeys();
-        if (featureKey === featureKeys.bookFinder) {
-            if (enabled) {
-                insertBookFinderLinks();
-            } else {
-                document.querySelectorAll('[data-book-finder-bar]').forEach(function (el) { el.remove(); });
-                document.querySelectorAll('[data-book-finder-injected]').forEach(function (el) {
-                    el.removeAttribute('data-book-finder-injected');
-                });
+        if (featureKey === featureKeys.textbookLinks) {
+            if (window.location.hostname === 'learn.inside.dtu.dk') {
+                if (enabled) {
+                    insertBookFinderLinks();
+                } else {
+                    document.querySelectorAll('[data-book-finder-bar]').forEach(function (el) { el.remove(); });
+                    document.querySelectorAll('[data-book-finder-injected]').forEach(function (el) {
+                        el.removeAttribute('data-book-finder-injected');
+                    });
+                }
+            }
+            if (window.location.hostname === 'kurser.dtu.dk') {
+                insertKurserTextbookLinks();
             }
         }
         if (featureKey === featureKeys.campusnetGpaTools && window.location.hostname === 'campusnet.dtu.dk') {
@@ -293,9 +298,6 @@
         }
         if (featureKey === featureKeys.kurserGradeStats && window.location.hostname === 'kurser.dtu.dk') {
             insertKurserGradeStats();
-        }
-        if (featureKey === featureKeys.kurserTextbookLinker && window.location.hostname === 'kurser.dtu.dk') {
-            insertKurserTextbookLinks();
         }
         if (featureKey === featureKeys.studyplanExamCluster && window.location.hostname === 'studieplan.dtu.dk') {
             scheduleStudyplanExamCluster(80);
@@ -910,8 +912,7 @@
             { id: 'feature-participant-intel-shared-history-toggle', key: featureKeys.participantIntelSharedHistory },
             { id: 'feature-participant-intel-retention-toggle', key: featureKeys.participantIntelRetention },
             { id: 'feature-kurser-grade-stats-toggle', key: featureKeys.kurserGradeStats },
-            { id: 'feature-book-finder-toggle', key: featureKeys.bookFinder },
-            { id: 'feature-kurser-textbook-linker-toggle', key: featureKeys.kurserTextbookLinker },
+            { id: 'feature-textbook-links-toggle', key: featureKeys.textbookLinks },
             { id: 'feature-kurser-course-eval-toggle', key: featureKeys.kurserCourseEval },
             { id: 'feature-kurser-myline-badges-toggle', key: featureKeys.kurserMyLineBadges },
             { id: 'feature-kurser-room-finder-toggle', key: featureKeys.kurserRoomFinder },
@@ -978,8 +979,7 @@
             {
                 id: 'course-catalog', label: 'Course Catalog', desc: 'Enhancements for kurser.dtu.dk and course resource pages', items: [
                     { tid: 'feature-kurser-grade-stats-toggle', title: 'Grade Statistics', desc: 'Show pass rates and grade histograms' },
-                    { tid: 'feature-book-finder-toggle', title: 'Book Finder', desc: 'Find textbooks from DTU Learn pages' },
-                    { tid: 'feature-kurser-textbook-linker-toggle', title: 'Textbook Links', desc: 'Direct links to textbooks on DTU FindIt' },
+                    { tid: 'feature-textbook-links-toggle', title: 'Textbook Links', desc: 'Textbook source links on DTU Learn and kurser.dtu.dk' },
                     { tid: 'feature-kurser-course-eval-toggle', title: 'Course Evaluation', desc: 'Show evaluation scores on course pages' },
                     { tid: 'feature-kurser-myline-badges-toggle', title: 'MyLine Curriculum Badges', desc: 'Mark courses as Mandatory/Core/Elective pool based on your study line' },
                     { tid: 'feature-kurser-room-finder-toggle', title: 'Room Finder', desc: 'Clickable room numbers with locations' },

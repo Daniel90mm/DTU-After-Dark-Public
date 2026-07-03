@@ -3318,7 +3318,6 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
     function syncAfterDarkFeatureToggleStates() {
         if (!isTopWindow()) return;
         const mapping = [
-            { id: 'feature-book-finder-toggle', key: FEATURE_BOOK_FINDER_KEY },
             { id: 'feature-content-shortcut-toggle', key: FEATURE_CONTENT_SHORTCUT_KEY },
             { id: 'feature-learn-nav-resource-links-toggle', key: FEATURE_LEARN_NAV_RESOURCE_LINKS_KEY },
             { id: 'feature-kurser-grade-stats-toggle', key: FEATURE_KURSER_GRADE_STATS_KEY },
@@ -3326,7 +3325,7 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
             { id: 'feature-kurser-room-finder-toggle', key: FEATURE_KURSER_ROOM_FINDER_KEY },
 
             { id: 'feature-smart-room-linker-toggle', key: FEATURE_SMART_ROOM_LINKER_KEY },
-            { id: 'feature-kurser-textbook-linker-toggle', key: FEATURE_KURSER_TEXTBOOK_LINKER_KEY },
+            { id: 'feature-textbook-links-toggle', key: FEATURE_TEXTBOOK_LINKS_KEY },
             { id: 'feature-kurser-schedule-annotation-toggle', key: FEATURE_KURSER_SCHEDULE_ANNOTATION_KEY },
             { id: 'feature-kurser-myline-badges-toggle', key: FEATURE_KURSER_MYLINE_BADGES_KEY },
             { id: 'feature-campusnet-gpa-tools-toggle', key: FEATURE_CAMPUSNET_GPA_TOOLS_KEY },
@@ -3368,10 +3367,9 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
                 applyAfterDarkAdminMenuThemeVars: applyAfterDarkAdminMenuThemeVars,
                 getFeatureKeys: function () {
                     return {
-                        bookFinder: FEATURE_BOOK_FINDER_KEY,
                         campusnetGpaTools: FEATURE_CAMPUSNET_GPA_TOOLS_KEY,
                         kurserGradeStats: FEATURE_KURSER_GRADE_STATS_KEY,
-                        kurserTextbookLinker: FEATURE_KURSER_TEXTBOOK_LINKER_KEY,
+                        textbookLinks: FEATURE_TEXTBOOK_LINKS_KEY,
                         studyplanExamCluster: FEATURE_STUDYPLAN_EXAM_CLUSTER_KEY,
                         kurserCourseEval: FEATURE_KURSER_COURSE_EVAL_KEY,
                         kurserRoomFinder: FEATURE_KURSER_ROOM_FINDER_KEY,
