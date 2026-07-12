@@ -1330,10 +1330,6 @@
         d2l-menu-item,
         button[aria-haspopup="true"][aria-label^="Actions for"],
         d2l-dropdown-context-menu button[aria-label^="Actions for"],
-        d2l-floating-buttons,
-        .d2l-floating-buttons-container,
-        .d2l-floating-buttons,
-        .d2l-floating-buttons-inner-container,
         div[role="list"]:not(.d2l-navigation-s-main-wrapper),
         d2l-breadcrumb,
         d2l-breadcrumbs,
@@ -1350,6 +1346,9 @@
     `;
 
     const LIGHTER_DARK_SELECTORS = `
+        d2l-floating-buttons,
+        .d2l-floating-buttons-container,
+        .d2l-floating-buttons-inner-container,
         .d2l-navigation-s-main-wrapper,
         .d2l-navigation-s-main-wrapper *,
         .d2l-navigation-s-item,
