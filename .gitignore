@@ -65,6 +65,7 @@
 !/scripts/audit-unused-functions.mjs
 !/scripts/build-chrome.ps1
 !/scripts/build-firefox.ps1
+!/scripts/build.mjs
 !/scripts/instrument-function-hits.mjs
 !/scripts/make-chrome-webstore-screenshots.ps1
 

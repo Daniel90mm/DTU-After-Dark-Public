@@ -94,6 +94,11 @@ Information shown by the extension, including exam dates, deadlines, grades, roo
 
 ## Build
 
+Build both browser packages with `node scripts/build.mjs`.
+
+To build only one target, run `node scripts/build.mjs firefox` or `node scripts/build.mjs chrome`.
+The existing PowerShell builders remain available on Windows:
+
 1. Firefox: `powershell -ExecutionPolicy Bypass -File .\scripts\build-firefox.ps1`
 2. Chrome: `powershell -ExecutionPolicy Bypass -File .\scripts\build-chrome.ps1`
 

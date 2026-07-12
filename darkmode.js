@@ -1801,17 +1801,6 @@
         return chosen;
     }
 
-    // ===== MOJANGLES TOGGLE IN ADMIN TOOLS =====
-    function insertMojanglesToggle() {
-    }
-
-    // ===== DARK MODE TOGGLE (works in both dark and light modes) =====
-    function insertDarkModeToggle() {
-    }
-
-    function insertSettingsAdminEntry() {
-    }
-
     // ===== CONTEXT CAPTURE HELPER =====
     // Dev-only helper. Must stay disabled in release builds.
     function setupContextCaptureHotkey() {
