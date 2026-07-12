@@ -920,6 +920,39 @@
                         background-color: transparent !important;
                     }
                 `;
+            } else if (tagName === 'd2l-button-icon') {
+                // Lessons navigation's Search and Course handbook controls use
+                // a white native hover fill, which hides their light glyphs.
+                styleId = 'dark-mode-shadow-styles-lessons-button-icon';
+                styleText = `
+                    :host([icon="tier1:search"]),
+                    :host([icon="tier1:arrow-collapse-small"]),
+                    :host([icon="tier1:arrow-expand-small"]) {
+                        color: ${DARK_TEXT} !important;
+                    }
+                    :host([icon="tier1:search"]) button,
+                    :host([icon="tier1:arrow-collapse-small"]) button,
+                    :host([icon="tier1:arrow-expand-small"]) button {
+                        background-color: transparent !important;
+                        color: ${DARK_TEXT} !important;
+                    }
+                    :host([icon="tier1:search"]) button:hover,
+                    :host([icon="tier1:search"]) button:focus,
+                    :host([icon="tier1:search"]) button:focus-visible,
+                    :host([icon="tier1:search"]) button:active,
+                    :host([icon="tier1:arrow-collapse-small"]) button:hover,
+                    :host([icon="tier1:arrow-collapse-small"]) button:focus,
+                    :host([icon="tier1:arrow-collapse-small"]) button:focus-visible,
+                    :host([icon="tier1:arrow-collapse-small"]) button:active,
+                    :host([icon="tier1:arrow-expand-small"]) button:hover,
+                    :host([icon="tier1:arrow-expand-small"]) button:focus,
+                    :host([icon="tier1:arrow-expand-small"]) button:focus-visible,
+                    :host([icon="tier1:arrow-expand-small"]) button:active {
+                        background-color: #3d3d3d !important;
+                        background-image: none !important;
+                        color: ${DARK_TEXT} !important;
+                    }
+                `;
             } else if (tagName === 'd2l-calendar') {
                 // Mini-month date grid renders as <button class="d2l-calendar-date">
                 // inside this shadow root, so the page stylesheet can't reach it
