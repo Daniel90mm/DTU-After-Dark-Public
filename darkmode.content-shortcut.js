@@ -544,11 +544,10 @@
             position: absolute !important;
             bottom: 6px !important;
             right: 6px !important;
-            /* Centre the book glyph on the native pin action above it. */
-            transform: translate(157px, 60px) !important;
-            min-width: 52px !important;
+            transform: translate(175px, 63px) !important;
+            min-width: 42px !important;
             min-height: 42px !important;
-            width: 52px !important;
+            width: 42px !important;
             height: 42px !important;
             display: flex !important;
             align-items: center !important;
