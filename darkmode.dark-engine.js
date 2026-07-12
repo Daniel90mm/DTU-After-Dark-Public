@@ -508,58 +508,6 @@
         .d2l-card-separator {
             border-color: ${DARK_BORDER} !important;
         }
-        a.dtu-dark-content-btn,
-        a.dtu-dark-content-btn:link,
-        a.dtu-dark-content-btn:visited {
-            position: absolute !important;
-            bottom: 6px !important;
-            right: 6px !important;
-            transform: translate(195px, 60px) !important;
-            min-width: 42px !important;
-            min-height: 42px !important;
-            width: 42px !important;
-            height: 42px !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            border-radius: 6px !important;
-            background-color: #2d2d2d !important;
-            color: #ffffff !important;
-            font-size: 18px !important;
-            font-family: sans-serif !important;
-            text-decoration: none !important;
-            cursor: pointer !important;
-            z-index: 5 !important;
-            border: none !important;
-            box-sizing: border-box !important;
-            line-height: 1 !important;
-            transition: opacity 0.2s, background-color 0.2s !important;
-            padding: 0 !important;
-            margin: 0 !important;
-            opacity: 0 !important;
-            pointer-events: none !important;
-        }
-        :host(:hover) a.dtu-dark-content-btn,
-        .d2l-card-container:hover a.dtu-dark-content-btn,
-        .d2l-card-header:hover a.dtu-dark-content-btn {
-            opacity: 1 !important;
-            pointer-events: auto !important;
-        }
-        a.dtu-dark-content-btn:hover {
-            background-color: rgba(0, 0, 0, 0.85) !important;
-        }
-        a.dtu-dark-content-btn .dtu-content-shortcut-icon {
-            width: 20px !important;
-            height: 20px !important;
-            display: block !important;
-            color: currentColor !important;
-            fill: none !important;
-            stroke: currentColor !important;
-            stroke-width: 1.8 !important;
-            stroke-linecap: round !important;
-            stroke-linejoin: round !important;
-            pointer-events: none !important;
-        }
     `;
 
     const expandCollapseStyles = `
