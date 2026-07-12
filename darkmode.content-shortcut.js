@@ -544,10 +544,10 @@
             position: absolute !important;
             bottom: 6px !important;
             right: 6px !important;
-            transform: translate(195px, 60px) !important;
-            min-width: 42px !important;
+            transform: translate(179px, 60px) !important;
+            min-width: 52px !important;
             min-height: 42px !important;
-            width: 42px !important;
+            width: 52px !important;
             height: 42px !important;
             display: flex !important;
             align-items: center !important;

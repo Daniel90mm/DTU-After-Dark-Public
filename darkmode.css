@@ -4295,23 +4295,6 @@ form.form-horizontal .form-control {
   color: #b0b0b0 !important;
 }
 
-.dtu-deadlines-rail-widget,
-.dtu-deadlines-rail-widget * {
-  box-sizing: border-box;
-}
-
-.dtu-deadlines-rail-widget,
-.dtu-deadlines-rail-widget [data-dtu-ext] {
-  background-color: transparent !important;
-  background-image: none !important;
-}
-
-.dtu-deadlines-rail-widget .dtu-deadlines-rail-source:focus-visible,
-.dtu-deadlines-rail-widget button[data-dtu-deadlines-chevron]:focus-visible {
-  outline: 2px solid currentColor !important;
-  outline-offset: 3px !important;
-}
-
 /* Quiz submissions histogram (Class Statistics / Grade Distribution) */
 /* Histogram styles intentionally left to default (light) */
 

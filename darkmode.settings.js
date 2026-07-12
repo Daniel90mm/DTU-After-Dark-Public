@@ -349,11 +349,6 @@
                 removeLibraryNavDropdown();
             }
         }
-        if (featureKey === featureKeys.deadlinesTimelineRail && window.location.hostname === 'learn.inside.dtu.dk') {
-            var existingDeadlines = document.querySelector('.dtu-deadlines-home-widget');
-            if (existingDeadlines) existingDeadlines.remove();
-            insertDeadlinesHomepageWidget();
-        }
         if (featureKey === featureKeys.learnLessonsBulkDownload && window.location.hostname === 'learn.inside.dtu.dk') {
             try { runLessonsBulkDownloadChecks(); } catch (eLbd0) { }
         }
@@ -903,7 +898,6 @@
             { id: 'feature-content-shortcut-toggle', key: featureKeys.contentShortcut },
             { id: 'feature-learn-nav-resource-links-toggle', key: featureKeys.learnNavResourceLinks },
             { id: 'library-dropdown-toggle', key: featureKeys.libraryDropdown },
-            { id: 'feature-deadlines-timeline-rail-toggle', key: featureKeys.deadlinesTimelineRail },
             { id: 'feature-lessons-bulk-download-toggle', key: featureKeys.learnLessonsBulkDownload },
             { id: 'feature-lessons-bulk-single-zip-toggle', key: featureKeys.learnLessonsBulkSingleZip },
             { id: 'feature-campusnet-gpa-tools-toggle', key: featureKeys.campusnetGpaTools },
@@ -957,7 +951,6 @@
                 id: 'dashboard', label: 'Dashboard Widgets', desc: 'DTU Learn homepage widgets and dashboard cards', items: [
                     { tid: 'bus-departures-toggle', title: 'Bus Departures', desc: 'Show live bus departure times around campus' },
                     { tid: 'deadlines-toggle', title: 'Deadlines Widget', desc: 'Timeline of upcoming assignments' },
-                    { tid: 'feature-deadlines-timeline-rail-toggle', title: 'Deadlines Timeline', desc: 'Experimental rail redesign for the deadlines widget', subToggleOf: 'deadlines-toggle' },
                     { tid: 'search-widget-toggle', title: 'Course Search', desc: 'Native course search on the dashboard' },
                     { tid: 'feature-lessons-bulk-download-toggle', title: 'Course Content Download', desc: 'Enable course content download tools in DTU Learn Lessons pages' },
                     { tid: 'feature-lessons-bulk-single-zip-toggle', title: 'Bulk Download', desc: 'Download selected section files as one ZIP bundle', subToggleOf: 'feature-lessons-bulk-download-toggle' }

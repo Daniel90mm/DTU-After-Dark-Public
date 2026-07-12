@@ -448,8 +448,6 @@
     const FEATURE_KURSER_ROOM_FINDER_KEY = 'dtuAfterDarkFeatureKurserRoomFinder';
     const FEATURE_KURSER_SCHEDULE_ANNOTATION_KEY = 'dtuAfterDarkFeatureKurserScheduleAnnotation';
     const FEATURE_KURSER_MYLINE_BADGES_KEY = 'dtuAfterDarkFeatureKurserMyLineBadges';
-    const FEATURE_DEADLINES_TIMELINE_RAIL_KEY = 'dtuAfterDarkFeatureDeadlinesTimelineRail';
-
     const FEATURE_SMART_ROOM_LINKER_KEY = 'dtuAfterDarkFeatureSmartRoomLinker';
     const FEATURE_LEARN_NAV_RESOURCE_LINKS_KEY = 'dtuAfterDarkFeatureLearnNavResourceLinks';
     const FEATURE_PARTICIPANT_INTEL_KEY = 'dtuAfterDarkFeatureParticipantIntel';
@@ -473,8 +471,6 @@
         [FEATURE_KURSER_ROOM_FINDER_KEY]: true,
         [FEATURE_KURSER_SCHEDULE_ANNOTATION_KEY]: true,
         [FEATURE_KURSER_MYLINE_BADGES_KEY]: true,
-        [FEATURE_DEADLINES_TIMELINE_RAIL_KEY]: true,
-
         [FEATURE_SMART_ROOM_LINKER_KEY]: true,
         [FEATURE_LEARN_NAV_RESOURCE_LINKS_KEY]: true,
         [FEATURE_PARTICIPANT_INTEL_KEY]: false,
@@ -1367,8 +1363,6 @@
             isDeadlinesEnabled: isDeadlinesEnabled,
             isSearchWidgetEnabled: isSearchWidgetEnabled,
             isDTULearnHomepage: isDTULearnHomepage,
-            isFeatureFlagEnabled: isFeatureFlagEnabled,
-            featureDeadlinesTimelineRailKey: FEATURE_DEADLINES_TIMELINE_RAIL_KEY,
             deepQueryAll: deepQueryAll,
             markExt: markExt,
             normalizeWhitespace: normalizeWhitespace,
@@ -1467,7 +1461,6 @@
                     studyplanExamCluster: FEATURE_STUDYPLAN_EXAM_CLUSTER_KEY,
                     kurserCourseEval: FEATURE_KURSER_COURSE_EVAL_KEY,
                     kurserRoomFinder: FEATURE_KURSER_ROOM_FINDER_KEY,
-                    deadlinesTimelineRail: FEATURE_DEADLINES_TIMELINE_RAIL_KEY,
                     smartRoomLinker: FEATURE_SMART_ROOM_LINKER_KEY,
                     kurserScheduleAnnotation: FEATURE_KURSER_SCHEDULE_ANNOTATION_KEY,
                     contentShortcut: FEATURE_CONTENT_SHORTCUT_KEY,
