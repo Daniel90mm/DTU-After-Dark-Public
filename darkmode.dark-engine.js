@@ -876,24 +876,6 @@
             } else if (tagName === 'd2l-expand-collapse-content' || tagName === 'd2l-lti-launch') {
                 styleId = 'dark-mode-shadow-styles-expand-collapse';
                 styleText = expandCollapseStyles;
-            } else if (tagName === 'd2l-list-item-nav') {
-                // Redesigned Lessons TOC (smart-curriculum app). The current /
-                // hovered item paints a near-white fill on the slotted
-                // outside-control-container div; force the dark-2 panel color
-                // and keep idle rows transparent.
-                styleId = 'dark-mode-shadow-styles-list-item-nav';
-                styleText = `
-                    [slot="outside-control-container"] {
-                        background-color: transparent !important;
-                        border-color: #404040 !important;
-                    }
-                    :host([current]) [slot="outside-control-container"],
-                    :host([_child-current]) [slot="outside-control-container"],
-                    :host(:hover) [slot="outside-control-container"],
-                    :host([_focusing]) [slot="outside-control-container"] {
-                        background-color: #2d2d2d !important;
-                    }
-                `;
             } else if (tagName === 'd2l-button-subtle') {
                 styleId = 'dark-mode-shadow-styles-button-subtle';
                 styleText = buttonSubtleStyles;
