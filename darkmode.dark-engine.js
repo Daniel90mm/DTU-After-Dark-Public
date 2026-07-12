@@ -680,23 +680,24 @@
         a {
             color: #66b3ff !important;
         }
-        /* Nav buttons (e.g. "Course information") render their label with D2L's
-           own dark text (rgb(32,33,34)) even in dark mode, and that color wins
-           over our light-text override. Forcing these containers dark made the
-           dark-on-dark text invisible. Instead, give them a fixed light pill
-           background in BOTH hover and non-hover states so the dark text stays
-           legible. This also overrides D2L's regolith/celestine "current"
-           background; the celestine border is left untouched. */
+        /* Iframe-aware nested shadow processing now reaches the restricted-text
+           label inside these controls, so the old light-pill contrast workaround
+           is no longer needed. Keep contained/current items on dark 2 and use the
+           shared raised hover while leaving D2L's semantic selection borders. */
         [slot="outside-control-container"],
         ::slotted([slot="outside-control-container"]),
         :host([current]),
-        :host([current]) [slot="outside-control-container"],
+        :host([current]) [slot="outside-control-container"] {
+            background-color: ${DARK_BG} !important;
+            background: ${DARK_BG} !important;
+            background-image: none !important;
+        }
         [slot="outside-control-container"]:hover,
         ::slotted([slot="outside-control-container"]):hover,
         :host([current]):hover,
         :host([current]) [slot="outside-control-container"]:hover {
-            background-color: rgb(224, 224, 244) !important;
-            background: rgb(224, 224, 244) !important;
+            background-color: #3d3d3d !important;
+            background: #3d3d3d !important;
             background-image: none !important;
         }
         [slot="supporting-info"],
@@ -1924,6 +1925,53 @@
         }
     }
 
+    function processIframeShadowTree(doc, rootNode) {
+        if (!doc || !rootNode || !shouldUseBrightspaceShadowDomProcessing()) return;
+
+        function processCandidate(node) {
+            if (!node || node.nodeType !== 1 || !node.tagName) return;
+            if (!node.tagName.toLowerCase().startsWith('d2l-')) return;
+            if (shouldExcludeElement(node) || isInsideExcludedContainer(node)) return;
+            if (node.shadowRoot) injectStylesIntoShadowRoot(node.shadowRoot, node);
+            else scheduleShadowHostRetry(node);
+        }
+
+        processCandidate(rootNode);
+        var view = doc.defaultView;
+        var showElement = view && view.NodeFilter ? view.NodeFilter.SHOW_ELEMENT : 1;
+        var walker;
+        try {
+            walker = doc.createTreeWalker(rootNode, showElement, null);
+        } catch (e0) {
+            return;
+        }
+        var node = walker.nextNode();
+        while (node) {
+            processCandidate(node);
+            node = walker.nextNode();
+        }
+    }
+
+    function observeIframeShadowRoots(doc) {
+        if (!doc || !doc.documentElement || doc._dtuDarkModeShadowObserver) return;
+        var view = doc.defaultView;
+        if (!view || !view.MutationObserver) return;
+        try {
+            var observer = new view.MutationObserver(function (mutations) {
+                for (var i = 0; i < mutations.length; i++) {
+                    var mutation = mutations[i];
+                    if (mutation.type !== 'childList') continue;
+                    for (var j = 0; j < mutation.addedNodes.length; j++) {
+                        var added = mutation.addedNodes[j];
+                        if (added && added.nodeType === 1) processIframeShadowTree(doc, added);
+                    }
+                }
+            });
+            observer.observe(doc.documentElement, { childList: true, subtree: true });
+            doc._dtuDarkModeShadowObserver = observer;
+        } catch (e0) { }
+    }
+
     function processIframes(root) {
         const iframes = [];
         if (root.matches && root.matches('iframe')) iframes.push(root);
@@ -1949,6 +1997,8 @@
                 } else if (style.textContent !== iframeStyles) {
                     style.textContent = iframeStyles;
                 }
+                processIframeShadowTree(doc, doc.documentElement);
+                observeIframeShadowRoots(doc);
             } catch (error) { }
         });
     }
