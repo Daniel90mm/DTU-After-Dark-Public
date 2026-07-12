@@ -378,49 +378,53 @@ td.d_gd {
   background-color: transparent !important;
 }
 
-/* Legacy Brightspace data grids (Assignments and similar LMS tools) are real
-   tabular surfaces, unlike the presentation/layout tables above. Keep the
-   table chrome on dark 1, data rows on dark 2, and nested presentation tables
-   transparent so attachment lists inherit their row instead of becoming
-   isolated black rectangles. */
-table.d2l-grid[type="data"] {
+/* Brightspace data grids (legacy `type=data` and newer MVC grids) are real
+   tabular surfaces, unlike the presentation/layout tables above. Keep table
+   chrome on dark 1, data rows on dark 2, and nested presentation tables
+   transparent so rich cell content inherits its row instead of becoming an
+   isolated black rectangle. */
+table.d2l-grid:is([type="data"], .d2l-grid-mvc) {
   background-color: #2d2d2d !important;
   border-color: #404040 !important;
 }
 
-table.d2l-grid[type="data"] > tbody > tr {
+table.d2l-grid:is([type="data"], .d2l-grid-mvc) > tbody > tr {
   background-color: #2d2d2d !important;
 }
 
-table.d2l-grid[type="data"] > tbody > tr > th,
-table.d2l-grid[type="data"] > tbody > tr > td {
+table.d2l-grid:is([type="data"], .d2l-grid-mvc) > tbody > tr > th,
+table.d2l-grid:is([type="data"], .d2l-grid-mvc) > tbody > tr > td {
   background-color: #2d2d2d !important;
   color: #e0e0e0 !important;
   border-color: #404040 !important;
 }
 
-table.d2l-grid[type="data"] > tbody > tr.d_gh,
-table.d2l-grid[type="data"] > tbody > tr.d_ggl2,
-table.d2l-grid[type="data"] > tbody > tr.d_gh > th,
-table.d2l-grid[type="data"] > tbody > tr.d_gh > td,
-table.d2l-grid[type="data"] > tbody > tr.d_ggl2 > th,
-table.d2l-grid[type="data"] > tbody > tr.d_ggl2 > td {
+table.d2l-grid:is([type="data"], .d2l-grid-mvc) > thead,
+table.d2l-grid:is([type="data"], .d2l-grid-mvc) > thead > tr,
+table.d2l-grid:is([type="data"], .d2l-grid-mvc) > thead > tr > th,
+table.d2l-grid:is([type="data"], .d2l-grid-mvc) > thead > tr > td,
+table.d2l-grid:is([type="data"], .d2l-grid-mvc) > tbody > tr.d_gh,
+table.d2l-grid:is([type="data"], .d2l-grid-mvc) > tbody > tr.d_ggl2,
+table.d2l-grid:is([type="data"], .d2l-grid-mvc) > tbody > tr.d_gh > th,
+table.d2l-grid:is([type="data"], .d2l-grid-mvc) > tbody > tr.d_gh > td,
+table.d2l-grid:is([type="data"], .d2l-grid-mvc) > tbody > tr.d_ggl2 > th,
+table.d2l-grid:is([type="data"], .d2l-grid-mvc) > tbody > tr.d_ggl2 > td {
   background-color: #1a1a1a !important;
 }
 
-table.d2l-grid[type="data"] > tbody > tr:not(.d_gh):not(.d_ggl2):hover,
-table.d2l-grid[type="data"] > tbody > tr:not(.d_gh):not(.d_ggl2):hover > th,
-table.d2l-grid[type="data"] > tbody > tr:not(.d_gh):not(.d_ggl2):hover > td {
+table.d2l-grid:is([type="data"], .d2l-grid-mvc) > tbody > tr:not(.d_gh):not(.d_ggl2):hover,
+table.d2l-grid:is([type="data"], .d2l-grid-mvc) > tbody > tr:not(.d_gh):not(.d_ggl2):hover > th,
+table.d2l-grid:is([type="data"], .d2l-grid-mvc) > tbody > tr:not(.d_gh):not(.d_ggl2):hover > td {
   background-color: #3d3d3d !important;
 }
 
-table.d2l-grid[type="data"] table[role="presentation"],
-table.d2l-grid[type="data"] table[role="presentation"] > tbody,
-table.d2l-grid[type="data"] table[role="presentation"] > tbody > tr,
-table.d2l-grid[type="data"] table[role="presentation"] > tbody > tr > td,
-table.d2l-grid[type="data"] .dco,
-table.d2l-grid[type="data"] .dco_c,
-table.d2l-grid[type="data"] a.d2l-link-inline {
+table.d2l-grid:is([type="data"], .d2l-grid-mvc) table[role="presentation"],
+table.d2l-grid:is([type="data"], .d2l-grid-mvc) table[role="presentation"] > tbody,
+table.d2l-grid:is([type="data"], .d2l-grid-mvc) table[role="presentation"] > tbody > tr,
+table.d2l-grid:is([type="data"], .d2l-grid-mvc) table[role="presentation"] > tbody > tr > td,
+table.d2l-grid:is([type="data"], .d2l-grid-mvc) .dco,
+table.d2l-grid:is([type="data"], .d2l-grid-mvc) .dco_c,
+table.d2l-grid:is([type="data"], .d2l-grid-mvc) a.d2l-link-inline {
   background-color: transparent !important;
   background-image: none !important;
 }

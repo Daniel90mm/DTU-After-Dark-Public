@@ -645,6 +645,56 @@
         }
     `;
 
+    const buttonSubtleStyles = `
+        :host {
+            color: ${DARK_TEXT} !important;
+        }
+        button {
+            background: ${DARK_BG} !important;
+            background-color: ${DARK_BG} !important;
+            background-image: none !important;
+            color: ${DARK_TEXT} !important;
+            border-color: ${DARK_BORDER} !important;
+            box-shadow: none !important;
+        }
+        .d2l-button-subtle-content-wrapper,
+        .d2l-button-subtle-content {
+            background: transparent !important;
+            background-color: transparent !important;
+            color: ${DARK_TEXT} !important;
+        }
+        button:hover,
+        button:focus,
+        button:focus-visible,
+        button:active {
+            background: #3d3d3d !important;
+            background-color: #3d3d3d !important;
+            background-image: none !important;
+            color: ${DARK_TEXT} !important;
+        }
+        button:disabled,
+        button[disabled],
+        button[aria-disabled="true"],
+        button:disabled .d2l-button-subtle-content-wrapper,
+        button:disabled .d2l-button-subtle-content,
+        button[disabled] .d2l-button-subtle-content-wrapper,
+        button[disabled] .d2l-button-subtle-content,
+        button[aria-disabled="true"] .d2l-button-subtle-content-wrapper,
+        button[aria-disabled="true"] .d2l-button-subtle-content {
+            background: ${DARK_BG} !important;
+            background-color: ${DARK_BG} !important;
+            background-image: none !important;
+            color: #b0b0b0 !important;
+            border-color: ${DARK_BORDER} !important;
+            opacity: 0.65 !important;
+        }
+        ::slotted(*) {
+            color: ${DARK_TEXT} !important;
+            background: transparent !important;
+            background-color: transparent !important;
+        }
+    `;
+
     const listItemNavStyles = `
         :host {
             background-color: transparent !important;
@@ -896,6 +946,9 @@
                         background-color: #2d2d2d !important;
                     }
                 `;
+            } else if (tagName === 'd2l-button-subtle') {
+                styleId = 'dark-mode-shadow-styles-button-subtle';
+                styleText = buttonSubtleStyles;
             } else if (tagName === 'd2l-menu' || tagName === 'd2l-menu-item' || tagName === 'd2l-menu-item-link') {
                 styleId = 'dark-mode-shadow-styles-menu';
                 styleText = menuStyles;
