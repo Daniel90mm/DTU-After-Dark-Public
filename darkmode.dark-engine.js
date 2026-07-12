@@ -220,6 +220,39 @@
         }
     `;
 
+    // Keep the shared button/icon baseline for every d2l-button-icon. The
+    // targeted Lessons overrides below must not replace it for unrelated
+    // controls such as Content Browser's Actions chevron.
+    const buttonIconShadowStyles = shadowDOMStyles + `
+        :host([icon="tier1:search"]),
+        :host([icon="tier1:arrow-collapse-small"]),
+        :host([icon="tier1:arrow-expand-small"]) {
+            color: ${DARK_TEXT} !important;
+        }
+        :host([icon="tier1:search"]) button,
+        :host([icon="tier1:arrow-collapse-small"]) button,
+        :host([icon="tier1:arrow-expand-small"]) button {
+            background-color: transparent !important;
+            color: ${DARK_TEXT} !important;
+        }
+        :host([icon="tier1:search"]) button:hover,
+        :host([icon="tier1:search"]) button:focus,
+        :host([icon="tier1:search"]) button:focus-visible,
+        :host([icon="tier1:search"]) button:active,
+        :host([icon="tier1:arrow-collapse-small"]) button:hover,
+        :host([icon="tier1:arrow-collapse-small"]) button:focus,
+        :host([icon="tier1:arrow-collapse-small"]) button:focus-visible,
+        :host([icon="tier1:arrow-collapse-small"]) button:active,
+        :host([icon="tier1:arrow-expand-small"]) button:hover,
+        :host([icon="tier1:arrow-expand-small"]) button:focus,
+        :host([icon="tier1:arrow-expand-small"]) button:focus-visible,
+        :host([icon="tier1:arrow-expand-small"]) button:active {
+            background-color: #3d3d3d !important;
+            background-image: none !important;
+            color: ${DARK_TEXT} !important;
+        }
+    `;
+
     const iframeStyles = `
         body,
         html,
@@ -506,6 +539,21 @@
         }
         .d2l-card-divider,
         .d2l-card-separator {
+            border-color: ${DARK_BORDER} !important;
+        }
+    `;
+
+    const breadcrumbShadowStyles = `
+        :host,
+        nav[aria-label="Breadcrumb"],
+        nav[aria-label="Breadcrumb"] div[role="list"],
+        nav[aria-label="Breadcrumb"] [role="list"],
+        nav[aria-label="Breadcrumb"] a,
+        nav[aria-label="Breadcrumb"] d2l-icon {
+            background: #1a1a1a !important;
+            background-color: #1a1a1a !important;
+            background-image: none !important;
+            color: ${DARK_TEXT} !important;
             border-color: ${DARK_BORDER} !important;
         }
     `;
@@ -878,6 +926,10 @@
             } else if (tagName === 'd2l-card') {
                 styleId = 'dark-mode-shadow-styles-card';
                 styleText = cardShadowStyles;
+            } else if (tagName === 'd2l-breadcrumb' || tagName === 'd2l-breadcrumbs'
+                || tagName === 'd2l-breadcrumb-current-page') {
+                styleId = 'dark-mode-shadow-styles-breadcrumb';
+                styleText = breadcrumbShadowStyles;
             } else if (tagName === 'd2l-expand-collapse-content' || tagName === 'd2l-lti-launch') {
                 styleId = 'dark-mode-shadow-styles-expand-collapse';
                 styleText = expandCollapseStyles;
@@ -908,38 +960,10 @@
                     }
                 `;
             } else if (tagName === 'd2l-button-icon') {
-                // Lessons navigation's Search and Course handbook controls use
-                // a white native hover fill, which hides their light glyphs.
+                // Layer Lessons-specific hover corrections over the shared
+                // button/icon baseline so unrelated glyphs retain their style.
                 styleId = 'dark-mode-shadow-styles-lessons-button-icon';
-                styleText = `
-                    :host([icon="tier1:search"]),
-                    :host([icon="tier1:arrow-collapse-small"]),
-                    :host([icon="tier1:arrow-expand-small"]) {
-                        color: ${DARK_TEXT} !important;
-                    }
-                    :host([icon="tier1:search"]) button,
-                    :host([icon="tier1:arrow-collapse-small"]) button,
-                    :host([icon="tier1:arrow-expand-small"]) button {
-                        background-color: transparent !important;
-                        color: ${DARK_TEXT} !important;
-                    }
-                    :host([icon="tier1:search"]) button:hover,
-                    :host([icon="tier1:search"]) button:focus,
-                    :host([icon="tier1:search"]) button:focus-visible,
-                    :host([icon="tier1:search"]) button:active,
-                    :host([icon="tier1:arrow-collapse-small"]) button:hover,
-                    :host([icon="tier1:arrow-collapse-small"]) button:focus,
-                    :host([icon="tier1:arrow-collapse-small"]) button:focus-visible,
-                    :host([icon="tier1:arrow-collapse-small"]) button:active,
-                    :host([icon="tier1:arrow-expand-small"]) button:hover,
-                    :host([icon="tier1:arrow-expand-small"]) button:focus,
-                    :host([icon="tier1:arrow-expand-small"]) button:focus-visible,
-                    :host([icon="tier1:arrow-expand-small"]) button:active {
-                        background-color: #3d3d3d !important;
-                        background-image: none !important;
-                        color: ${DARK_TEXT} !important;
-                    }
-                `;
+                styleText = buttonIconShadowStyles;
             } else if (tagName === 'd2l-calendar') {
                 // Mini-month date grid renders as <button class="d2l-calendar-date">
                 // inside this shadow root, so the page stylesheet can't reach it
@@ -1346,6 +1370,14 @@
     `;
 
     const LIGHTER_DARK_SELECTORS = `
+        #d_content.d2l-dialog-width,
+        #d_content.d2l-dialog-width #d_content_inner,
+        #d_content.d2l-dialog-width #d_page_header,
+        #d_content.d2l-dialog-width #d_content_r_c1,
+        #d_content.d2l-dialog-width #d_content_r_c2,
+        #d_content.d2l-dialog-width #d_content_r,
+        #d_content.d2l-dialog-width #d_content_r_p,
+        #d_content.d2l-dialog-width form#d2l_form,
         d2l-floating-buttons,
         .d2l-floating-buttons-container,
         .d2l-floating-buttons-inner-container,

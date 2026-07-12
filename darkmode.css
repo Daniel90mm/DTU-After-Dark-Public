@@ -184,6 +184,19 @@ div[data-embed-id="2150775"] {
   color: #e0e0e0 !important;
 }
 
+/* Dialog bodies are raised surfaces, unlike the regular page canvas. */
+#d_content.d2l-dialog-width,
+#d_content.d2l-dialog-width #d_content_inner,
+#d_content.d2l-dialog-width #d_page_header,
+#d_content.d2l-dialog-width #d_content_r_c1,
+#d_content.d2l-dialog-width #d_content_r_c2,
+#d_content.d2l-dialog-width #d_content_r,
+#d_content.d2l-dialog-width #d_content_r_p,
+#d_content.d2l-dialog-width form#d2l_form {
+  background-color: #2d2d2d !important;
+  color: #e0e0e0 !important;
+}
+
 /* Course tiles/cards */
 .d2l-tile,
 .d2l-card,
@@ -1636,13 +1649,13 @@ button[aria-label^="Actions for Lecture 01, Quiz 1"] {
   border-color: #404040 !important;
 }
 
-/* Breadcrumb - dark 2 */
+/* Breadcrumbs are structural navigation, not a raised panel. */
 d2l-breadcrumb,
 d2l-breadcrumbs,
 [d2l-breadcrumb],
 [d2l-breadcrumb-current-page],
 d2l-breadcrumb-current-page {
-  background-color: #2d2d2d !important;
+  background-color: #1a1a1a !important;
   color: #e0e0e0 !important;
 }
 
@@ -1650,6 +1663,13 @@ d2l-breadcrumb-current-page {
 a.d2l-link:not(.d2l-link-inline):not([href*="/d2l/common/viewFile.d2lfile"]),
 a.d2l-link-small:not(.d2l-link-inline):not([href*="/d2l/common/viewFile.d2lfile"]) {
   background-color: #2d2d2d !important;
+}
+
+d2l-breadcrumb a.d2l-link,
+d2l-breadcrumbs a.d2l-link,
+d2l-breadcrumb a.d2l-link-small,
+d2l-breadcrumbs a.d2l-link-small {
+  background-color: #1a1a1a !important;
 }
 
 /* Breadcrumb current page span */
@@ -1709,7 +1729,7 @@ iframe.ddial_c_frame {
 /* Breadcrumb icons */
 d2l-breadcrumbs d2l-icon,
 d2l-breadcrumb d2l-icon {
-  background-color: #2d2d2d !important;
+  background-color: #1a1a1a !important;
 }
 
 /* File viewer / content viewer */
