@@ -668,10 +668,15 @@
         d2l-icon[icon="tier1:arrow-collapse-small"],
         d2l-icon[icon="tier1:arrow-expand-small"],
         d2l-icon[icon="tier1:dragger"],
-        d2l-icon[icon="tier2:upload"],
-        d2l-icon[icon="tier2:file-document"] {
+        d2l-icon[icon="tier2:upload"] {
             background-color: #1a1a1a !important;
             background: #1a1a1a !important;
+            background-image: none !important;
+            color: ${DARK_TEXT} !important;
+        }
+        d2l-icon[icon="tier2:file-document"] {
+            background-color: ${DARK_BG} !important;
+            background: ${DARK_BG} !important;
             background-image: none !important;
             color: ${DARK_TEXT} !important;
         }
@@ -1726,6 +1731,15 @@
         }
         var tagName = ((el.tagName || '') + '').toLowerCase();
         var iconName = (el.getAttribute && el.getAttribute('icon')) || '';
+        if (tagName === 'd2l-icon' && iconName === 'tier2:file-document') {
+            if (inlineStyleHasDarkFill(el, '#2d2d2d', 'rgb(45,45,45)')
+                && inlineStyleHasTextColor(el, '#e0e0e0', 'rgb(224,224,224)')) return;
+            el.style.setProperty('background', '#2d2d2d', 'important');
+            el.style.setProperty('background-color', '#2d2d2d', 'important');
+            el.style.setProperty('background-image', 'none', 'important');
+            el.style.setProperty('color', '#e0e0e0', 'important');
+            return;
+        }
         if (el.matches && (
             el.matches('d2l-icon.module-triangle')
             || el.matches('.module-triangle')
@@ -1736,7 +1750,6 @@
                 || iconName === 'tier1:arrow-expand-small'
                 || iconName === 'tier1:dragger'
                 || iconName === 'tier2:upload'
-                || iconName === 'tier2:file-document'
             ))
             || (tagName === 'd2l-icon' && el.closest && el.closest('.navigation-container .navigation-tree .title-container'))
         )) {
