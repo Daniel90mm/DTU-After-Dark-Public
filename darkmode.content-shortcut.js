@@ -544,7 +544,7 @@
             position: absolute !important;
             bottom: 6px !important;
             right: 6px !important;
-            transform: translate(175px, 63px) !important;
+            transform: translate(175px, 60px) !important;
             min-width: 42px !important;
             min-height: 42px !important;
             width: 42px !important;
