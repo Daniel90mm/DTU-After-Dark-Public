@@ -380,12 +380,77 @@
         });
     }
 
+    function styleLegacyFloatingButtons(scope, darkModeEnabled) {
+        var root = (scope && scope.querySelectorAll) ? scope : document;
+        var hosts = [];
+        try {
+            if (root.matches && root.matches('d2l-floating-buttons')) hosts.push(root);
+            root.querySelectorAll('d2l-floating-buttons').forEach(function (host) { hosts.push(host); });
+        } catch (e0) { return; }
+
+        hosts.forEach(function (host) {
+            if (!host) return;
+            var shadowStyle = host.shadowRoot && host.shadowRoot.getElementById('dtu-dark-floating-buttons');
+
+            if (!darkModeEnabled) {
+                if (shadowStyle) shadowStyle.remove();
+                if (!host.style) return;
+                var bg = String(host.style.getPropertyValue('background') || '').toLowerCase();
+                var bgColor = String(host.style.getPropertyValue('background-color') || '').toLowerCase();
+                var color = String(host.style.getPropertyValue('color') || '').toLowerCase();
+                var borderColor = String(host.style.getPropertyValue('border-color') || '').toLowerCase();
+                if (host.style.getPropertyPriority('background') === 'important'
+                    && /#1a1a1a|rgb\(\s*26\s*,\s*26\s*,\s*26\s*\)/i.test(bg)) {
+                    host.style.removeProperty('background');
+                }
+                if (host.style.getPropertyPriority('background-color') === 'important'
+                    && /#1a1a1a|rgb\(\s*26\s*,\s*26\s*,\s*26\s*\)/i.test(bgColor)) {
+                    host.style.removeProperty('background-color');
+                    host.style.removeProperty('background-image');
+                }
+                if (host.style.getPropertyPriority('color') === 'important'
+                    && /#e0e0e0|rgb\(\s*224\s*,\s*224\s*,\s*224\s*\)/i.test(color)) {
+                    host.style.removeProperty('color');
+                }
+                if (host.style.getPropertyPriority('border-color') === 'important'
+                    && /#404040|rgb\(\s*64\s*,\s*64\s*,\s*64\s*\)/i.test(borderColor)) {
+                    host.style.removeProperty('border-color');
+                }
+                return;
+            }
+
+            if (host.style) {
+                var currentBg = String(host.style.getPropertyValue('background-color') || '').toLowerCase();
+                var alreadyDark1 = host.style.getPropertyPriority('background-color') === 'important'
+                    && /#1a1a1a|rgb\(\s*26\s*,\s*26\s*,\s*26\s*\)/i.test(currentBg);
+                if (!alreadyDark1) {
+                    host.style.setProperty('background', '#1a1a1a', 'important');
+                    host.style.setProperty('background-color', '#1a1a1a', 'important');
+                    host.style.setProperty('background-image', 'none', 'important');
+                    host.style.setProperty('color', '#e0e0e0', 'important');
+                    host.style.setProperty('border-color', '#404040', 'important');
+                }
+            }
+
+            if (host.shadowRoot && !shadowStyle) {
+                shadowStyle = document.createElement('style');
+                shadowStyle.id = 'dtu-dark-floating-buttons';
+                shadowStyle.textContent =
+                    ':host,.d2l-floating-buttons-container,.d2l-floating-buttons-inner-container'
+                    + '{background:#1a1a1a !important;background-color:#1a1a1a !important;'
+                    + 'background-image:none !important;color:#e0e0e0 !important;border-color:#404040 !important;}';
+                host.shadowRoot.appendChild(shadowStyle);
+            }
+        });
+    }
+
     function fixDTULearnLegacyLmsToolStyling(rootNode) {
         if (window.location.hostname !== 'learn.inside.dtu.dk') return;
         if (!isLegacyHeavyPage()) return;
 
         if (!isDarkModeEnabled()) {
             clearDTULearnLegacyLmsToolInlineDarkBackgrounds(rootNode);
+            styleLegacyFloatingButtons(rootNode, false);
             return;
         }
 
@@ -410,6 +475,7 @@
                 el.style.setProperty('background-image', 'none', 'important');
             });
         });
+        styleLegacyFloatingButtons(scope, true);
         styleLegacySortButtonShadows(scope);
     }
 
