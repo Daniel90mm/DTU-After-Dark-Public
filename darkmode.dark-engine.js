@@ -1215,13 +1215,20 @@
 
     function styleMultiselectElements(root) {
         root.querySelectorAll('.d2l-multiselect, ul.d2l-multiselect').forEach(function (el) {
+            el.style.setProperty('background', '#3d3d3d', 'important');
             el.style.setProperty('background-color', '#3d3d3d', 'important');
+            el.style.setProperty('background-image', 'none', 'important');
             el.style.setProperty('border-color', '#505050', 'important');
+            el.style.setProperty('box-shadow', 'none', 'important');
         });
         root.querySelectorAll('.d2l-multiselect-choice').forEach(function (el) {
+            el.style.setProperty('background', '#4a4a4a', 'important');
             el.style.setProperty('background-color', '#4a4a4a', 'important');
+            el.style.setProperty('background-image', 'none', 'important');
             el.style.setProperty('color', '#e0e0e0', 'important');
             el.style.setProperty('border-color', '#606060', 'important');
+            el.style.setProperty('box-shadow', 'none', 'important');
+            el.style.setProperty('text-shadow', 'none', 'important');
         });
         root.querySelectorAll('.d2l-multiselect-choice span').forEach(function (el) {
             el.style.setProperty('color', '#e0e0e0', 'important');

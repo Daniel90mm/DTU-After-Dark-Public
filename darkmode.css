@@ -1266,8 +1266,11 @@ ul[class*="d2l-multiselect"],
 [id$="$control"].d2l-multiselect,
 [id*="Addresses$control"],
 ul[id*="$control"] {
+  background: #3d3d3d !important;
   background-color: #3d3d3d !important;
+  background-image: none !important;
   border-color: #505050 !important;
+  box-shadow: none !important;
 }
 
 .d2l-multiselect-choice,
@@ -1275,9 +1278,13 @@ li.d2l-multiselect-choice,
 ul.d2l-multiselect li.d2l-multiselect-choice,
 ul[id*="$control"] li.d2l-multiselect-choice,
 li[class*="d2l-multiselect-choice"] {
+  background: #4a4a4a !important;
   background-color: #4a4a4a !important;
+  background-image: none !important;
   color: #e0e0e0 !important;
   border-color: #606060 !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
 }
 
 .d2l-multiselect-choice span,
@@ -1470,6 +1477,34 @@ table.dsearch > tbody > tr > td:has(> [id$="_searchOptions"]),
 table.dsearch > tbody > tr:hover > td:has(> [id$="_searchOptions"]),
 table.dsearch > tbody > tr > td:has(> [id$="_searchOptions"]) table.dsearch_header tr:hover,
 table.dsearch > tbody > tr > td:has(> [id$="_searchOptions"]) table.dsearch_header tr:hover > td {
+  background: #1a1a1a !important;
+  background-color: #1a1a1a !important;
+  background-image: none !important;
+  color: #e0e0e0 !important;
+}
+
+/* Classlist's expanded search form is structural filtering space, not a raised
+   card. Pin every layout layer and hover row to dark 1; form controls retain
+   their own raised interactive surfaces. */
+table.d_dgsearch:has(#z_g_searchOptions),
+table.d_dgsearch:has(#z_g_searchOptions) > tbody > tr,
+table.d_dgsearch:has(#z_g_searchOptions) td.d_gsearch,
+table.dsearch:has(#z_g_searchOptions),
+table.dsearch:has(#z_g_searchOptions) > tbody > tr,
+table.dsearch:has(#z_g_searchOptions) > tbody > tr > td,
+#z_g_searchOptions,
+#z_g_searchOptions > table.d_FG,
+#z_g_searchOptions > table.d_FG > tbody,
+#z_g_searchOptions > table.d_FG > tbody > tr,
+#z_g_searchOptions > table.d_FG > tbody > tr > td,
+#z_g_searchOptions fieldset,
+#z_g_searchOptions .dfs_c_f,
+#z_g_searchOptions table[role="presentation"],
+#z_g_searchOptions table[role="presentation"] > tbody,
+#z_g_searchOptions table[role="presentation"] > tbody > tr,
+#z_g_searchOptions table[role="presentation"] > tbody > tr > td,
+#z_g_searchOptions tr:hover,
+#z_g_searchOptions tr:hover > td {
   background: #1a1a1a !important;
   background-color: #1a1a1a !important;
   background-image: none !important;
