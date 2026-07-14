@@ -2358,6 +2358,20 @@ form[action*="/d2l/lms/quizzing/user/quizzes_list.d2l"] #z_b.d2l-table > tbody >
   background-color: #3d3d3d !important;
 }
 
+/* Quiz attempts render inside nested same-origin frames. These are layout
+   wrappers around the question, answer list, and submit area—not raised cards.
+   Keeping them dark 1 removes the awkward dark-2 blocks without touching
+   authored question content, answer status, radios, or submission controls. */
+.d2l-quiz-question-autosave-container,
+.d2l-quiz-question-autosave-container > .dco_c,
+.d2l-quiz-answer-container,
+.d2l-quiz-answer-container > .dco_c,
+.d2l-quiz-attempt-buttons,
+.d2l-quiz-attempt-buttons > .dco_c {
+  background-color: #1a1a1a !important;
+  background-image: none !important;
+}
+
 /* Message bucket buttons - dark 2 */
 .d2l-messagebucket-button-container,
 .d2l-messagebucket-button-container *,

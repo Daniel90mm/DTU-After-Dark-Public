@@ -1673,6 +1673,18 @@
         if (isStudyplanModalBackgroundExemptElement(el)) return;
         if (window.location.hostname === 'learn.inside.dtu.dk' && el.matches) {
             try {
+                var isQuizAttemptStructure = window.location.pathname.indexOf('/d2l/lms/quizzing/user/attempt/quiz_attempt_page') !== -1
+                    && (el.matches('.d2l-quiz-question-autosave-container, .d2l-quiz-answer-container, .d2l-quiz-attempt-buttons')
+                        || (el.closest && el.closest('.d2l-quiz-question-autosave-container, .d2l-quiz-answer-container, .d2l-quiz-attempt-buttons')));
+                if (isQuizAttemptStructure) {
+                    if (inlineStyleHasDarkFill(el, '#1a1a1a', 'rgb(26,26,26)')
+                        && inlineStyleHasTextColor(el, '#e0e0e0', 'rgb(224,224,224)')) return;
+                    el.style.setProperty('background', '#1a1a1a', 'important');
+                    el.style.setProperty('background-color', '#1a1a1a', 'important');
+                    el.style.setProperty('background-image', 'none', 'important');
+                    el.style.setProperty('color', '#e0e0e0', 'important');
+                    return;
+                }
                 if (el.matches('.d2l-labs-navigation-notification-icon-indicator')) {
                     el.style.setProperty('background', 'var(--dtu-ad-accent)', 'important');
                     el.style.setProperty('background-color', 'var(--dtu-ad-accent)', 'important');
@@ -1741,6 +1753,18 @@
         if (isStudyplanModalBackgroundExemptElement(el)) return;
         if (window.location.hostname === 'learn.inside.dtu.dk' && el.matches) {
             try {
+                var isQuizAttemptStructure = window.location.pathname.indexOf('/d2l/lms/quizzing/user/attempt/quiz_attempt_page') !== -1
+                    && (el.matches('.d2l-quiz-question-autosave-container, .d2l-quiz-answer-container, .d2l-quiz-attempt-buttons')
+                        || (el.closest && el.closest('.d2l-quiz-question-autosave-container, .d2l-quiz-answer-container, .d2l-quiz-attempt-buttons')));
+                if (isQuizAttemptStructure) {
+                    if (inlineStyleHasDarkFill(el, '#1a1a1a', 'rgb(26,26,26)')
+                        && inlineStyleHasTextColor(el, '#e0e0e0', 'rgb(224,224,224)')) return;
+                    el.style.setProperty('background', '#1a1a1a', 'important');
+                    el.style.setProperty('background-color', '#1a1a1a', 'important');
+                    el.style.setProperty('background-image', 'none', 'important');
+                    el.style.setProperty('color', '#e0e0e0', 'important');
+                    return;
+                }
                 if (el.matches('.d2l-labs-navigation-notification-icon-indicator')) {
                     el.style.setProperty('background', 'var(--dtu-ad-accent)', 'important');
                     el.style.setProperty('background-color', 'var(--dtu-ad-accent)', 'important');
