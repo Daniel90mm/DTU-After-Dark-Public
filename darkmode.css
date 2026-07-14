@@ -1713,8 +1713,8 @@ button[aria-haspopup="true"][aria-label="Actions for Study Announcements"],
 button[aria-label^="Actions for Study Announcements"],
 button[aria-haspopup="true"][aria-label="Actions for Calendar"],
 button[aria-label^="Actions for Calendar"],
-button[aria-haspopup="true"][aria-label="Actions for Lecture 01, Quiz 1"],
-button[aria-label^="Actions for Lecture 01, Quiz 1"] {
+button[aria-haspopup="true"][aria-label*="Quiz"],
+button[aria-label*="Quiz"] {
   background-color: #2d2d2d !important;
   color: #e0e0e0 !important;
   border-color: #404040 !important;
@@ -2334,10 +2334,28 @@ button[aria-haspopup="true"][aria-label^="Actions for"] d2l-icon[icon="tier1:che
 button[aria-label^="Actions for Work To Do"] d2l-icon[icon="tier1:chevron-down"],
 button[aria-label^="Actions for Study Announcements"] d2l-icon[icon="tier1:chevron-down"],
 button[aria-label^="Actions for Calendar"] d2l-icon[icon="tier1:chevron-down"],
-button[aria-label^="Actions for Lecture 01, Quiz 1"] d2l-icon[icon="tier1:chevron-down"] {
+button[aria-label*="Quiz"] d2l-icon[icon="tier1:chevron-down"] {
   background-color: #2d2d2d !important;
   background: #2d2d2d !important;
   background-image: none !important;
+}
+
+/* Quiz List only: preserve the table as a contained data surface, but give its
+   links the selected accent and make the hovered quiz row visibly actionable.
+   Do not extend these selectors to quiz-summary/attempt pages: their authored
+   question and feedback states carry meaningful course/answer semantics. */
+form[action*="/d2l/lms/quizzing/user/quizzes_list.d2l"] #z_b.d2l-table a.d2l-link-inline {
+  color: var(--dtu-ad-accent-soft) !important;
+}
+
+form[action*="/d2l/lms/quizzing/user/quizzes_list.d2l"] #z_b.d2l-table a.d2l-link-inline:hover,
+form[action*="/d2l/lms/quizzing/user/quizzes_list.d2l"] #z_b.d2l-table a.d2l-link-inline:focus-visible {
+  color: var(--dtu-ad-accent-soft) !important;
+  text-decoration: underline !important;
+}
+
+form[action*="/d2l/lms/quizzing/user/quizzes_list.d2l"] #z_b.d2l-table > tbody > tr:not(.d_gh):hover > td {
+  background-color: #3d3d3d !important;
 }
 
 /* Message bucket buttons - dark 2 */
