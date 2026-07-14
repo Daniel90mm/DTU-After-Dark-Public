@@ -2094,8 +2094,13 @@ form[action*="/Answer/SaveAnswers/"],
   color: #ffffff !important;
 }
 
-/* Comparison legend drawer, including its state after the Legend button opens it. */
-.tsMasterContent .comparison__aside,
+/* The fixed aside is a full-size structural overlay. It must stay transparent;
+   only the actual legend card inside it is an opaque dark-2 surface. */
+.tsMasterContent .comparison__aside {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
 .tsMasterContent .comparison__legend,
 .tsMasterContent .comparison__legend .legend,
 .tsMasterContent .comparison__legend .legend__content,
