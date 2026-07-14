@@ -403,6 +403,49 @@
                     icon.style.setProperty('color', '#ffffff', 'important');
                 }
             });
+
+            // Files Overview has a legacy plain table header (Name / Author /
+            // Last modified) that otherwise keeps its native white fill. Limit
+            // this correction to that route and header signature, rather than
+            // changing generic CampusNet tables.
+            if (/\/cnnet\/filesharing\/overview\.aspx$/i.test(window.location.pathname || '')) {
+                document.querySelectorAll('table').forEach(function (table) {
+                    var headers = Array.prototype.slice.call(table.querySelectorAll('thead th, tr:first-child th'));
+                    var labels = headers.map(function (th) {
+                        return (th.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+                    });
+                    var isFilesHeader = labels.indexOf('name') !== -1
+                        && labels.indexOf('author') !== -1
+                        && labels.some(function (label) { return /^last modified/.test(label); });
+                    if (!isFilesHeader) return;
+                    var row = headers[0] && headers[0].parentElement;
+                    if (row && row.style) {
+                        if (isDarkModeEnabled()) {
+                            row.style.setProperty('background', '#2d2d2d', 'important');
+                            row.style.setProperty('background-color', '#2d2d2d', 'important');
+                            row.style.setProperty('border-color', '#404040', 'important');
+                        } else {
+                            row.style.removeProperty('background');
+                            row.style.removeProperty('background-color');
+                            row.style.removeProperty('border-color');
+                        }
+                    }
+                    headers.forEach(function (th) {
+                        if (!th || !th.style) return;
+                        if (isDarkModeEnabled()) {
+                            th.style.setProperty('background', '#2d2d2d', 'important');
+                            th.style.setProperty('background-color', '#2d2d2d', 'important');
+                            th.style.setProperty('color', '#e0e0e0', 'important');
+                            th.style.setProperty('border-color', '#404040', 'important');
+                        } else {
+                            th.style.removeProperty('background');
+                            th.style.removeProperty('background-color');
+                            th.style.removeProperty('color');
+                            th.style.removeProperty('border-color');
+                        }
+                    });
+                });
+            }
         }
 
         if (!isDarkModeEnabled()) {
