@@ -936,6 +936,21 @@
             } else if (tagName === 'd2l-button-subtle') {
                 styleId = 'dark-mode-shadow-styles-button-subtle';
                 styleText = buttonSubtleStyles;
+            } else if (tagName === 'd2l-floating-buttons') {
+                // The visible wrappers live inside this component's open shadow
+                // root, beyond the reach of the page stylesheet.
+                styleId = 'dark-mode-shadow-styles-floating-buttons';
+                styleText = `
+                    :host,
+                    .d2l-floating-buttons-container,
+                    .d2l-floating-buttons-inner-container {
+                        background: #1a1a1a !important;
+                        background-color: #1a1a1a !important;
+                        background-image: none !important;
+                        color: ${DARK_TEXT} !important;
+                        border-color: ${DARK_BORDER} !important;
+                    }
+                `;
             } else if (tagName === 'd2l-menu' || tagName === 'd2l-menu-item' || tagName === 'd2l-menu-item-link') {
                 styleId = 'dark-mode-shadow-styles-menu';
                 styleText = menuStyles;
@@ -1366,7 +1381,10 @@
         .d_fgh,
         .fct_w,
         .fl_n,
-        .fl_top
+        .fl_top,
+        d2l-floating-buttons,
+        .d2l-floating-buttons-container,
+        .d2l-floating-buttons-inner-container
     `;
 
     const LIGHTER_DARK_SELECTORS = `
@@ -1378,9 +1396,6 @@
         #d_content.d2l-dialog-width #d_content_r,
         #d_content.d2l-dialog-width #d_content_r_p,
         #d_content.d2l-dialog-width form#d2l_form,
-        d2l-floating-buttons,
-        .d2l-floating-buttons-container,
-        .d2l-floating-buttons-inner-container,
         .d2l-navigation-s-main-wrapper,
         .d2l-navigation-s-main-wrapper *,
         .d2l-navigation-s-item,

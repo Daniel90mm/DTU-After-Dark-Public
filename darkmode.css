@@ -1574,12 +1574,12 @@ button.d2l-hpg-opener {
   border-color: #1a1a1a !important;
 }
 
-/* Floating actions are a raised surface. */
+/* Floating actions merge with the surrounding page canvas. */
 d2l-floating-buttons,
 .d2l-floating-buttons-container,
 .d2l-floating-buttons-inner-container {
-  background: #2d2d2d !important;
-  background-color: #2d2d2d !important;
+  background: #1a1a1a !important;
+  background-color: #1a1a1a !important;
   background-image: none !important;
   color: #e0e0e0 !important;
   border-color: #404040 !important;

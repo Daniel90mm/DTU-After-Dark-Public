@@ -5,6 +5,7 @@ Add one row per shipped change so changelog text and reviewer notes are ready.
 
 | Date | Area | Change | Reviewer Notes |
 | --- | --- | --- | --- |
+| 2026-07-14 | DTU Learn Assignments | Reclassified the floating action rail as dark 1 (`#1a1a1a`). Added a `d2l-floating-buttons` shadow-root style so its internal container and inner container cannot be repainted light by Brightspace. | Open an Assignments page with Dark Mode on. Verify the whole floating action rail is dark 1 after load and rerender. |
 | 2026-07-12 | DTU Learn dialogs | Made `.d2l-dialog-width` dialog bodies—including their form and structural `#d_content*` wrappers—dark 2 rather than dark 1. | Open a Learn dialog such as `Add a File` with Dark Mode on. Verify its complete body is one dark-2 surface, including after dynamic dialog content loads. |
 | 2026-07-12 | DTU Learn navigation | Unified breadcrumb hosts, links, icons, and their internal shadow navigation list on dark 1. Breadcrumbs are structural navigation rather than dark-2 raised panels. | With Dark Mode on, inspect breadcrumbs on Learn pages. Verify the text and icons sit on one continuous dark-1 surface with no dark-2 patches. |
 | 2026-07-12 | DTU Learn Assignments | Reclassified the floating action rail (`.d2l-floating-buttons-container`) as a dark-2 raised surface in both static and dynamic styling. | Open an Assignments page with Dark Mode on and verify the floating action rail and its inner container are dark 2 after load and rerender. |
