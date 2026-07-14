@@ -143,9 +143,9 @@
             var accentSoftHex = theme.accentSoft || accentHex;
             var linkColor = isDarkModeEnabled() ? accentSoftHex : accentDeepHex;
             // The base/deep accent is too dark against CampusNet's dark canvas.
-            // Keep dark-mode feed links visibly interactive without sacrificing
-            // their readable soft-accent resting state.
-            var linkHoverColor = isDarkModeEnabled() ? '#ffffff' : accentHoverHex;
+            // Keep the user-selected soft accent in dark mode; interaction is
+            // signalled with an underline rather than reverting to a fixed red.
+            var linkHoverColor = isDarkModeEnabled() ? accentSoftHex : accentHoverHex;
 
             document.querySelectorAll('.widget__header').forEach(function (header) {
                 if (!header || !header.style) return;
@@ -286,10 +286,16 @@
                 if (!a.hasAttribute('data-dtu-accent-link')) {
                     a.setAttribute('data-dtu-accent-link', '1');
                     a.addEventListener('mouseenter', function () {
-                        try { a.style.setProperty('color', linkHoverColor, 'important'); } catch (e1) { }
+                        try {
+                            a.style.setProperty('color', linkHoverColor, 'important');
+                            if (isDarkModeEnabled()) a.style.setProperty('text-decoration', 'underline', 'important');
+                        } catch (e1) { }
                     }, true);
                     a.addEventListener('mouseleave', function () {
-                        try { a.style.setProperty('color', linkColor, 'important'); } catch (e2) { }
+                        try {
+                            a.style.setProperty('color', linkColor, 'important');
+                            a.style.removeProperty('text-decoration');
+                        } catch (e2) { }
                     }, true);
                 }
             });
@@ -302,10 +308,16 @@
                     if (!a.hasAttribute('data-dtu-accent-link')) {
                         a.setAttribute('data-dtu-accent-link', '1');
                         a.addEventListener('mouseenter', function () {
-                            try { a.style.setProperty('color', linkHoverColor, 'important'); } catch (e3) { }
+                            try {
+                                a.style.setProperty('color', linkHoverColor, 'important');
+                                if (isDarkModeEnabled()) a.style.setProperty('text-decoration', 'underline', 'important');
+                            } catch (e3) { }
                         }, true);
                         a.addEventListener('mouseleave', function () {
-                            try { a.style.setProperty('color', linkColor, 'important'); } catch (e4) { }
+                            try {
+                                a.style.setProperty('color', linkColor, 'important');
+                                a.style.removeProperty('text-decoration');
+                            } catch (e4) { }
                         }, true);
                     }
                 });
@@ -319,10 +331,16 @@
                         if (!link.hasAttribute('data-dtu-accent-link')) {
                             link.setAttribute('data-dtu-accent-link', '1');
                             link.addEventListener('mouseenter', function () {
-                                try { link.style.setProperty('color', linkHoverColor, 'important'); } catch (e5) { }
+                                try {
+                                    link.style.setProperty('color', linkHoverColor, 'important');
+                                    if (isDarkModeEnabled()) link.style.setProperty('text-decoration', 'underline', 'important');
+                                } catch (e5) { }
                             }, true);
                             link.addEventListener('mouseleave', function () {
-                                try { link.style.setProperty('color', linkColor, 'important'); } catch (e6) { }
+                                try {
+                                    link.style.setProperty('color', linkColor, 'important');
+                                    link.style.removeProperty('text-decoration');
+                                } catch (e6) { }
                             }, true);
                         }
                     } else {
@@ -444,7 +462,8 @@
                     'border-color',
                     'border-top-color',
                     'filter',
-                    'mix-blend-mode'
+                    'mix-blend-mode',
+                    'text-decoration'
                 ]
             );
             applyCampusnetAccentElements();

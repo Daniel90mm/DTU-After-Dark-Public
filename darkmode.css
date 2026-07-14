@@ -4614,6 +4614,112 @@ img.basketIcon[src*="basket_empty"]:focus {
   background-image: none !important;
 }
 
+/* CampusNet My messages: cards are generated after the base page has loaded,
+   so target the message-specific structure rather than broad table rules. */
+.msgFilterOptionsContainer {
+  color-scheme: dark !important;
+  color: #e0e0e0 !important;
+}
+
+.msgFilterOptionsContainer select {
+  background: #2d2d2d !important;
+  color: #e0e0e0 !important;
+  border-color: #505050 !important;
+}
+
+.messages-area .msg-wrapper {
+  background: #2d2d2d !important;
+  color: #e0e0e0 !important;
+  border-top-color: #404040 !important;
+  border-right-color: #404040 !important;
+  border-bottom-color: #404040 !important;
+}
+
+.messages-area .msg-wrapper.msg-unread {
+  background: #353535 !important;
+}
+
+.messages-area .msg-row,
+.messages-area .msg-cell,
+.messages-area .msg-fullwidth-row,
+.messages-area .msg-fullwidth-row-singleline {
+  background: transparent !important;
+  color: #e0e0e0 !important;
+}
+
+.messages-area .msg-content-wrap .msg-fullwidth-row:first-child,
+.messages-area .msg-content-wrap .msg-fullwidth-row:first-child * {
+  color: var(--dtu-ad-accent-soft) !important;
+}
+
+.messages-area .msg-status-wrap,
+.messages-area .msg-status-wrap * {
+  color: #bdbdbd !important;
+}
+
+.messages-area a.msg-link {
+  text-decoration: none !important;
+}
+
+.messages-area a.msg-link:hover .msg-wrapper,
+.messages-area a.msg-link:focus-visible .msg-wrapper {
+  background: #3d3d3d !important;
+}
+
+.messages-area a.msg-link:focus-visible .msg-wrapper {
+  outline: 2px solid var(--dtu-ad-accent-soft) !important;
+  outline-offset: 2px !important;
+}
+
+/* CampusNet legacy calendar. These panels are written by the calendar's own
+   scripts after the initial page markup, so they need their own narrow scope. */
+#ctl00_ContentBox .ui_calendar_menu_controls,
+#ctl00_ContentBox .ui_functions_table_old,
+#ctl00_ContentBox .noAppointments {
+  background: #1a1a1a !important;
+  color: #e0e0e0 !important;
+  border-color: #404040 !important;
+}
+
+#ctl00_ContentBox .ui_calendar_menu_controls a,
+#ctl00_ContentBox .ui_functions_table_old a {
+  color: var(--dtu-ad-accent-soft) !important;
+}
+
+#ctl00_ContentBox .ui_calendar_menu_controls a {
+  background: #2d2d2d !important;
+}
+
+#ctl00_ContentBox .ui_calendar_menu_controls a:hover,
+#ctl00_ContentBox .ui_calendar_menu_controls a:focus-visible,
+#ctl00_ContentBox .ui_functions_table_old a:hover,
+#ctl00_ContentBox .ui_functions_table_old a:focus-visible {
+  background: #3d3d3d !important;
+  color: var(--dtu-ad-accent-soft) !important;
+  text-decoration: underline !important;
+}
+
+#ctl00_ContentBox .ui_calendar_menu_controls span {
+  background: #3d3d3d !important;
+  color: #e0e0e0 !important;
+}
+
+#ActionChooser,
+#AppointmentEditorRaw,
+#AppointmentCancelor {
+  background: #2d2d2d !important;
+  color: #e0e0e0 !important;
+  border-color: #505050 !important;
+}
+
+#AppointmentEditorRaw input:not([type="button"]),
+#AppointmentEditorRaw select,
+#AppointmentEditorRaw textarea {
+  background: #1a1a1a !important;
+  color: #e0e0e0 !important;
+  border-color: #505050 !important;
+}
+
 /* CampusNet main content row - dark 1 */
 main.main.arc-row,
 main.main.arc-row>#ctl00_LeftMenuContainer.main__aside,
