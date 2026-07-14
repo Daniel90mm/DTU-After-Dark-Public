@@ -856,6 +856,16 @@ div[style*="white"]:not(.typebox):not([data-dtu-ext]) {
   color: #e0e0e0 !important;
 }
 
+/* Calendar Tasks uses generic placeholders, but its outer shell and title row
+   are structural sidebar surfaces rather than raised list content. */
+.d2l-placeholder:has(> div > d2l-dropdown-context-menu[text="Actions for: Tasks"]),
+.d2l-placeholder:has(> div > d2l-dropdown-context-menu[text="Actions for: Tasks"]) > div > .d2l-placeholder {
+  background: #1a1a1a !important;
+  background-color: #1a1a1a !important;
+  background-image: none !important;
+  color: #e0e0e0 !important;
+}
+
 /* Course selector items - dark 2 */
 .d2l-datalist-item-actionable,
 li.d2l-datalist-item.d2l-datalist-item-actionable {
@@ -1454,10 +1464,21 @@ table.d_FG .dh_fg {
   color: #e0e0e0 !important;
 }
 
-/* The legacy Announcements search form is one raised filter panel, despite
-   being assembled from nested layout tables. Keep its full surface dark 2;
+/* Collapsed legacy search bars are structural page chrome. Keep their wrapper
+   and nested layout row dark 1 even when the generic table-row hover fires. */
+table.dsearch > tbody > tr > td:has(> [id$="_searchOptions"]),
+table.dsearch > tbody > tr:hover > td:has(> [id$="_searchOptions"]),
+table.dsearch > tbody > tr > td:has(> [id$="_searchOptions"]) table.dsearch_header tr:hover,
+table.dsearch > tbody > tr > td:has(> [id$="_searchOptions"]) table.dsearch_header tr:hover > td {
+  background: #1a1a1a !important;
+  background-color: #1a1a1a !important;
+  background-image: none !important;
+  color: #e0e0e0 !important;
+}
+
+/* The expanded legacy Announcements search form is a raised filter panel,
+   despite being assembled from nested layout tables. Keep that panel dark 2;
    layout-table hover must not expose a different background behind its fields. */
-td:has(> #z_d_searchOptions),
 #z_d_searchOptions,
 #z_d_searchOptions > table.d_FG,
 #z_d_searchOptions > table.d_FG > tbody,
