@@ -416,7 +416,8 @@
         var accent = '#1f7ae0';
         try {
             var styles = getComputedStyle(document.documentElement);
-            accent = (styles.getPropertyValue('--dtu-ad-accent') || styles.getPropertyValue('--dtu-ad-accent-deep') || accent).trim() || accent;
+            var primaryAccentProperty = isDark ? '--dtu-ad-accent-soft' : '--dtu-ad-accent-deep';
+            accent = (styles.getPropertyValue(primaryAccentProperty) || styles.getPropertyValue('--dtu-ad-accent') || accent).trim() || accent;
         } catch (e0) { }
         return {
             ink: isDark ? '#f0eee8' : '#1a1a1a',

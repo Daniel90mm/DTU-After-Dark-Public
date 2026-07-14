@@ -2772,8 +2772,8 @@
             surfaceInset: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.06)',
             divider: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.10)',
             quietTrack: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)',
-            linkColor: isDark ? getResolvedAccent() : getResolvedAccentDeep(),
-            accentText: isDark ? getResolvedAccent() : getResolvedAccentDeep()
+            linkColor: isDark ? 'var(--dtu-ad-accent-soft)' : getResolvedAccentDeep(),
+            accentText: isDark ? 'var(--dtu-ad-accent-soft)' : getResolvedAccentDeep()
         };
     }
 

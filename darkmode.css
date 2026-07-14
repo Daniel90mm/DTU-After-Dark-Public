@@ -4438,6 +4438,34 @@ form.form-horizontal .form-control {
   border-color: #404040 !important;
 }
 
+/* Kurser search controls should ask the browser for its native dark widgets.
+   This keeps checkbox geometry/accessibility browser-native in both Firefox
+   and Chromium without leaving bright white unchecked boxes on the form. */
+form.form-horizontal[action="/search"],
+form.form-horizontal[action="/search"] .multiselect-container {
+  color-scheme: dark !important;
+}
+
+form.form-horizontal[action="/search"] input[type="checkbox"],
+form.form-horizontal[action="/search"] .multiselect-container input[type="checkbox"] {
+  accent-color: var(--dtu-ad-accent) !important;
+}
+
+/* The native empty-basket asset is nearly black and disappears on dark result
+   rows. Brighten only the empty state; populated/semantic basket assets retain
+   their original colors. */
+img.basketIcon[src*="basket_empty"] {
+  background: transparent !important;
+  filter: brightness(0) invert(0.78) !important;
+  opacity: 0.8 !important;
+}
+
+img.basketIcon[src*="basket_empty"]:hover,
+img.basketIcon[src*="basket_empty"]:focus {
+  filter: brightness(0) invert(1) !important;
+  opacity: 1 !important;
+}
+
 /* Frontpage area and widgets - dark 1 */
 .frontpage-area {
   background-color: #1a1a1a !important;
