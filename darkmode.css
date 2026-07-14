@@ -1511,6 +1511,21 @@ table.dsearch:has(#z_g_searchOptions) > tbody > tr > td,
   color: #e0e0e0 !important;
 }
 
+/* Brightspace's generic row hover can repaint the Classlist search-header strip
+   with the interactive hover grey. Use the stable Classlist search-table id as
+   a :has()-free fallback so every header layer stays dark 1 in Firefox too. */
+table#z_g.dsearch > tbody > tr:hover,
+table#z_g.dsearch > tbody > tr:hover > td,
+table#z_g.dsearch table.dsearch_header,
+table#z_g.dsearch table.dsearch_header > tbody,
+table#z_g.dsearch table.dsearch_header > tbody > tr:hover,
+table#z_g.dsearch table.dsearch_header > tbody > tr:hover > td {
+  background: #1a1a1a !important;
+  background-color: #1a1a1a !important;
+  background-image: none !important;
+  color: #e0e0e0 !important;
+}
+
 /* The expanded legacy Announcements search form is a raised filter panel,
    despite being assembled from nested layout tables. Keep that panel dark 2;
    layout-table hover must not expose a different background behind its fields. */
