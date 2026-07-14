@@ -571,6 +571,42 @@
         }
     `;
 
+    const htmlEditorShadowStyles = `
+        :host {
+            color: ${DARK_TEXT} !important;
+        }
+        .d2l-htmleditor-container,
+        .d2l-htmleditor-flex-container,
+        .d2l-htmleditor-toolbar-container,
+        d2l-htmleditor-toolbar,
+        .tox-tinymce,
+        .tox-editor-container,
+        .tox-editor-header,
+        .tox-toolbar-overlord,
+        .tox-toolbar__primary,
+        .tox-statusbar {
+            background: ${DARK_BG} !important;
+            background-color: ${DARK_BG} !important;
+            background-image: none !important;
+            color: ${DARK_TEXT} !important;
+            border-color: ${DARK_BORDER} !important;
+        }
+        .tox-edit-area,
+        .tox-edit-area iframe {
+            background: #1a1a1a !important;
+            background-color: #1a1a1a !important;
+            background-image: none !important;
+            color: ${DARK_TEXT} !important;
+            border-color: ${DARK_BORDER} !important;
+        }
+        .tox-statusbar,
+        .tox-statusbar__path,
+        .tox-statusbar__wordcount,
+        .tox-statusbar__resize-handle {
+            color: ${DARK_TEXT} !important;
+        }
+    `;
+
     const menuStyles = `
         :host,
         .d2l-menu,
@@ -933,6 +969,11 @@
             } else if (tagName === 'd2l-expand-collapse-content' || tagName === 'd2l-lti-launch') {
                 styleId = 'dark-mode-shadow-styles-expand-collapse';
                 styleText = expandCollapseStyles;
+            } else if (tagName === 'd2l-htmleditor') {
+                // The editor shell and its TinyMCE iframe live inside this open
+                // shadow root, where the page stylesheet cannot reach them.
+                styleId = 'dark-mode-shadow-styles-html-editor';
+                styleText = htmlEditorShadowStyles;
             } else if (tagName === 'd2l-button-subtle') {
                 styleId = 'dark-mode-shadow-styles-button-subtle';
                 styleText = buttonSubtleStyles;
