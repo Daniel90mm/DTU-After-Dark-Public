@@ -2055,6 +2055,95 @@ form[action*="/Answer/SaveAnswers/"],
   flex: 0 0 auto !important;
 }
 
+/* Result comparison tabs and the sticky action footer belong to the page shell. */
+.tsMasterContent .tsMainTabs.ui-widget-content,
+.tsMasterContent .resultsTab.ui-widget-content,
+.tsMasterContent .tsResultsTab.ui-widget-content,
+.tsMasterContent article.main__footer,
+.tsMasterContent .main__footer-container {
+  background: #1a1a1a !important;
+  background-color: #1a1a1a !important;
+  color: #e0e0e0 !important;
+  border-color: #404040 !important;
+}
+
+.tsMasterContent .ui-tabs-nav,
+.tsMasterContent .ui-tabs-tab,
+.tsMasterContent .ui-tabs-anchor {
+  background: #2d2d2d !important;
+  background-color: #2d2d2d !important;
+  color: #e0e0e0 !important;
+  border-color: #404040 !important;
+}
+
+.tsMasterContent .ui-tabs-tab:hover,
+.tsMasterContent .ui-tabs-tab:hover .ui-tabs-anchor,
+.tsMasterContent .ui-tabs-tab.ui-state-hover,
+.tsMasterContent .ui-tabs-tab.ui-state-hover .ui-tabs-anchor {
+  background: #3d3d3d !important;
+  background-color: #3d3d3d !important;
+  color: #ffffff !important;
+}
+
+.tsMasterContent .ui-tabs-tab.ui-tabs-active,
+.tsMasterContent .ui-tabs-tab.ui-tabs-active .ui-tabs-anchor,
+.tsMasterContent .ui-tabs-tab.ui-state-active,
+.tsMasterContent .ui-tabs-tab.ui-state-active .ui-tabs-anchor {
+  background: #1a1a1a !important;
+  background-color: #1a1a1a !important;
+  color: #ffffff !important;
+}
+
+/* Comparison legend drawer, including its state after the Legend button opens it. */
+.tsMasterContent .comparison__aside,
+.tsMasterContent .comparison__legend,
+.tsMasterContent .comparison__legend .legend,
+.tsMasterContent .comparison__legend .legend__content,
+.tsMasterContent .comparison__legend .legend__body {
+  background: #2d2d2d !important;
+  background-color: #2d2d2d !important;
+  color: #e0e0e0 !important;
+  border-color: #404040 !important;
+}
+
+/* Bar-visualization table of contents: fixed panel, hover, and collapsed states. */
+.tsMasterContent .table-of-content,
+.tsMasterContent .table-of-content-title,
+.tsMasterContent .table-of-content-actions,
+.tsMasterContent .table-of-content-body,
+.tsMasterContent .table-of-content-line {
+  background: #2d2d2d !important;
+  background-color: #2d2d2d !important;
+  color: #e0e0e0 !important;
+  border-color: #505050 !important;
+}
+
+.tsMasterContent .table-of-content-line:hover,
+.tsMasterContent .table-of-content-title:hover,
+.tsMasterContent .table-of-content-actions button:hover {
+  background: #3d3d3d !important;
+  background-color: #3d3d3d !important;
+  color: #ffffff !important;
+}
+
+.tsMasterContent .table-of-content a {
+  color: #66b3ff !important;
+}
+
+.tsMasterContent .table-of-content a:hover,
+.tsMasterContent .table-of-content a:focus-visible {
+  color: #99ccff !important;
+}
+
+.tsMasterContent .table-of-content input,
+.tsMasterContent .table-of-content select,
+.tsMasterContent .table-of-content button {
+  background: #3d3d3d !important;
+  background-color: #3d3d3d !important;
+  color: #e0e0e0 !important;
+  border-color: #505050 !important;
+}
+
 /* Help text */
 .text--help,
 .text--help--noopacity,

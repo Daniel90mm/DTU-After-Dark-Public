@@ -68,7 +68,7 @@
     },
     {
       "matches": ["*://evaluering.dtu.dk/*"],
-      "js": ["config.js", "darkmode.js", "darkmode.dark-engine.js", "darkmode.smart-room-linker.js"],
+      "js": ["config.js", "darkmode.js", "darkmode.dark-engine.js", "darkmode.smart-room-linker.js", "darkmode.host-shells.js"],
       "run_at": "document_start",
       "all_frames": true
     },

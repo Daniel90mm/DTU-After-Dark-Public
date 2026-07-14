@@ -43,6 +43,47 @@
         if (!isTopWindow()) return;
         if (window.location.hostname !== 'evaluering.dtu.dk') return;
 
+        var darkMode = isDarkModeEnabled();
+        var path = (window.location.pathname || '').toLowerCase();
+        var isBarVisualization = path.indexOf('/resultpresentation/barvisualization') !== -1;
+
+        function restoreOwnedCanvasFilter(canvas) {
+            if (!canvas || !canvas.style || canvas.dataset.dtuAfterDarkCanvasFilter !== '1') return;
+
+            var previousValue = canvas.dataset.dtuAfterDarkCanvasFilterValue || '';
+            var previousPriority = canvas.dataset.dtuAfterDarkCanvasFilterPriority || '';
+            if (previousValue) {
+                canvas.style.setProperty('filter', previousValue, previousPriority);
+            } else {
+                canvas.style.removeProperty('filter');
+            }
+
+            delete canvas.dataset.dtuAfterDarkCanvasFilter;
+            delete canvas.dataset.dtuAfterDarkCanvasFilterValue;
+            delete canvas.dataset.dtuAfterDarkCanvasFilterPriority;
+        }
+
+        function applyCanvasFilter(canvas) {
+            if (!canvas || !canvas.style) return;
+            if (canvas.dataset.dtuAfterDarkCanvasFilter !== '1') {
+                canvas.dataset.dtuAfterDarkCanvasFilter = '1';
+                canvas.dataset.dtuAfterDarkCanvasFilterValue = canvas.style.getPropertyValue('filter') || '';
+                canvas.dataset.dtuAfterDarkCanvasFilterPriority = canvas.style.getPropertyPriority('filter') || '';
+            }
+            canvas.style.setProperty('filter', 'invert(1) hue-rotate(180deg)', 'important');
+        }
+
+        var canvasSelector = 'canvas[id^="CanvasQuestion_"]';
+        // BarVisualization uses generated UUID ids and does not expose a stable
+        // chart class. The pathname is stable, so all canvases on that route are
+        // result charts and can be handled without affecting other evaluering pages.
+        if (isBarVisualization) canvasSelector = 'canvas';
+
+        if (!darkMode) {
+            document.querySelectorAll(canvasSelector).forEach(restoreOwnedCanvasFilter);
+            return;
+        }
+
         document.querySelectorAll('.mx-s.hide-on-print, .mx-s.hide-on-print .flex.flex--content-between').forEach(function (row) {
             row.style.setProperty('background', 'transparent', 'important');
             row.style.setProperty('background-color', 'transparent', 'important');
@@ -62,7 +103,8 @@
             }
         });
 
-        document.querySelectorAll('canvas[id^="CanvasQuestion_"]').forEach(function (canvas) {
+        document.querySelectorAll(canvasSelector).forEach(function (canvas) {
+            applyCanvasFilter(canvas);
             canvas.style.setProperty('background', 'transparent', 'important');
             canvas.style.setProperty('background-color', 'transparent', 'important');
 
