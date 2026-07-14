@@ -4728,6 +4728,15 @@ main.main.arc-row>section.main__content {
   background: #1a1a1a !important;
 }
 
+/* CampusNet My Links uses plain page-section headings, not raised cards.
+   Let them merge with the dark-1 canvas instead of inheriting the generic
+   main-content h2 strip intended for result panels. */
+#ctl00_ContentBox form[action$="su_link.aspx"] > h2 {
+  background: transparent !important;
+  background-color: transparent !important;
+  color: #e0e0e0 !important;
+}
+
 
 /* Library dropdown panel styles are injected at runtime from `darkmode.js`
    (`ensureLibraryRuntimeStyles`) so the UI stays consistent in both dark mode ON/OFF. */
