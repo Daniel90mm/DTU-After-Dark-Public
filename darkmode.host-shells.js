@@ -142,7 +142,10 @@
             var accentHoverHex = theme.accentHover || '#b30000';
             var accentSoftHex = theme.accentSoft || accentHex;
             var linkColor = isDarkModeEnabled() ? accentSoftHex : accentDeepHex;
-            var linkHoverColor = isDarkModeEnabled() ? accentHex : accentHoverHex;
+            // The base/deep accent is too dark against CampusNet's dark canvas.
+            // Keep dark-mode feed links visibly interactive without sacrificing
+            // their readable soft-accent resting state.
+            var linkHoverColor = isDarkModeEnabled() ? '#ffffff' : accentHoverHex;
 
             document.querySelectorAll('.widget__header').forEach(function (header) {
                 if (!header || !header.style) return;
