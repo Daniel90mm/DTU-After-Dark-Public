@@ -4114,12 +4114,12 @@ article.arc-toolbar.mb-l,
 
 /* Archived elements list */
 .archived-elements {
-  background-color: #2d2d2d !important;
+  background-color: #1a1a1a !important;
   color: #e0e0e0 !important;
 }
 
 .archived-elements__header {
-  background-color: #1a1a1a !important;
+  background-color: #2d2d2d !important;
   color: #e0e0e0 !important;
   border-color: #404040 !important;
 }
@@ -4130,20 +4130,20 @@ article.arc-toolbar.mb-l,
 }
 
 .archived-elements__content {
-  background-color: #2d2d2d !important;
+  background-color: #1a1a1a !important;
 }
 
 /* Individual archived element rows */
 .archived-element,
 article.archived-element {
-  background-color: #2d2d2d !important;
+  background-color: #1a1a1a !important;
   color: #e0e0e0 !important;
   border-color: #404040 !important;
 }
 
 .archived-element:hover,
 article.archived-element:hover {
-  background-color: #3d3d3d !important;
+  background-color: #2d2d2d !important;
 }
 
 .archived-element__select,
@@ -4158,13 +4158,23 @@ article.archived-element:hover {
   background-color: transparent !important;
 }
 
-.archived-element__subtitle {
-  color: #888888 !important;
+.archived-element__title a {
+  color: var(--dtu-ad-accent-soft) !important;
+}
+
+.archived-element__title a:hover,
+.archived-element__title a:focus-visible {
+  color: var(--dtu-ad-accent-soft) !important;
+  text-decoration: underline !important;
+}
+
+.archived-element .archived-element__subtitle {
+  color: #b0b0b0 !important;
   background-color: transparent !important;
 }
 
-.archived-element__expiration time {
-  color: #b0b0b0 !important;
+.archived-element .archived-element__expiration time {
+  color: #c0c0c0 !important;
 }
 
 /* Sort icons */
