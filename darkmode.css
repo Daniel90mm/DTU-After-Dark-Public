@@ -1526,9 +1526,9 @@ table#z_g.dsearch table.dsearch_header > tbody > tr:hover > td {
   color: #e0e0e0 !important;
 }
 
-/* The expanded legacy Announcements search form is a raised filter panel,
-   despite being assembled from nested layout tables. Keep that panel dark 2;
-   layout-table hover must not expose a different background behind its fields. */
+/* The expanded legacy Announcements search form is structural page content,
+   despite being assembled from nested layout tables. Keep every layout layer
+   dark 1 so Firefox does not expose dark-2 sheets between its field groups. */
 #z_d_searchOptions,
 #z_d_searchOptions > table.d_FG,
 #z_d_searchOptions > table.d_FG > tbody,
@@ -1536,7 +1536,7 @@ table#z_g.dsearch table.dsearch_header > tbody > tr:hover > td {
 #z_d_searchOptions > table.d_FG > tbody > tr > td,
 #z_d_searchOptions fieldset,
 #z_d_searchOptions .dfs_c_f {
-  background-color: #2d2d2d !important;
+  background-color: #1a1a1a !important;
   color: #e0e0e0 !important;
 }
 
@@ -1549,7 +1549,7 @@ table#z_g.dsearch table.dsearch_header > tbody > tr:hover > td {
 
 #z_d_searchOptions tr:hover,
 #z_d_searchOptions tr:hover > td {
-  background-color: #2d2d2d !important;
+  background-color: #1a1a1a !important;
 }
 
 /* List role containers */
