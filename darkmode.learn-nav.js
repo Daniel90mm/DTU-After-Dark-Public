@@ -709,90 +709,6 @@
 
     var _learnNavBootstrapTimer = null;
     var _learnNavBootstrapAttempts = 0;
-    var QUICK_ACCESS_ID = 'dtu-after-dark-quick-access';
-    var QUICK_ACCESS_STYLE_ID = 'dtu-after-dark-quick-access-style';
-
-    function ensureQuickAccessStyles() {
-        if (document.getElementById(QUICK_ACCESS_STYLE_ID)) return;
-        var style = document.createElement('style');
-        style.id = QUICK_ACCESS_STYLE_ID;
-        style.textContent = ''
-            + '#' + QUICK_ACCESS_ID + '{position:fixed;top:88px;right:16px;z-index:2147483645;display:flex;gap:8px;align-items:center;flex-wrap:wrap;'
-            + 'padding:10px 12px;border-radius:14px;background:rgba(24,24,24,0.94);border:1px solid rgba(255,255,255,0.12);'
-            + 'box-shadow:0 12px 30px rgba(0,0,0,0.28);backdrop-filter:blur(8px);}'
-            + '#' + QUICK_ACCESS_ID + ' button{appearance:none;border:1px solid rgba(255,255,255,0.14);background:#2a2a2a;color:#f3f3f3;'
-            + 'padding:8px 12px;border-radius:999px;font:600 13px/1.1 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;cursor:pointer;}'
-            + '#' + QUICK_ACCESS_ID + ' button:hover{border-color:var(--dtu-ad-accent,#990000);color:#ffffff;background:#333333;}'
-            + '#' + QUICK_ACCESS_ID + ' .dtu-after-dark-primary{background:var(--dtu-ad-accent-deep,#7d0000);border-color:var(--dtu-ad-accent-deep,#7d0000);color:#ffffff;}'
-            + '#' + QUICK_ACCESS_ID + ' .dtu-after-dark-primary:hover{background:var(--dtu-ad-accent,#990000);border-color:var(--dtu-ad-accent,#990000);}'
-            + '@media (max-width: 900px){#' + QUICK_ACCESS_ID + '{top:auto;bottom:16px;right:16px;left:16px;justify-content:flex-end;}}';
-        (document.head || document.documentElement).appendChild(style);
-    }
-
-    function removeLearnQuickAccessFallback() {
-        var existing = document.getElementById(QUICK_ACCESS_ID);
-        if (existing) {
-            try { existing.remove(); } catch (e0) { }
-        }
-    }
-
-    function ensureLearnQuickAccessFallback() {
-        if (!isTopWindow()) return;
-        if (window.location.hostname !== 'learn.inside.dtu.dk') return;
-        if (queryFirstDeep('.dtu-settings-nav-item', document)) {
-            removeLearnQuickAccessFallback();
-            return;
-        }
-
-        ensureQuickAccessStyles();
-        var existing = document.getElementById(QUICK_ACCESS_ID);
-        if (existing) {
-            var darkBtnExisting = existing.querySelector('[data-role="dark-toggle"]');
-            if (darkBtnExisting) {
-                darkBtnExisting.textContent = isDarkModeEnabled() ? 'Dark: On' : 'Dark: Off';
-            }
-            return;
-        }
-
-        var wrap = document.createElement('div');
-        wrap.id = QUICK_ACCESS_ID;
-        markExt(wrap);
-
-        var settingsBtn = document.createElement('button');
-        settingsBtn.type = 'button';
-        settingsBtn.className = 'dtu-after-dark-primary';
-        settingsBtn.textContent = 'After Dark Settings';
-        settingsBtn.addEventListener('click', function () {
-            try { showSettingsModal(); } catch (e0) { }
-        });
-
-        var darkBtn = document.createElement('button');
-        darkBtn.type = 'button';
-        darkBtn.setAttribute('data-role', 'dark-toggle');
-        darkBtn.textContent = isDarkModeEnabled() ? 'Dark: On' : 'Dark: Off';
-        darkBtn.addEventListener('click', function () {
-            var next = !isDarkModeEnabled();
-            try { saveDarkModePreference(next); } catch (e0) { }
-            darkBtn.textContent = next ? 'Dark: On' : 'Dark: Off';
-            try { window.location.reload(); } catch (e1) { }
-        });
-
-        var libraryBtn = document.createElement('button');
-        libraryBtn.type = 'button';
-        libraryBtn.textContent = 'Library';
-        libraryBtn.addEventListener('click', function () {
-            var api = getLibraryUiApi();
-            if (api && typeof api.showLibraryPanel === 'function') {
-                try { api.showLibraryPanel(libraryBtn); } catch (e0) { }
-            }
-        });
-
-        wrap.appendChild(settingsBtn);
-        wrap.appendChild(darkBtn);
-        wrap.appendChild(libraryBtn);
-        (document.body || document.documentElement).appendChild(wrap);
-    }
-
     function runLearnNavBootstrapPass() {
         if (!isTopWindow()) return false;
         if (window.location.hostname !== 'learn.inside.dtu.dk') return false;
@@ -801,7 +717,6 @@
         try { insertSettingsNavItem(); } catch (e1) { }
         try { insertLibraryNavItem(); } catch (e2) { }
         try { insertDTULearnNavResourceLinks(); } catch (e3) { }
-        try { ensureLearnQuickAccessFallback(); } catch (e4) { }
 
         var mainWrapper = getMainNavWrapper();
         var hasSettings = !!(mainWrapper && mainWrapper.querySelector && mainWrapper.querySelector('.dtu-settings-nav-item'));
