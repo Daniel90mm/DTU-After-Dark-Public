@@ -1721,6 +1721,28 @@
         return false;
     }
 
+    // Survey answer rows use legacy hover/focus styling that can repaint an
+    // entire table cell white. Their controls and text are layout, not cards,
+    // so keep the complete row on the dark-1 canvas with guarded inline styles.
+    function forceSurveyAttemptAnswerRowDark1(row) {
+        if (!row || !row.style) return;
+        var nodes = [row];
+        try {
+            row.querySelectorAll('td').forEach(function (cell) { nodes.push(cell); });
+        } catch (e0) { }
+        nodes.forEach(function (node) {
+            if (!node || !node.style) return;
+            if (inlineStyleHasDarkFill(node, '#1a1a1a', 'rgb(26,26,26)')
+                && inlineStyleHasTextColor(node, '#e0e0e0', 'rgb(224,224,224)')) return;
+            node.style.setProperty('background', '#1a1a1a', 'important');
+            node.style.setProperty('background-color', '#1a1a1a', 'important');
+            node.style.setProperty('background-image', 'none', 'important');
+            node.style.setProperty('color', '#e0e0e0', 'important');
+            node.style.setProperty('border-color', '#404040', 'important');
+            node.style.setProperty('outline-color', '#404040', 'important');
+        });
+    }
+
     function applyDarkStyle(el) {
         if (!el || !el.style) return;
         if (isStudyplanModalBackgroundExemptElement(el)) return;
@@ -1735,6 +1757,11 @@
                 var isSurveyListRowStructure = window.location.pathname.indexOf('/d2l/lms/survey/user/surveys_list.d2l') !== -1
                     && el.closest
                     && el.closest('#z_b.d2l-table > tbody > tr:not(.d_gh)');
+                var surveyAnswerRow = el.closest && el.closest('tr.d2l-rowshadeonhover');
+                var isSurveyAttemptAnswerRowStructure = window.location.pathname.indexOf('/d2l/lms/survey/user/attempt/') !== -1
+                    && surveyAnswerRow
+                    && surveyAnswerRow.querySelector('.d2l-qc-controls-container input.d2l-radio');
+                if (isSurveyAttemptAnswerRowStructure) forceSurveyAttemptAnswerRowDark1(surveyAnswerRow);
                 var surveyRadioWrapper = el.closest && el.closest('.dco_c');
                 var isSurveyAttemptRadioStructure = window.location.pathname.indexOf('/d2l/lms/survey/user/attempt/') !== -1
                     && (el.matches('.d2l-radio')
@@ -1750,7 +1777,7 @@
                     && el.closest
                     && el.closest('tr')
                     && el.closest('tr').querySelector('.d2l-grades-score');
-                if (isQuizAttemptStructure || isQuizListRowStructure || isSurveyListRowStructure || isSurveyAttemptRadioStructure || isQuizSubmissionScoreStructure || isQuizSubmissionAttemptStructure || isQuizSubmissionScoreRowStructure) {
+                if (isQuizAttemptStructure || isQuizListRowStructure || isSurveyListRowStructure || isSurveyAttemptAnswerRowStructure || isSurveyAttemptRadioStructure || isQuizSubmissionScoreStructure || isQuizSubmissionAttemptStructure || isQuizSubmissionScoreRowStructure) {
                     if (inlineStyleHasDarkFill(el, '#1a1a1a', 'rgb(26,26,26)')
                         && inlineStyleHasTextColor(el, '#e0e0e0', 'rgb(224,224,224)')) return;
                     el.style.setProperty('background', '#1a1a1a', 'important');
@@ -1836,6 +1863,11 @@
                 var isSurveyListRowStructure = window.location.pathname.indexOf('/d2l/lms/survey/user/surveys_list.d2l') !== -1
                     && el.closest
                     && el.closest('#z_b.d2l-table > tbody > tr:not(.d_gh)');
+                var surveyAnswerRow = el.closest && el.closest('tr.d2l-rowshadeonhover');
+                var isSurveyAttemptAnswerRowStructure = window.location.pathname.indexOf('/d2l/lms/survey/user/attempt/') !== -1
+                    && surveyAnswerRow
+                    && surveyAnswerRow.querySelector('.d2l-qc-controls-container input.d2l-radio');
+                if (isSurveyAttemptAnswerRowStructure) forceSurveyAttemptAnswerRowDark1(surveyAnswerRow);
                 var surveyRadioWrapper = el.closest && el.closest('.dco_c');
                 var isSurveyAttemptRadioStructure = window.location.pathname.indexOf('/d2l/lms/survey/user/attempt/') !== -1
                     && (el.matches('.d2l-radio')
@@ -1851,7 +1883,7 @@
                     && el.closest
                     && el.closest('tr')
                     && el.closest('tr').querySelector('.d2l-grades-score');
-                if (isQuizAttemptStructure || isQuizListRowStructure || isSurveyListRowStructure || isSurveyAttemptRadioStructure || isQuizSubmissionScoreStructure || isQuizSubmissionAttemptStructure || isQuizSubmissionScoreRowStructure) {
+                if (isQuizAttemptStructure || isQuizListRowStructure || isSurveyListRowStructure || isSurveyAttemptAnswerRowStructure || isSurveyAttemptRadioStructure || isQuizSubmissionScoreStructure || isQuizSubmissionAttemptStructure || isQuizSubmissionScoreRowStructure) {
                     if (inlineStyleHasDarkFill(el, '#1a1a1a', 'rgb(26,26,26)')
                         && inlineStyleHasTextColor(el, '#e0e0e0', 'rgb(224,224,224)')) return;
                     el.style.setProperty('background', '#1a1a1a', 'important');
