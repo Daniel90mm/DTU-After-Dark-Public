@@ -2340,10 +2340,25 @@ button[aria-label*="Quiz"] d2l-icon[icon="tier1:chevron-down"] {
   background-image: none !important;
 }
 
-/* Quiz List only: preserve the table as a contained data surface, but give its
-   links the selected accent and make the hovered quiz row visibly actionable.
+/* Quiz List only: the page and column header are structural dark 1, while
+   individual quizzes are dark-2 data rows. Keep this explicit rather than
+   depending on the generic legacy-table darkening path. Links use the selected
+   accent and a hovered quiz row is visibly actionable.
    Do not extend these selectors to quiz-summary/attempt pages: their authored
    question and feedback states carry meaningful course/answer semantics. */
+form[action*="/d2l/lms/quizzing/user/quizzes_list.d2l"] .d2l-grid-container,
+form[action*="/d2l/lms/quizzing/user/quizzes_list.d2l"] d2l-table-wrapper,
+form[action*="/d2l/lms/quizzing/user/quizzes_list.d2l"] #z_b.d2l-table,
+form[action*="/d2l/lms/quizzing/user/quizzes_list.d2l"] #z_b.d2l-table > tbody,
+form[action*="/d2l/lms/quizzing/user/quizzes_list.d2l"] #z_b.d2l-table > tbody > tr.d_gh,
+form[action*="/d2l/lms/quizzing/user/quizzes_list.d2l"] #z_b.d2l-table > tbody > tr.d_gh > th {
+  background-color: #1a1a1a !important;
+}
+
+form[action*="/d2l/lms/quizzing/user/quizzes_list.d2l"] #z_b.d2l-table > tbody > tr:not(.d_gh) > td {
+  background-color: #2d2d2d !important;
+}
+
 form[action*="/d2l/lms/quizzing/user/quizzes_list.d2l"] #z_b.d2l-table a.d2l-link-inline {
   color: var(--dtu-ad-accent-soft) !important;
 }
