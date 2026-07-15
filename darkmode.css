@@ -2823,6 +2823,22 @@ button.dropdown-toggle.red {
   border-color: #404040 !important;
 }
 
+/* Brightspace's default web-component alert renders its panel in shadow DOM.
+   The host/light-DOM fallback keeps neutral notices readable while preserving
+   success, warning, and error semantics. */
+d2l-alert[type="default"],
+d2l-alert[type="default"] .d2l-htmlblock-untrusted,
+d2l-alert[type="default"] d2l-html-block {
+  background-color: #2d2d2d !important;
+  color: #e0e0e0 !important;
+  border-color: #404040 !important;
+}
+
+d2l-alert[type="default"] .d2l-htmlblock-untrusted,
+d2l-alert[type="default"] d2l-html-block {
+  background-color: transparent !important;
+}
+
 /* ===== DTU Course Base (kurser.dtu.dk) ===== */
 /* Container */
 .container {
