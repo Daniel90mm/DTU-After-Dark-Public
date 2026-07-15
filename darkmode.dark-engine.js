@@ -996,8 +996,18 @@
                 styleId = 'dark-mode-shadow-styles-menu';
                 styleText = menuStyles;
             } else if (tagName === 'd2l-html-block') {
-                styleId = 'dark-mode-shadow-styles-html-block';
-                styleText = htmlBlockStyles;
+                var isSurveyAttemptHtmlBlock = window.location.pathname.indexOf('/d2l/lms/survey/user/attempt/') !== -1;
+                styleId = isSurveyAttemptHtmlBlock
+                    ? 'dark-mode-shadow-styles-survey-attempt-html-block'
+                    : 'dark-mode-shadow-styles-html-block';
+                styleText = htmlBlockStyles + (isSurveyAttemptHtmlBlock ? `
+                    :host,
+                    .d2l-html-block-rendered {
+                        background: #1a1a1a !important;
+                        background-color: #1a1a1a !important;
+                        background-image: none !important;
+                    }
+                ` : '');
             } else if (tagName === 'd2l-alert') {
                 // d2l-alert owns its visible default panel inside shadow DOM.
                 // Keep semantic alert variants intact; this handles the neutral
