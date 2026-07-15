@@ -1676,7 +1676,10 @@
                 var isQuizAttemptStructure = window.location.pathname.indexOf('/d2l/lms/quizzing/user/attempt/quiz_attempt_page') !== -1
                     && (el.matches('.d2l-quiz-question-autosave-container, .d2l-quiz-answer-container, .d2l-quiz-attempt-buttons')
                         || (el.closest && el.closest('.d2l-quiz-question-autosave-container, .d2l-quiz-answer-container, .d2l-quiz-attempt-buttons')));
-                if (isQuizAttemptStructure) {
+                var isQuizListRowStructure = window.location.pathname.indexOf('/d2l/lms/quizzing/user/quizzes_list.d2l') !== -1
+                    && el.closest
+                    && el.closest('#z_b.d2l-table > tbody > tr:not(.d_gh)');
+                if (isQuizAttemptStructure || isQuizListRowStructure) {
                     if (inlineStyleHasDarkFill(el, '#1a1a1a', 'rgb(26,26,26)')
                         && inlineStyleHasTextColor(el, '#e0e0e0', 'rgb(224,224,224)')) return;
                     el.style.setProperty('background', '#1a1a1a', 'important');
@@ -1756,7 +1759,10 @@
                 var isQuizAttemptStructure = window.location.pathname.indexOf('/d2l/lms/quizzing/user/attempt/quiz_attempt_page') !== -1
                     && (el.matches('.d2l-quiz-question-autosave-container, .d2l-quiz-answer-container, .d2l-quiz-attempt-buttons')
                         || (el.closest && el.closest('.d2l-quiz-question-autosave-container, .d2l-quiz-answer-container, .d2l-quiz-attempt-buttons')));
-                if (isQuizAttemptStructure) {
+                var isQuizListRowStructure = window.location.pathname.indexOf('/d2l/lms/quizzing/user/quizzes_list.d2l') !== -1
+                    && el.closest
+                    && el.closest('#z_b.d2l-table > tbody > tr:not(.d_gh)');
+                if (isQuizAttemptStructure || isQuizListRowStructure) {
                     if (inlineStyleHasDarkFill(el, '#1a1a1a', 'rgb(26,26,26)')
                         && inlineStyleHasTextColor(el, '#e0e0e0', 'rgb(224,224,224)')) return;
                     el.style.setProperty('background', '#1a1a1a', 'important');

@@ -2340,10 +2340,10 @@ button[aria-label*="Quiz"] d2l-icon[icon="tier1:chevron-down"] {
   background-image: none !important;
 }
 
-/* Quiz List only: the page and column header are structural dark 1, while
-   individual quizzes are dark-2 data rows. Keep this explicit rather than
-   depending on the generic legacy-table darkening path. Links use the selected
-   accent and a hovered quiz row is visibly actionable.
+/* Quiz List only: the page, column header, and resting rows are structural
+   dark 1. Keep this explicit rather than depending on the generic legacy-table
+   darkening path. Links use the selected accent and a hovered quiz row lifts
+   to dark 2.
    Do not extend these selectors to quiz-summary/attempt pages: their authored
    question and feedback states carry meaningful course/answer semantics. */
 form[action*="/d2l/lms/quizzing/user/quizzes_list.d2l"] .d2l-grid-container,
@@ -2356,7 +2356,7 @@ form[action*="/d2l/lms/quizzing/user/quizzes_list.d2l"] #z_b.d2l-table > tbody >
 }
 
 form[action*="/d2l/lms/quizzing/user/quizzes_list.d2l"] #z_b.d2l-table > tbody > tr:not(.d_gh) > td {
-  background-color: #2d2d2d !important;
+  background-color: #1a1a1a !important;
 }
 
 form[action*="/d2l/lms/quizzing/user/quizzes_list.d2l"] #z_b.d2l-table a.d2l-link-inline {
@@ -2370,7 +2370,7 @@ form[action*="/d2l/lms/quizzing/user/quizzes_list.d2l"] #z_b.d2l-table a.d2l-lin
 }
 
 form[action*="/d2l/lms/quizzing/user/quizzes_list.d2l"] #z_b.d2l-table > tbody > tr:not(.d_gh):hover > td {
-  background-color: #3d3d3d !important;
+  background-color: #2d2d2d !important;
 }
 
 /* Quiz attempts render inside nested same-origin frames. These are layout
