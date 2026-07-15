@@ -2408,6 +2408,12 @@ form[action*="/d2l/lms/grades/my_grades/main.d2l"] table#z_a.d2l-table > tbody >
   background-color: #1a1a1a !important;
 }
 
+form[action*="/d2l/lms/grades/my_grades/main.d2l"] .d2l-grades-individualcommentlabelcontainer,
+form[action*="/d2l/lms/grades/my_grades/main.d2l"] .d2l-grades-individualcommentlabelcontainer .dco,
+form[action*="/d2l/lms/grades/my_grades/main.d2l"] .d2l-grades-individualcommentlabelcontainer .dco_c {
+  background-color: #1a1a1a !important;
+}
+
 /* Quiz attempts render inside nested same-origin frames. These are layout
    wrappers around the question, answer list, and submit area—not raised cards.
    Keeping them dark 1 removes the awkward dark-2 blocks without touching
