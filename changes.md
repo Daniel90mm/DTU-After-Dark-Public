@@ -5,6 +5,7 @@ Add one row per shipped change so changelog text and reviewer notes are ready.
 
 | Date | Area | Change | Reviewer Notes |
 | --- | --- | --- | --- |
+| 2026-07-15 | CampusNet Calendar | Reclassified the private-appointments and semester-navigation layout row as dark 1, while preserving the selector and Update button as controls. | Open CampusNet Calendar in dark mode. Confirm the Display private appointments and Group calendars last updated area, plus the space behind the semester selector, blend with dark 1. |
 | 2026-07-15 | CampusNet Calendar | Darkened the week-view day labels and inline-white empty-appointment cells to dark 1. | Open CampusNet Calendar week view in dark mode. Confirm Tuesday and other day headers, plus every [no appointments] row, blend with dark 1. Turn Dark Mode off and confirm native styling returns. |
 | 2026-07-15 | CampusNet Assignments | Replaced the native pale assignment-table header gradient with a readable dark-2 header. Assignment rows and their hover state remain unchanged. | Open Assignments in dark mode after it finishes loading. Confirm Assignment, Type, Handed in, and Status have a dark header with readable labels; hover rows and confirm no light state appears. |
 | 2026-07-15 | DTU Learn FAQ | Darkened the legacy Categories accordion heading and border to dark 1, removing its native light panel. | Open Frequently Asked Questions in dark mode. Confirm Categories blends with the page canvas and remains readable; turn Dark Mode off to confirm native styling returns. |

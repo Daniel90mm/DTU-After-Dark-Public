@@ -4860,6 +4860,25 @@ img.basketIcon[src*="basket_empty"]:focus {
   border-color: #404040 !important;
 }
 
+/* Calendar private-appointment and semester controls sit in a legacy layout
+   row. The row itself is structural canvas; its select and Update button keep
+   their own control styling. */
+#ctl00_ContentBox td.ui-links,
+#ctl00_ContentBox td.ui-links + td {
+  background: #1a1a1a !important;
+  background-color: #1a1a1a !important;
+  background-image: none !important;
+  color: #e0e0e0 !important;
+  border-color: #404040 !important;
+}
+
+#ctl00_ContentBox td.ui-links .linkLiteral,
+#ctl00_ContentBox td.ui-links .showPrivateLiteral,
+#ctl00_ContentBox td.ui-links .lastUpdatedLiteral {
+  background: transparent !important;
+  color: #e0e0e0 !important;
+}
+
 #ActionChooser,
 #AppointmentEditorRaw,
 #AppointmentCancelor {
