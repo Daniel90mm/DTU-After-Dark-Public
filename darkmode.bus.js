@@ -3501,6 +3501,11 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
         var root = (rootNode && rootNode.querySelectorAll) ? rootNode : document;
         function forceDark1(el) {
             if (!el || !el.style) return;
+            var alreadyDark1 = String(el.style.getPropertyValue('background-color') || '').replace(/\s+/g, '').toLowerCase() === '#1a1a1a'
+                && el.style.getPropertyPriority('background-color') === 'important'
+                && String(el.style.getPropertyValue('color') || '').replace(/\s+/g, '').toLowerCase() === '#e0e0e0'
+                && el.style.getPropertyPriority('color') === 'important';
+            if (alreadyDark1) return;
             el.style.setProperty('background', '#1a1a1a', 'important');
             el.style.setProperty('background-color', '#1a1a1a', 'important');
             el.style.setProperty('background-image', 'none', 'important');
@@ -3508,18 +3513,16 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
             el.style.setProperty('border-color', '#404040', 'important');
         }
 
+        // The attempt/overall grade is structural metadata, not a raised badge.
+        // Its nested legacy .dco wrappers otherwise inherit the dark-2 baseline.
+        root.querySelectorAll('.d2l-grades-score, .d2l-grades-score .dco, .d2l-grades-score .dco_c').forEach(forceDark1);
+
         // Grade rows with blue/white graph bars should keep a dark-1 row background.
         root.querySelectorAll('tr').forEach(function (row) {
             if (!row.querySelector('img[src*="Framework.GraphBar"]')) return;
 
             row.querySelectorAll('td.d_tl.d_tm.d_tn, td.d_tr.d_tm.d_tn').forEach(function (td) { forceDark1(td); });
-            row.querySelectorAll('.d2l-grades-score, .dco, .dco_c').forEach(function (el) {
-                if (!el || !el.style) return;
-                el.style.setProperty('background-color', '#1a1a1a', 'important');
-                el.style.setProperty('background', '#1a1a1a', 'important');
-                el.style.setProperty('color', '#e0e0e0', 'important');
-                el.style.setProperty('background-image', 'none', 'important');
-            });
+            row.querySelectorAll('.d2l-grades-score, .dco, .dco_c').forEach(forceDark1);
             row.querySelectorAll('label').forEach(function (label) {
                 if (!label || !label.style) return;
                 label.style.setProperty('color', '#e0e0e0', 'important');
