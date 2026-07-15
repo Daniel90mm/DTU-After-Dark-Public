@@ -1704,7 +1704,11 @@
                 var isQuizSubmissionScoreStructure = window.location.pathname.indexOf('/d2l/lms/quizzing/user/quiz_submissions.d2l') !== -1
                     && el.closest
                     && el.closest('.d2l-grades-score');
-                if (isQuizAttemptStructure || isQuizListRowStructure || isQuizSubmissionScoreStructure) {
+                var isQuizSubmissionAttemptStructure = window.location.pathname.indexOf('/d2l/lms/quizzing/user/quiz_submissions.d2l') !== -1
+                    && el.closest
+                    && el.closest('tr')
+                    && el.closest('tr').querySelector('a[href*="/d2l/lms/quizzing/user/quiz_submissions_attempt.d2l"]');
+                if (isQuizAttemptStructure || isQuizListRowStructure || isQuizSubmissionScoreStructure || isQuizSubmissionAttemptStructure) {
                     if (inlineStyleHasDarkFill(el, '#1a1a1a', 'rgb(26,26,26)')
                         && inlineStyleHasTextColor(el, '#e0e0e0', 'rgb(224,224,224)')) return;
                     el.style.setProperty('background', '#1a1a1a', 'important');
@@ -1790,7 +1794,11 @@
                 var isQuizSubmissionScoreStructure = window.location.pathname.indexOf('/d2l/lms/quizzing/user/quiz_submissions.d2l') !== -1
                     && el.closest
                     && el.closest('.d2l-grades-score');
-                if (isQuizAttemptStructure || isQuizListRowStructure || isQuizSubmissionScoreStructure) {
+                var isQuizSubmissionAttemptStructure = window.location.pathname.indexOf('/d2l/lms/quizzing/user/quiz_submissions.d2l') !== -1
+                    && el.closest
+                    && el.closest('tr')
+                    && el.closest('tr').querySelector('a[href*="/d2l/lms/quizzing/user/quiz_submissions_attempt.d2l"]');
+                if (isQuizAttemptStructure || isQuizListRowStructure || isQuizSubmissionScoreStructure || isQuizSubmissionAttemptStructure) {
                     if (inlineStyleHasDarkFill(el, '#1a1a1a', 'rgb(26,26,26)')
                         && inlineStyleHasTextColor(el, '#e0e0e0', 'rgb(224,224,224)')) return;
                     el.style.setProperty('background', '#1a1a1a', 'important');
