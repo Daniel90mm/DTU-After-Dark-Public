@@ -2400,6 +2400,14 @@ form[action*="/d2l/lms/survey/user/surveys_list.d2l"] #z_b.d2l-table > tbody > t
   background-color: #2d2d2d !important;
 }
 
+/* Grade Item and Grade are structural columns. Keep their legacy wrappers on
+   the page canvas, while the authored Comments and Assessments panel remains
+   a raised dark-2 surface. */
+form[action*="/d2l/lms/grades/my_grades/main.d2l"] table#z_a.d2l-table > tbody > tr:not(.d_gh) > th[scope="row"],
+form[action*="/d2l/lms/grades/my_grades/main.d2l"] table#z_a.d2l-table > tbody > tr:not(.d_gh) > td.d_gn {
+  background-color: #1a1a1a !important;
+}
+
 /* Quiz attempts render inside nested same-origin frames. These are layout
    wrappers around the question, answer list, and submit area—not raised cards.
    Keeping them dark 1 removes the awkward dark-2 blocks without touching

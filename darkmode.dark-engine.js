@@ -1762,6 +1762,11 @@
                 var isSurveyListRowStructure = window.location.pathname.indexOf('/d2l/lms/survey/user/surveys_list.d2l') !== -1
                     && el.closest
                     && el.closest('#z_b.d2l-table > tbody > tr:not(.d_gh)');
+                var isGradesMainStructuralCell = window.location.pathname.indexOf('/d2l/lms/grades/my_grades/main.d2l') !== -1
+                    && el.closest
+                    && el.closest('table#z_a.d2l-table')
+                    && !el.closest('.d2l-grades-individualcommentlabelcontainer')
+                    && el.closest('th[scope="row"], td.d_gn');
                 var surveyAnswerRow = el.closest && el.closest('tr.d2l-rowshadeonhover');
                 var isSurveyAttemptAnswerRowStructure = window.location.pathname.indexOf('/d2l/lms/survey/user/attempt/') !== -1
                     && surveyAnswerRow
@@ -1782,7 +1787,7 @@
                     && el.closest
                     && el.closest('tr')
                     && el.closest('tr').querySelector('.d2l-grades-score');
-                if (isQuizAttemptStructure || isQuizListRowStructure || isSurveyListRowStructure || isSurveyAttemptAnswerRowStructure || isSurveyAttemptRadioStructure || isQuizSubmissionScoreStructure || isQuizSubmissionAttemptStructure || isQuizSubmissionScoreRowStructure) {
+                if (isQuizAttemptStructure || isQuizListRowStructure || isSurveyListRowStructure || isGradesMainStructuralCell || isSurveyAttemptAnswerRowStructure || isSurveyAttemptRadioStructure || isQuizSubmissionScoreStructure || isQuizSubmissionAttemptStructure || isQuizSubmissionScoreRowStructure) {
                     if (inlineStyleHasDarkFill(el, '#1a1a1a', 'rgb(26,26,26)')
                         && inlineStyleHasTextColor(el, '#e0e0e0', 'rgb(224,224,224)')) return;
                     el.style.setProperty('background', '#1a1a1a', 'important');
@@ -1868,6 +1873,11 @@
                 var isSurveyListRowStructure = window.location.pathname.indexOf('/d2l/lms/survey/user/surveys_list.d2l') !== -1
                     && el.closest
                     && el.closest('#z_b.d2l-table > tbody > tr:not(.d_gh)');
+                var isGradesMainStructuralCell = window.location.pathname.indexOf('/d2l/lms/grades/my_grades/main.d2l') !== -1
+                    && el.closest
+                    && el.closest('table#z_a.d2l-table')
+                    && !el.closest('.d2l-grades-individualcommentlabelcontainer')
+                    && el.closest('th[scope="row"], td.d_gn');
                 var surveyAnswerRow = el.closest && el.closest('tr.d2l-rowshadeonhover');
                 var isSurveyAttemptAnswerRowStructure = window.location.pathname.indexOf('/d2l/lms/survey/user/attempt/') !== -1
                     && surveyAnswerRow
@@ -1888,7 +1898,7 @@
                     && el.closest
                     && el.closest('tr')
                     && el.closest('tr').querySelector('.d2l-grades-score');
-                if (isQuizAttemptStructure || isQuizListRowStructure || isSurveyListRowStructure || isSurveyAttemptAnswerRowStructure || isSurveyAttemptRadioStructure || isQuizSubmissionScoreStructure || isQuizSubmissionAttemptStructure || isQuizSubmissionScoreRowStructure) {
+                if (isQuizAttemptStructure || isQuizListRowStructure || isSurveyListRowStructure || isGradesMainStructuralCell || isSurveyAttemptAnswerRowStructure || isSurveyAttemptRadioStructure || isQuizSubmissionScoreStructure || isQuizSubmissionAttemptStructure || isQuizSubmissionScoreRowStructure) {
                     if (inlineStyleHasDarkFill(el, '#1a1a1a', 'rgb(26,26,26)')
                         && inlineStyleHasTextColor(el, '#e0e0e0', 'rgb(224,224,224)')) return;
                     el.style.setProperty('background', '#1a1a1a', 'important');
