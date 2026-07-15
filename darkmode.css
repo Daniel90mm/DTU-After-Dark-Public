@@ -2836,7 +2836,7 @@ d2l-alert[type="default"] d2l-html-block {
 
 d2l-alert[type="default"] .d2l-htmlblock-untrusted,
 d2l-alert[type="default"] d2l-html-block {
-  background-color: transparent !important;
+  background-color: #2d2d2d !important;
 }
 
 /* ===== DTU Course Base (kurser.dtu.dk) ===== */

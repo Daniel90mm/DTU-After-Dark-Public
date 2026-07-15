@@ -997,14 +997,19 @@
                 styleText = menuStyles;
             } else if (tagName === 'd2l-html-block') {
                 var isSurveyAttemptHtmlBlock = window.location.pathname.indexOf('/d2l/lms/survey/user/attempt/') !== -1;
-                styleId = isSurveyAttemptHtmlBlock
-                    ? 'dark-mode-shadow-styles-survey-attempt-html-block'
-                    : 'dark-mode-shadow-styles-html-block';
+                var isSurveyAlertHtmlBlock = isSurveyAttemptHtmlBlock
+                    && element.closest
+                    && element.closest('d2l-alert[type="default"]');
+                styleId = isSurveyAlertHtmlBlock
+                    ? 'dark-mode-shadow-styles-survey-alert-html-block'
+                    : (isSurveyAttemptHtmlBlock
+                        ? 'dark-mode-shadow-styles-survey-attempt-html-block'
+                        : 'dark-mode-shadow-styles-html-block');
                 styleText = htmlBlockStyles + (isSurveyAttemptHtmlBlock ? `
                     :host,
                     .d2l-html-block-rendered {
-                        background: #1a1a1a !important;
-                        background-color: #1a1a1a !important;
+                        background: ${isSurveyAlertHtmlBlock ? DARK_BG : '#1a1a1a'} !important;
+                        background-color: ${isSurveyAlertHtmlBlock ? DARK_BG : '#1a1a1a'} !important;
                         background-image: none !important;
                     }
                 ` : '');
