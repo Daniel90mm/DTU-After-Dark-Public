@@ -2387,6 +2387,17 @@ form[action*="/d2l/lms/quizzing/user/quizzes_list.d2l"] #z_b.d2l-table > tbody >
   background-image: none !important;
 }
 
+/* Reviewing a submitted quiz reuses Brightspace's row-hover class for answer
+   options. Its light-theme border reads as a stray outlined answer in dark
+   mode, so remove only that cosmetic hover treatment. Correct/incorrect
+   feedback and actual keyboard focus remain owned by the quiz UI. */
+form[action*="/d2l/lms/quizzing/user/quiz_submissions_attempt.d2l"] tr.d2l-rowshadeonhover:hover,
+form[action*="/d2l/lms/quizzing/user/quiz_submissions_attempt.d2l"] tr.d2l-rowshadeonhover:hover > td {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
+}
+
 /* Message bucket buttons - dark 2 */
 .d2l-messagebucket-button-container,
 .d2l-messagebucket-button-container *,
