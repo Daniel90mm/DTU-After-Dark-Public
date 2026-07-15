@@ -1020,14 +1020,15 @@
                 // button/icon baseline so unrelated glyphs retain their style.
                 var quizListActionHost = null;
                 try { quizListActionHost = element.getRootNode && element.getRootNode().host; } catch (eBtnHost) { }
-                var isQuizListActionButton = window.location.pathname.indexOf('/d2l/lms/quizzing/user/quizzes_list.d2l') !== -1
+                var isStructuralListActionButton = (window.location.pathname.indexOf('/d2l/lms/quizzing/user/quizzes_list.d2l') !== -1
+                    || window.location.pathname.indexOf('/d2l/lms/survey/user/surveys_list.d2l') !== -1)
                     && quizListActionHost
                     && quizListActionHost.matches
                     && quizListActionHost.matches('d2l-dropdown-context-menu')
                     && quizListActionHost.closest
                     && quizListActionHost.closest('#z_b.d2l-table > tbody > tr:not(.d_gh)');
-                if (isQuizListActionButton) {
-                    styleId = 'dark-mode-shadow-styles-quiz-list-button-icon';
+                if (isStructuralListActionButton) {
+                    styleId = 'dark-mode-shadow-styles-structural-list-button-icon';
                     styleText = buttonIconShadowStyles + `
                         button,
                         button:hover,
@@ -1701,6 +1702,9 @@
                 var isQuizListRowStructure = window.location.pathname.indexOf('/d2l/lms/quizzing/user/quizzes_list.d2l') !== -1
                     && el.closest
                     && el.closest('#z_b.d2l-table > tbody > tr:not(.d_gh)');
+                var isSurveyListRowStructure = window.location.pathname.indexOf('/d2l/lms/survey/user/surveys_list.d2l') !== -1
+                    && el.closest
+                    && el.closest('#z_b.d2l-table > tbody > tr:not(.d_gh)');
                 var isQuizSubmissionScoreStructure = window.location.pathname.indexOf('/d2l/lms/quizzing/user/quiz_submissions.d2l') !== -1
                     && el.closest
                     && el.closest('.d2l-grades-score');
@@ -1712,7 +1716,7 @@
                     && el.closest
                     && el.closest('tr')
                     && el.closest('tr').querySelector('.d2l-grades-score');
-                if (isQuizAttemptStructure || isQuizListRowStructure || isQuizSubmissionScoreStructure || isQuizSubmissionAttemptStructure || isQuizSubmissionScoreRowStructure) {
+                if (isQuizAttemptStructure || isQuizListRowStructure || isSurveyListRowStructure || isQuizSubmissionScoreStructure || isQuizSubmissionAttemptStructure || isQuizSubmissionScoreRowStructure) {
                     if (inlineStyleHasDarkFill(el, '#1a1a1a', 'rgb(26,26,26)')
                         && inlineStyleHasTextColor(el, '#e0e0e0', 'rgb(224,224,224)')) return;
                     el.style.setProperty('background', '#1a1a1a', 'important');
@@ -1795,6 +1799,9 @@
                 var isQuizListRowStructure = window.location.pathname.indexOf('/d2l/lms/quizzing/user/quizzes_list.d2l') !== -1
                     && el.closest
                     && el.closest('#z_b.d2l-table > tbody > tr:not(.d_gh)');
+                var isSurveyListRowStructure = window.location.pathname.indexOf('/d2l/lms/survey/user/surveys_list.d2l') !== -1
+                    && el.closest
+                    && el.closest('#z_b.d2l-table > tbody > tr:not(.d_gh)');
                 var isQuizSubmissionScoreStructure = window.location.pathname.indexOf('/d2l/lms/quizzing/user/quiz_submissions.d2l') !== -1
                     && el.closest
                     && el.closest('.d2l-grades-score');
@@ -1806,7 +1813,7 @@
                     && el.closest
                     && el.closest('tr')
                     && el.closest('tr').querySelector('.d2l-grades-score');
-                if (isQuizAttemptStructure || isQuizListRowStructure || isQuizSubmissionScoreStructure || isQuizSubmissionAttemptStructure || isQuizSubmissionScoreRowStructure) {
+                if (isQuizAttemptStructure || isQuizListRowStructure || isSurveyListRowStructure || isQuizSubmissionScoreStructure || isQuizSubmissionAttemptStructure || isQuizSubmissionScoreRowStructure) {
                     if (inlineStyleHasDarkFill(el, '#1a1a1a', 'rgb(26,26,26)')
                         && inlineStyleHasTextColor(el, '#e0e0e0', 'rgb(224,224,224)')) return;
                     el.style.setProperty('background', '#1a1a1a', 'important');

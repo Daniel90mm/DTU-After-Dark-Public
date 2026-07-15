@@ -2373,6 +2373,33 @@ form[action*="/d2l/lms/quizzing/user/quizzes_list.d2l"] #z_b.d2l-table > tbody >
   background-color: #2d2d2d !important;
 }
 
+/* Survey List uses the same legacy table/wrapper pattern as Quiz List. Its
+   row wrappers are structural rather than cards, so keep them on the page
+   canvas and reserve dark 2 for a hovered row. */
+form[action*="/d2l/lms/survey/user/surveys_list.d2l"] .d2l-grid-container,
+form[action*="/d2l/lms/survey/user/surveys_list.d2l"] d2l-table-wrapper,
+form[action*="/d2l/lms/survey/user/surveys_list.d2l"] #z_b.d2l-table,
+form[action*="/d2l/lms/survey/user/surveys_list.d2l"] #z_b.d2l-table > tbody,
+form[action*="/d2l/lms/survey/user/surveys_list.d2l"] #z_b.d2l-table > tbody > tr.d_gh,
+form[action*="/d2l/lms/survey/user/surveys_list.d2l"] #z_b.d2l-table > tbody > tr.d_gh > th,
+form[action*="/d2l/lms/survey/user/surveys_list.d2l"] #z_b.d2l-table > tbody > tr:not(.d_gh) > td {
+  background-color: #1a1a1a !important;
+}
+
+form[action*="/d2l/lms/survey/user/surveys_list.d2l"] #z_b.d2l-table a.d2l-link-inline {
+  color: var(--dtu-ad-accent-soft) !important;
+}
+
+form[action*="/d2l/lms/survey/user/surveys_list.d2l"] #z_b.d2l-table a.d2l-link-inline:hover,
+form[action*="/d2l/lms/survey/user/surveys_list.d2l"] #z_b.d2l-table a.d2l-link-inline:focus-visible {
+  color: var(--dtu-ad-accent-soft) !important;
+  text-decoration: underline !important;
+}
+
+form[action*="/d2l/lms/survey/user/surveys_list.d2l"] #z_b.d2l-table > tbody > tr:not(.d_gh):hover > td {
+  background-color: #2d2d2d !important;
+}
+
 /* Quiz attempts render inside nested same-origin frames. These are layout
    wrappers around the question, answer list, and submit area—not raised cards.
    Keeping them dark 1 removes the awkward dark-2 blocks without touching
