@@ -2414,6 +2414,15 @@ form[action*="/d2l/lms/grades/my_grades/main.d2l"] .d2l-grades-individualcomment
   background-color: #1a1a1a !important;
 }
 
+/* Legacy FAQ category accordion: the native header is near-white and its
+   light border remains visible even after the page canvas is darkened. */
+.d_ua,
+.d_ua > h2.d_ua_h {
+  background-color: #1a1a1a !important;
+  color: #e0e0e0 !important;
+  border-color: #404040 !important;
+}
+
 /* Quiz attempts render inside nested same-origin frames. These are layout
    wrappers around the question, answer list, and submit area—not raised cards.
    Keeping them dark 1 removes the awkward dark-2 blocks without touching
