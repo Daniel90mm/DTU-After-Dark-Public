@@ -1018,8 +1018,30 @@
             } else if (tagName === 'd2l-button-icon') {
                 // Layer Lessons-specific hover corrections over the shared
                 // button/icon baseline so unrelated glyphs retain their style.
-                styleId = 'dark-mode-shadow-styles-lessons-button-icon';
-                styleText = buttonIconShadowStyles;
+                var quizListActionHost = null;
+                try { quizListActionHost = element.getRootNode && element.getRootNode().host; } catch (eBtnHost) { }
+                var isQuizListActionButton = window.location.pathname.indexOf('/d2l/lms/quizzing/user/quizzes_list.d2l') !== -1
+                    && quizListActionHost
+                    && quizListActionHost.matches
+                    && quizListActionHost.matches('d2l-dropdown-context-menu')
+                    && quizListActionHost.closest
+                    && quizListActionHost.closest('#z_b.d2l-table > tbody > tr:not(.d_gh)');
+                if (isQuizListActionButton) {
+                    styleId = 'dark-mode-shadow-styles-quiz-list-button-icon';
+                    styleText = buttonIconShadowStyles + `
+                        button,
+                        button:hover,
+                        button:focus,
+                        button:focus-visible {
+                            background: #1a1a1a !important;
+                            background-color: #1a1a1a !important;
+                            background-image: none !important;
+                        }
+                    `;
+                } else {
+                    styleId = 'dark-mode-shadow-styles-lessons-button-icon';
+                    styleText = buttonIconShadowStyles;
+                }
             } else if (tagName === 'd2l-calendar') {
                 // Mini-month date grid renders as <button class="d2l-calendar-date">
                 // inside this shadow root, so the page stylesheet can't reach it
