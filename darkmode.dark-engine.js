@@ -1701,7 +1701,10 @@
                 var isQuizListRowStructure = window.location.pathname.indexOf('/d2l/lms/quizzing/user/quizzes_list.d2l') !== -1
                     && el.closest
                     && el.closest('#z_b.d2l-table > tbody > tr:not(.d_gh)');
-                if (isQuizAttemptStructure || isQuizListRowStructure) {
+                var isQuizSubmissionScoreStructure = window.location.pathname.indexOf('/d2l/lms/quizzing/user/quiz_submissions.d2l') !== -1
+                    && el.closest
+                    && el.closest('.d2l-grades-score');
+                if (isQuizAttemptStructure || isQuizListRowStructure || isQuizSubmissionScoreStructure) {
                     if (inlineStyleHasDarkFill(el, '#1a1a1a', 'rgb(26,26,26)')
                         && inlineStyleHasTextColor(el, '#e0e0e0', 'rgb(224,224,224)')) return;
                     el.style.setProperty('background', '#1a1a1a', 'important');
@@ -1784,7 +1787,10 @@
                 var isQuizListRowStructure = window.location.pathname.indexOf('/d2l/lms/quizzing/user/quizzes_list.d2l') !== -1
                     && el.closest
                     && el.closest('#z_b.d2l-table > tbody > tr:not(.d_gh)');
-                if (isQuizAttemptStructure || isQuizListRowStructure) {
+                var isQuizSubmissionScoreStructure = window.location.pathname.indexOf('/d2l/lms/quizzing/user/quiz_submissions.d2l') !== -1
+                    && el.closest
+                    && el.closest('.d2l-grades-score');
+                if (isQuizAttemptStructure || isQuizListRowStructure || isQuizSubmissionScoreStructure) {
                     if (inlineStyleHasDarkFill(el, '#1a1a1a', 'rgb(26,26,26)')
                         && inlineStyleHasTextColor(el, '#e0e0e0', 'rgb(224,224,224)')) return;
                     el.style.setProperty('background', '#1a1a1a', 'important');
