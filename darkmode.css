@@ -4849,6 +4849,17 @@ img.basketIcon[src*="basket_empty"]:focus {
   color: #e0e0e0 !important;
 }
 
+/* Week-view day labels and the dynamically generated empty appointment cells
+   use inline native-white fills, so they need an explicit dark-1 override. */
+#ctl00_ContentBox td.context_header,
+#ctl00_ContentBox td[style*="background-color: white"] {
+  background: #1a1a1a !important;
+  background-color: #1a1a1a !important;
+  background-image: none !important;
+  color: #e0e0e0 !important;
+  border-color: #404040 !important;
+}
+
 #ActionChooser,
 #AppointmentEditorRaw,
 #AppointmentCancelor {
