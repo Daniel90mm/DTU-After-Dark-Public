@@ -46,7 +46,6 @@ The public extension operates locally in your browser and stores settings/caches
   - Grade stats cache (24h)
   - Course evaluation cache (24h)
   - FindIt availability cache (7d)
-  - MyLine curriculum cache (7d)
   - Library events/news cache (6h)
   - Shared library crowding cache (1m) when a shared library trends endpoint is configured
 - Participant Intelligence dataset (if enabled), including:
@@ -76,7 +75,6 @@ Note: origin-scoped `localStorage` keys can be readable by scripts running on th
   - `https://karakterer.dtu.dk/*`
   - `https://findit.dtu.dk/*`
   - `https://evaluering.dtu.dk/*`
-  - `https://sdb.dtu.dk/*`
   - `https://student.dtu.dk/*`
   - `https://www.dtu.dk/*`
   - `https://www.bibliotek.dtu.dk/*`
@@ -107,7 +105,6 @@ Some features render optional outbound links (opened only when you click), inclu
 - `https://karakterer.dtu.dk/*`
 - `https://findit.dtu.dk/*`
 - `https://evaluering.dtu.dk/*`
-- `https://sdb.dtu.dk/*`
 - `https://student.dtu.dk/*`
 - `https://eksamensplan.dtu.dk/*`
 - `https://sts.ait.dtu.dk/*`

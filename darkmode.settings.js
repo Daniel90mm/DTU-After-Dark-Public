@@ -184,20 +184,12 @@
         callDep('insertKurserCourseEvaluation', [], null);
     }
 
-    function insertKurserRoomFinder() {
-        callDep('insertKurserRoomFinder', [], null);
-    }
-
     function scheduleSmartRoomLinkerScan(root, delayMs) {
         callDep('scheduleSmartRoomLinkerScan', [root, delayMs], null);
     }
 
     function removeSmartRoomLinks() {
         callDep('removeSmartRoomLinks', [], null);
-    }
-
-    function annotateKurserSchedulePlacement() {
-        callDep('annotateKurserSchedulePlacement', [], null);
     }
 
     function insertContentButtons() {
@@ -222,10 +214,6 @@
 
     function insertParticipantIntelligence() {
         callDep('insertParticipantIntelligence', [], null);
-    }
-
-    function insertKurserMyLineBadge() {
-        callDep('insertKurserMyLineBadge', [], null);
     }
 
     function insertLibraryNavDropdown() {
@@ -305,19 +293,12 @@
         if (featureKey === featureKeys.kurserCourseEval && window.location.hostname === 'kurser.dtu.dk') {
             insertKurserCourseEvaluation();
         }
-        if (featureKey === featureKeys.kurserRoomFinder && window.location.hostname === 'kurser.dtu.dk') {
-            insertKurserRoomFinder();
-        }
         if (featureKey === featureKeys.smartRoomLinker) {
             if (enabled) {
                 scheduleSmartRoomLinkerScan(null, 140);
             } else {
                 removeSmartRoomLinks();
             }
-            if (window.location.hostname === 'kurser.dtu.dk') insertKurserRoomFinder();
-        }
-        if (featureKey === featureKeys.kurserScheduleAnnotation && window.location.hostname === 'kurser.dtu.dk') {
-            annotateKurserSchedulePlacement();
         }
         if (featureKey === featureKeys.contentShortcut && window.location.hostname === 'learn.inside.dtu.dk') {
             if (enabled) {
@@ -338,9 +319,6 @@
             if (window.location.hostname === 'campusnet.dtu.dk') {
                 insertParticipantIntelligence();
             }
-        }
-        if (featureKey === featureKeys.kurserMyLineBadges && window.location.hostname === 'kurser.dtu.dk') {
-            insertKurserMyLineBadge();
         }
         if (featureKey === featureKeys.libraryDropdown && window.location.hostname === 'learn.inside.dtu.dk') {
             if (enabled) {
@@ -908,10 +886,7 @@
             { id: 'feature-kurser-grade-stats-toggle', key: featureKeys.kurserGradeStats },
             { id: 'feature-textbook-links-toggle', key: featureKeys.textbookLinks },
             { id: 'feature-kurser-course-eval-toggle', key: featureKeys.kurserCourseEval },
-            { id: 'feature-kurser-myline-badges-toggle', key: featureKeys.kurserMyLineBadges },
-            { id: 'feature-kurser-room-finder-toggle', key: featureKeys.kurserRoomFinder },
-            { id: 'feature-smart-room-linker-toggle', key: featureKeys.smartRoomLinker },
-            { id: 'feature-kurser-schedule-annotation-toggle', key: featureKeys.kurserScheduleAnnotation }
+            { id: 'feature-smart-room-linker-toggle', key: featureKeys.smartRoomLinker }
         ].forEach(function (ft) {
             if (!ft.key) return;
             toggleHandlers[ft.id] = {
@@ -973,10 +948,7 @@
                 id: 'course-catalog', label: 'Course Catalog', desc: 'Enhancements for kurser.dtu.dk and course resource pages', items: [
                     { tid: 'feature-kurser-grade-stats-toggle', title: 'Grade Statistics', desc: 'Show pass rates and grade histograms' },
                     { tid: 'feature-textbook-links-toggle', title: 'Textbook Links', desc: 'Textbook source links on DTU Learn and kurser.dtu.dk' },
-                    { tid: 'feature-kurser-course-eval-toggle', title: 'Course Evaluation', desc: 'Show evaluation scores on course pages' },
-                    { tid: 'feature-kurser-myline-badges-toggle', title: 'MyLine Curriculum Badges', desc: 'Mark courses as Mandatory/Core/Elective pool based on your study line' },
-                    { tid: 'feature-kurser-room-finder-toggle', title: 'Room Finder', desc: 'Clickable room numbers with locations' },
-                    { tid: 'feature-kurser-schedule-annotation-toggle', title: 'Schedule Annotation', desc: 'Enhanced schedule view on course pages' }
+                    { tid: 'feature-kurser-course-eval-toggle', title: 'Course Evaluation', desc: 'Show evaluation scores on course pages' }
                 ]
             }
         ];

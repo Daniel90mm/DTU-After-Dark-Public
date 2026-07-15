@@ -445,9 +445,6 @@
     const FEATURE_CAMPUSNET_GPA_TOOLS_KEY = 'dtuAfterDarkFeatureCampusnetGpaTools';
     const FEATURE_STUDYPLAN_EXAM_CLUSTER_KEY = 'dtuAfterDarkFeatureStudyplanExamCluster';
     const FEATURE_KURSER_COURSE_EVAL_KEY = 'dtuAfterDarkFeatureKurserCourseEval';
-    const FEATURE_KURSER_ROOM_FINDER_KEY = 'dtuAfterDarkFeatureKurserRoomFinder';
-    const FEATURE_KURSER_SCHEDULE_ANNOTATION_KEY = 'dtuAfterDarkFeatureKurserScheduleAnnotation';
-    const FEATURE_KURSER_MYLINE_BADGES_KEY = 'dtuAfterDarkFeatureKurserMyLineBadges';
     const FEATURE_SMART_ROOM_LINKER_KEY = 'dtuAfterDarkFeatureSmartRoomLinker';
     const FEATURE_LEARN_NAV_RESOURCE_LINKS_KEY = 'dtuAfterDarkFeatureLearnNavResourceLinks';
     const FEATURE_PARTICIPANT_INTEL_KEY = 'dtuAfterDarkFeatureParticipantIntel';
@@ -468,9 +465,6 @@
         [FEATURE_CAMPUSNET_GPA_TOOLS_KEY]: true,
         [FEATURE_STUDYPLAN_EXAM_CLUSTER_KEY]: false,
         [FEATURE_KURSER_COURSE_EVAL_KEY]: true,
-        [FEATURE_KURSER_ROOM_FINDER_KEY]: true,
-        [FEATURE_KURSER_SCHEDULE_ANNOTATION_KEY]: true,
-        [FEATURE_KURSER_MYLINE_BADGES_KEY]: true,
         [FEATURE_SMART_ROOM_LINKER_KEY]: true,
         [FEATURE_LEARN_NAV_RESOURCE_LINKS_KEY]: true,
         [FEATURE_PARTICIPANT_INTEL_KEY]: false,
@@ -1010,7 +1004,14 @@
         try {
             var _twinCleanupStorage = getExtensionStorageArea();
             if (_twinCleanupStorage) {
-                _twinCleanupStorage.area.remove(['dtuAfterDarkFeatureParticipantIntelSemesterTwins', 'dtuAfterDarkSemesterTwinPrefsV1']);
+                _twinCleanupStorage.area.remove([
+                    'dtuAfterDarkFeatureParticipantIntelSemesterTwins',
+                    'dtuAfterDarkSemesterTwinPrefsV1',
+                    'dtuAfterDarkFeatureKurserRoomFinder',
+                    'dtuAfterDarkFeatureKurserScheduleAnnotation',
+                    'dtuAfterDarkFeatureKurserMyLineBadges',
+                    'cache_myline_me'
+                ]);
             }
         } catch (eTwinCleanup) { }
         storageLocalGet({ dtuAfterDarkFeatureBookFinder: null }, function (legacyBf) {
@@ -1460,13 +1461,10 @@
                     textbookLinks: FEATURE_TEXTBOOK_LINKS_KEY,
                     studyplanExamCluster: FEATURE_STUDYPLAN_EXAM_CLUSTER_KEY,
                     kurserCourseEval: FEATURE_KURSER_COURSE_EVAL_KEY,
-                    kurserRoomFinder: FEATURE_KURSER_ROOM_FINDER_KEY,
                     smartRoomLinker: FEATURE_SMART_ROOM_LINKER_KEY,
-                    kurserScheduleAnnotation: FEATURE_KURSER_SCHEDULE_ANNOTATION_KEY,
                     contentShortcut: FEATURE_CONTENT_SHORTCUT_KEY,
                     learnNavResourceLinks: FEATURE_LEARN_NAV_RESOURCE_LINKS_KEY,
                     participantIntel: FEATURE_PARTICIPANT_INTEL_KEY,
-                    kurserMyLineBadges: FEATURE_KURSER_MYLINE_BADGES_KEY,
                     libraryDropdown: FEATURE_LIBRARY_DROPDOWN_KEY,
                     learnLessonsBulkDownload: FEATURE_LEARN_LESSONS_BULK_DOWNLOAD_KEY,
                     learnLessonsBulkSingleZip: FEATURE_LEARN_LESSONS_BULK_SINGLE_ZIP_KEY,
@@ -1509,17 +1507,14 @@
             insertKurserTextbookLinks: insertKurserTextbookLinks,
             scheduleStudyplanExamCluster: scheduleStudyplanExamCluster,
             insertKurserCourseEvaluation: insertKurserCourseEvaluation,
-            insertKurserRoomFinder: insertKurserRoomFinder,
             scheduleSmartRoomLinkerScan: scheduleSmartRoomLinkerScan,
             removeSmartRoomLinks: removeSmartRoomLinks,
-            annotateKurserSchedulePlacement: annotateKurserSchedulePlacement,
             insertContentButtons: insertContentButtons,
             startContentButtonBootstrap: startContentButtonBootstrap,
             removeContentButtons: removeContentButtons,
             insertDTULearnNavResourceLinks: insertDTULearnNavResourceLinks,
             removeDTULearnNavResourceLinks: removeDTULearnNavResourceLinks,
             insertParticipantIntelligence: insertParticipantIntelligence,
-            insertKurserMyLineBadge: insertKurserMyLineBadge,
             insertLibraryNavDropdown: insertLibraryNavDropdown,
             removeLibraryNavDropdown: removeLibraryNavDropdown,
             runLessonsBulkDownloadChecks: runLessonsBulkDownloadChecks,
@@ -2752,21 +2747,9 @@
             getKurserInsightTheme: getKurserInsightTheme,
             getKurserInsightContainerStyle: getKurserInsightContainerStyle,
             getKurserInsightSurfaceStyle: getKurserInsightSurfaceStyle,
-            createMazemapSmartLink: createMazemapSmartLink,
-            featureKurserGradeStatsKey: FEATURE_KURSER_GRADE_STATS_KEY,
-            featureKurserMylineBadgesKey: FEATURE_KURSER_MYLINE_BADGES_KEY,
-            featureKurserRoomFinderKey: FEATURE_KURSER_ROOM_FINDER_KEY,
-            featureKurserScheduleAnnotationKey: FEATURE_KURSER_SCHEDULE_ANNOTATION_KEY,
-            featureSmartRoomLinkerKey: FEATURE_SMART_ROOM_LINKER_KEY
+            featureKurserGradeStatsKey: FEATURE_KURSER_GRADE_STATS_KEY
         };
     } catch (eKurserWidgetsDeps) { }
-
-    function insertKurserMyLineBadge() {
-        var api = getKurserWidgetsApi();
-        if (api && typeof api.insertKurserMyLineBadge === 'function') {
-            api.insertKurserMyLineBadge();
-        }
-    }
 
     function getKurserInsightTheme() {
         var isDark = !!darkModeEnabled;
@@ -2906,26 +2889,6 @@
         }
     }
 
-    /* ===================================================================
-     *  Room Finder for kurser.dtu.dk
-     *  Shows building / room data from bundled TimeEdit scrape.
-     *  Data file: data/rooms_spring_2026.json
-     *  TODO (May 2026): Re-scrape TimeEdit for fall semester & update JSON.
-     * =================================================================== */
-
-    function insertKurserRoomFinder() {
-        var api = getKurserWidgetsApi();
-        if (api && typeof api.insertKurserRoomFinder === 'function') {
-            api.insertKurserRoomFinder();
-        }
-    }
-
-    function annotateKurserSchedulePlacement() {
-        var api = getKurserWidgetsApi();
-        if (api && typeof api.annotateKurserSchedulePlacement === 'function') {
-            api.annotateKurserSchedulePlacement();
-        }
-    }
 
     function getHostShellApi() {
         try { return globalThis.DTUAfterDarkHostShell || null; } catch (e0) { return null; }
@@ -3329,9 +3292,6 @@
         if (host === 'kurser.dtu.dk') {
             insertKurserGradeStats();
             insertKurserCourseEvaluation();
-            insertKurserRoomFinder();
-            annotateKurserSchedulePlacement();
-            insertKurserMyLineBadge();
             scheduleKurserTextbookLinker(refreshBus ? 240 : 620);
         }
 
@@ -3400,10 +3360,8 @@
             } else if (host === 'kurser.dtu.dk') {
                 done = !!document.querySelector('[data-dtu-grade-stats]')
                     || !!document.querySelector('[data-dtu-course-eval]')
-                    || !!document.querySelector('[data-dtu-room-finder]')
                     || !!document.querySelector('[data-dtu-textbook-linker]')
-                    || !!document.querySelector('[data-dtu-textbook-linker-bar-host]')
-                    || !!document.querySelector('[data-dtu-myline-badge]');
+                    || !!document.querySelector('[data-dtu-textbook-linker-bar-host]');
             }
 
             if (done || attempts >= 35) {
@@ -3438,9 +3396,6 @@
             if (host === 'kurser.dtu.dk') {
                 insertKurserGradeStats();
                 insertKurserCourseEvaluation();
-                insertKurserRoomFinder();
-                annotateKurserSchedulePlacement();
-                insertKurserMyLineBadge();
                 scheduleKurserTextbookLinker(110);
                 // Kurser can also swap logos late; keep it stable in dark mode.
                 try { replaceLogoImage(); } catch (eLogo2) { }

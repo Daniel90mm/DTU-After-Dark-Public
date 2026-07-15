@@ -43,7 +43,6 @@ Chrome Web Store: https://chromewebstore.google.com/detail/dtu-after-dark/hemonf
 
 - Grade statistics panel with pass-rate and grade-distribution data in a flatter dashboard-style course insight panel.
 - Course evaluation summary panel with satisfaction/workload snapshots and a link to the full evaluation, using the same calmer course-insight layout.
-- MyLine curriculum badges such as `Mandatory`, `Core`, `Elective pool`, and `Approved elective`.
 - Textbook Links that parse course literature sections and add direct library and book-source links (same module and toggle as the Learn book finder).
 - Smart room linking for recognizable building/room mentions on supported pages.
 
@@ -74,7 +73,6 @@ Used as data sources and integrations:
 - `student.dtu.dk`
 - `findit.dtu.dk`
 - `www.bibliotek.dtu.dk`
-- `sdb.dtu.dk`
 - `api.mazemap.com`
 - `www.rejseplanen.dk`
 - `www.dtu.dk`

@@ -7,7 +7,6 @@
     const GRADE_VALUES = { '12': 12, '10': 10, '7': 7, '4': 4, '02': 2, '00': 0, '-3': -3 };
     const EXAM_CALENDAR_CACHE_TTL_MS = 1000 * 60 * 60 * 12; // 12 hours
     const STUDENT_DEADLINES_CACHE_TTL_MS = 1000 * 60 * 60 * 24; // 24 hours
-    const MYLINE_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 7; // 7 days
     const STUDENT_COURSE_REG_DEADLINES_URL = 'https://student.dtu.dk/en/courses-and-teaching/course-registration/course-registration-deadlines';
     const STUDENT_EXAM_REG_DEADLINES_URL = 'https://student.dtu.dk/en/exam/exam-registration/-deadlines-for-exams';
     const EXAM_CALENDAR_URLS = [
@@ -31,7 +30,6 @@
     const CACHE_PREFIX_GRADE  = 'cache_grade_';
     const CACHE_PREFIX_EVAL   = 'cache_eval_';
     const CACHE_PREFIX_FINDIT = 'cache_findit_';
-    const CACHE_PREFIX_MYLINE = 'cache_myline_';
     const CACHE_PREFIX_LIB_EVENTS = 'cache_lib_events_';
     const CACHE_PREFIX_LIB_NEWS   = 'cache_lib_news_';
     const CACHE_PREFIX_LIB_CROWD  = 'cache_lib_crowd_';
@@ -71,201 +69,14 @@
         storageSet(key, { ts: Date.now(), data });
     }
 
-    storageRemove(['worker_usage_install_id_v1', 'worker_usage_last_day_v1']);
-
-    function stripTags(html) {
-        return String(html || '').replace(/<[^>]+>/g, ' ');
-    }
-
-    function decodeHtmlBasic(text) {
-        // Minimal decode: enough for headings and badge labels.
-        return String(text || '')
-            .replace(/&nbsp;/gi, ' ')
-            .replace(/&amp;/gi, '&')
-            .replace(/&lt;/gi, '<')
-            .replace(/&gt;/gi, '>')
-            .replace(/&#(\d+);/g, (_, n) => {
-                const code = parseInt(n, 10);
-                if (!isFinite(code) || code <= 0) return '';
-                try { return String.fromCharCode(code); } catch (e) { return ''; }
-            })
-            .replace(/\s+/g, ' ')
-            .trim();
-    }
-
-    function normalizeCourseCode(code) {
-        const c = String(code || '').trim().toUpperCase();
-        if (/^\d{5}$/.test(c)) return c;
-        if (/^KU\d{3}$/.test(c)) return c;
-        return '';
-    }
-
-    function putCourseKind(map, code, kind, source) {
-        if (!map || !code || !kind) return;
-        const priority = {
-            mandatory: 100,
-            core: 80,
-            project: 70,
-            elective_pool: 60,
-            approved_elective: 40
-        }[kind] || 10;
-        const existing = map[code];
-        if (!existing || (existing.priority || 0) < priority) {
-            map[code] = { kind, priority, source: source || '' };
-        }
-    }
-
-    function extractCodesFromFragment(fragment, onCode) {
-        if (!fragment) return;
-        const re = /kurser\.dtu\.dk\/course\/[^"'<>]*?\/([0-9]{5}|KU[0-9]{3})\b/ig;
-        let m;
-        while ((m = re.exec(fragment)) !== null) {
-            const code = normalizeCourseCode(m[1]);
-            if (code) onCode(code);
-        }
-    }
-
-    function parseMyLineHtml(html) {
-        const out = {
-            ok: true,
-            programTitle: '',
-            updatedLabel: '',
-            kinds: {},
-            ts: Date.now()
-        };
-
-        const text = String(html || '');
-        const h1 = text.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
-        if (h1 && h1[1]) out.programTitle = decodeHtmlBasic(stripTags(h1[1]));
-
-        // Try to capture a useful "revision" label if present ("senest revideret ...").
-        const rev = text.match(/senest\s+revideret\s+den\s+([^.<]+)[.<]/i);
-        if (rev && rev[1]) out.updatedLabel = decodeHtmlBasic(rev[1]);
-
-        // Prefer the "Studieplan" block; fall back to whole document if we can't find anchors.
-        let studyplanStart = -1;
-        let studyplanEnd = -1;
-        const mStudieplan = text.match(/<h2[^>]+id="Studieplan"[^>]*>/i);
-        if (mStudieplan && mStudieplan.index != null) studyplanStart = mStudieplan.index;
-        const mPrev = text.match(/<h2[^>]+id="Kurser,_tidligere_årgange"[^>]*>/i);
-        if (mPrev && mPrev.index != null) studyplanEnd = mPrev.index;
-        if (studyplanStart >= 0 && studyplanEnd > studyplanStart) {
-            // ok
-        } else {
-            studyplanStart = 0;
-            studyplanEnd = text.length;
-        }
-        const plan = text.slice(studyplanStart, studyplanEnd);
-
-        function sliceBetween(idStart, idEnd) {
-            const reStart = new RegExp(`<h2[^>]+id="${idStart}"[^>]*>`, 'i');
-            const reEnd = new RegExp(`<h2[^>]+id="${idEnd}"[^>]*>`, 'i');
-            const ms = plan.match(reStart);
-            if (!ms || ms.index == null) return '';
-            const start = ms.index;
-            const me = plan.slice(start).match(reEnd);
-            if (!me || me.index == null) return plan.slice(start);
-            const end = start + me.index;
-            return plan.slice(start, end);
-        }
-
-        const coreFrag = sliceBetween('Det_polytekniske_grundlag', 'Retningsspecifikke_kurser');
-        extractCodesFromFragment(coreFrag, code => putCourseKind(out.kinds, code, 'core', 'core'));
-
-        // Retningsspecifikke kurser: classify by current "pulje" label.
-        const lineFrag = sliceBetween('Retningsspecifikke_kurser', 'Projekter');
-        if (lineFrag) {
-            let bucket = 'mandatory';
-            const re = /<p[^>]*>[\s\S]*?Pulje[\s\S]*?<\/p>|kurser\.dtu\.dk\/course\/[^"'<>]*?\/([0-9]{5}|KU[0-9]{3})\b/ig;
-            let m;
-            while ((m = re.exec(lineFrag)) !== null) {
-                if (m[1]) {
-                    const code = normalizeCourseCode(m[1]);
-                    if (code) {
-                        putCourseKind(out.kinds, code, bucket, 'line');
-                    }
-                    continue;
-                }
-                const seg = String(m[0] || '');
-                const segText = decodeHtmlBasic(stripTags(seg));
-                if (/semi-?obligatorisk|valgbare|valgbar/i.test(segText)) {
-                    bucket = 'elective_pool';
-                } else if (/obligatorisk/i.test(segText)) {
-                    bucket = 'mandatory';
-                }
-            }
-        }
-
-        const projFrag = sliceBetween('Projekter', 'Valgfrie_kurser');
-        extractCodesFromFragment(projFrag, code => putCourseKind(out.kinds, code, 'project', 'project'));
-
-        // Approved electives: the "Forhåndsgodkendte kandidatkurser" table is useful.
-        const electivesFrag = sliceBetween('Forhåndsgodkendte_kandidatkurser', 'Kurser,_tidligere_årgange');
-        extractCodesFromFragment(electivesFrag, code => putCourseKind(out.kinds, code, 'approved_elective', 'approved'));
-
-        return out;
-    }
-
-    async function fetchMyLine(forceRefresh) {
-        const cacheId = 'me';
-        if (!forceRefresh) {
-            const cached = await storageCacheGet(CACHE_PREFIX_MYLINE, cacheId, MYLINE_CACHE_TTL_MS);
-            if (cached && cached.ok && cached.kinds) {
-                cached.cached = true;
-                return cached;
-            }
-        }
-
-        let resp = null;
-        try {
-            resp = await fetch('https://sdb.dtu.dk/myline', {
-                credentials: 'include',
-                redirect: 'follow'
-            });
-        } catch (e) {
-            return { ok: false, error: 'fetch_error' };
-        }
-
-        if (!resp || !resp.ok) {
-            return { ok: false, error: 'http', status: resp ? resp.status : 0 };
-        }
-
-        // If we got redirected into STS/login, we are not authenticated for SDB.
-        try {
-            const finalUrl = String(resp.url || '');
-            if (/sts\.ait\.dtu\.dk/i.test(finalUrl) || /login/i.test(finalUrl)) {
-                return { ok: false, error: 'not_logged_in', url: finalUrl };
-            }
-        } catch (eUrl) {}
-
-        let html = '';
-        try {
-            html = await resp.text();
-        } catch (e2) {
-            return { ok: false, error: 'parse_empty' };
-        }
-        if (!html || html.length < 200) return { ok: false, error: 'parse_empty' };
-
-        // If we got a login page, we can't parse anything useful.
-        if (/sts\.ait\.dtu\.dk|login|mitid/i.test(html) && !/Det\s+polytekniske\s+grundlag|Retningsspecifikke\s+kurser/i.test(html)) {
-            return { ok: false, error: 'not_logged_in' };
-        }
-
-        let parsed = null;
-        try {
-            parsed = parseMyLineHtml(html);
-        } catch (e3) {
-            parsed = null;
-        }
-
-        if (!parsed || !parsed.ok || !parsed.kinds || !Object.keys(parsed.kinds).length) {
-            return { ok: false, error: 'parse_empty' };
-        }
-
-        storageCacheSet(CACHE_PREFIX_MYLINE, cacheId, parsed);
-        parsed.cached = false;
-        return parsed;
-    }
+    storageRemove([
+        'worker_usage_install_id_v1',
+        'worker_usage_last_day_v1',
+        'dtuAfterDarkFeatureKurserRoomFinder',
+        'dtuAfterDarkFeatureKurserScheduleAnnotation',
+        'dtuAfterDarkFeatureKurserMyLineBadges',
+        'cache_myline_me'
+    ]);
 
     function getCourseCodeVariants(courseCode) {
         const raw = String(courseCode || '').trim();
@@ -1725,14 +1536,6 @@
                 resolveMazemapPoi(building, room)
                     .then(sendResponse)
                     .catch(e => sendResponse({ ok: false, error: 'fetch_error', message: String(e && e.message || e) }));
-                return true;
-            }
-
-            if (message.type === 'dtu-sdb-myline') {
-                const forceRefresh = !!message.forceRefresh;
-                fetchMyLine(forceRefresh)
-                    .then(sendResponse)
-                    .catch(() => sendResponse({ ok: false, error: 'fetch_error' }));
                 return true;
             }
 

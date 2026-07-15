@@ -54,7 +54,7 @@ This repo is still centered around a large content script, but the runtime bound
   - Owns homepage widget rendering, deduping, refresh/collapse UX, and admin toggles for deadlines/search.
 - `darkmode.kurser-widgets.js`
   - Extracted `kurser.dtu.dk` course-widget shell.
-  - Owns MyLine badges, grade stats, room finder, and schedule annotation.
+  - Owns the grade-statistics course panel.
 - `darkmode.kurser-course-eval.js`
   - Extracted `kurser.dtu.dk` course-evaluation shell.
   - Owns evaluation discovery, retry logic, fetch/render flow, and the evaluation panel UI.
@@ -136,7 +136,7 @@ This repo is still centered around a large content script, but the runtime bound
   - Homepage widget placement, deadline row rendering, admin toggles, cache/refresh state.
 - Kurser course-widget shell:
   - `darkmode.kurser-widgets.js`
-  - MyLine badges, grade stats, room finder, and schedule annotation.
+  - Grade-statistics fetching, rendering, and cleanup.
 - Kurser course-evaluation shell:
   - `darkmode.kurser-course-eval.js`
   - Evaluation link discovery, retry/backoff flow, and evaluation panel rendering.
@@ -241,10 +241,7 @@ When editing `darkmode.js`, start with `rg` on the feature entrypoint instead of
   - `createMazemapSmartLink`
 - Kurser course widgets:
   - `darkmode.kurser-widgets.js`
-  - `insertKurserMyLineBadge`
   - `insertKurserGradeStats`
-  - `insertKurserRoomFinder`
-  - `annotateKurserSchedulePlacement`
 - Kurser course evaluation:
   - `darkmode.kurser-course-eval.js`
   - `insertKurserCourseEvaluation`
