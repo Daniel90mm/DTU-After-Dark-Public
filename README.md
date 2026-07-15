@@ -24,7 +24,7 @@ Chrome Web Store: https://chromewebstore.google.com/detail/dtu-after-dark/hemonf
 - Homepage widgets for live bus departures, upcoming DTU course/exam deadlines, and quick course search.
 - Bus departures with multi-campus support (`DTU Lyngby`, `DTU Ballerup`, `DTU Risø`), per-line direction filters, caching, and automatic refresh.
 - Library panel with live occupancy, crowding trends, upcoming events, news, and quick-access links.
-- Course-card `Content` shortcut with per-course override management.
+- Course-card `Content` shortcut with optional custom destinations managed in a simple inline editor.
 - Course content download tools for Lessons pages, including section picking and optional single-ZIP bundling.
 - Textbook Links that detect textbook references on Learn pages and link out to relevant sources (shared with the kurser.dtu.dk literature linker).
 - Smart Room Links that turn room mentions into click-to-resolve MazeMap links.

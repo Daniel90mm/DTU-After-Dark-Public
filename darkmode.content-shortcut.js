@@ -253,82 +253,13 @@
             alert('Could not detect the course ID for this card, so no custom link can be saved yet.');
             return;
         }
-
-        var currentCustom = getContentShortcutOverride(courseId);
-        var currentTarget = currentCustom || defaultHref;
-        var msg = 'Set custom "Go to Content" link for this course (ID ' + courseId + ').\n'
-            + 'Use a relative path (example: /d2l/home/' + courseId + ') or full learn.inside.dtu.dk URL.\n'
-            + 'Leave empty to reset to default.\n\n'
-            + 'Default: ' + defaultHref + '\n'
-            + 'Current: ' + currentTarget;
-
-        var input = prompt(msg, currentCustom || currentTarget);
-        if (input === null) return;
-
-        var trimmed = String(input || '').trim();
-        if (!trimmed) {
-            setContentShortcutOverride(courseId, '', null);
-            insertContentButtons();
-            return;
-        }
-
-        var normalized = normalizeContentShortcutTarget(trimmed);
-        if (!normalized) {
-            alert('Invalid link. Use a relative path (starting with /) or a full learn.inside.dtu.dk URL.');
-            return;
-        }
-
-        if (normalized === defaultHref) {
-            setContentShortcutOverride(courseId, '', null);
-        } else {
-            setContentShortcutOverride(courseId, normalized, null);
-        }
-
-        insertContentButtons();
+        showContentShortcutOverridesModal({
+            courseId: courseId,
+            defaultHref: defaultHref
+        });
     }
 
-    function promptForCourseId(defaultValue) {
-        var input = prompt(
-            'Brightspace Org Unit ID or course URL:\n'
-            + '- Paste URL, e.g. https://learn.inside.dtu.dk/d2l/home/242098\n'
-            + '- or paste just the Org Unit ID, e.g. 242098\n\n'
-            + 'Do NOT use DTU course code (e.g. 22050).',
-            defaultValue || ''
-        );
-        if (input === null) return null;
-        var id = normalizeContentShortcutCourseId(input);
-        if (!id) return '';
-        if (isLikelyDtuCourseCodeInput(input, id)) {
-            var proceed = confirm(
-                '"' + id + '" looks like a DTU course code, not a Brightspace Org Unit ID.\n'
-                + 'If unsure, cancel and paste the course URL from Learn to auto-detect the correct ID.\n\n'
-                + 'Use "' + id + '" anyway?'
-            );
-            if (!proceed) return null;
-        }
-        return id;
-    }
-
-    function promptForContentShortcutTarget(defaultValue) {
-        var input = prompt(
-            'Custom link for this course:\n'
-            + '- Relative path, e.g. /d2l/home/123456\n'
-            + '- or full learn.inside.dtu.dk URL\n'
-            + '(Leave empty to cancel)',
-            defaultValue || ''
-        );
-        if (input === null) return null;
-        var trimmed = String(input || '').trim();
-        if (!trimmed) return '';
-        var normalized = normalizeContentShortcutTarget(trimmed);
-        if (!normalized) {
-            alert('Invalid link. Use a relative path (starting with /) or a full learn.inside.dtu.dk URL.');
-            return null;
-        }
-        return normalized || null;
-    }
-
-    function showContentShortcutOverridesModal() {
+    function showContentShortcutOverridesModal(options) {
         if (!isTopWindow()) return;
 
         var existing = document.querySelector('.dtu-content-shortcut-overrides-modal');
@@ -341,7 +272,9 @@
                 heading: '#ffffff',
                 muted: '#9aa0a6',
                 border: '#404040',
-                panel: '#1f1f1f'
+                panel: '#1f1f1f',
+                field: '#262626',
+                error: '#fca5a5'
             }
             : {
                 bg: 'rgba(255,255,255,0.96)',
@@ -349,12 +282,30 @@
                 heading: '#111827',
                 muted: '#6b7280',
                 border: '#d1d5db',
-                panel: '#f9fafb'
+                panel: '#f9fafb',
+                field: '#ffffff',
+                error: '#b91c1c'
             };
+
+        var initialCourseId = normalizeContentShortcutCourseId(options && options.courseId);
+        var initialDefaultHref = normalizeContentShortcutTarget(options && options.defaultHref) || '';
+        var editorState = initialCourseId ? {
+            mode: 'edit',
+            courseId: initialCourseId,
+            courseInput: initialCourseId,
+            targetInput: getContentShortcutOverride(initialCourseId) || initialDefaultHref,
+            defaultHref: initialDefaultHref || ('/d2l/le/lessons/' + initialCourseId),
+            error: ''
+        } : null;
+        var noticeText = '';
 
         var overlay = document.createElement('div');
         markExt(overlay);
         overlay.className = 'dtu-content-shortcut-overrides-modal';
+        overlay.setAttribute('role', 'dialog');
+        overlay.setAttribute('aria-modal', 'true');
+        overlay.setAttribute('aria-label', 'Content shortcuts');
+        overlay.tabIndex = -1;
         overlay.style.cssText = 'position:fixed;inset:0;z-index:1000001;display:flex;align-items:center;justify-content:center;'
             + 'background:transparent !important;background-color:transparent !important;'
             + 'backdrop-filter:blur(4px) !important;-webkit-backdrop-filter:blur(4px) !important;'
@@ -362,8 +313,8 @@
 
         var modal = document.createElement('div');
         markExt(modal);
-        modal.style.cssText = 'width:min(760px,92vw);max-height:82vh;overflow:auto;'
-            + 'border-radius:14px;padding:22px 22px 16px;background:' + palette.bg + ';'
+        modal.style.cssText = 'width:min(680px,92vw);max-height:82vh;overflow:auto;box-sizing:border-box;'
+            + 'border-radius:14px;padding:20px;background:' + palette.bg + ';'
             + 'color:' + palette.text + ';border:1px solid ' + palette.border + ';'
             + 'box-shadow:0 18px 52px rgba(0,0,0,0.45);font-family:sans-serif;';
 
@@ -374,12 +325,12 @@
 
         function buttonStyle(kind) {
             if (kind === 'danger') {
-                return 'border:1px solid #7f1d1d;background:rgba(127,29,29,0.12);color:#ef9a9a;';
+                return 'border:1px solid transparent;background:transparent;color:' + palette.error + ';';
             }
             if (kind === 'primary') {
                 return 'border:1px solid var(--dtu-ad-accent-border);background:var(--dtu-ad-accent);color:#fff;';
             }
-            return 'border:1px solid ' + palette.border + ';background:transparent;color:' + palette.text + ';';
+            return 'border:1px solid ' + palette.border + ';background:' + palette.field + ';color:' + palette.text + ';';
         }
 
         function makeBtn(label, kind) {
@@ -392,22 +343,200 @@
             return btn;
         }
 
+        function makeInput(value, placeholder) {
+            var input = document.createElement('input');
+            markExt(input);
+            input.type = 'text';
+            input.value = value || '';
+            input.placeholder = placeholder || '';
+            input.autocomplete = 'off';
+            input.spellcheck = false;
+            input.style.cssText = 'width:100%;box-sizing:border-box;padding:10px 11px;border-radius:8px;'
+                + 'border:1px solid ' + palette.border + ';background:' + palette.field + ';color:' + palette.text + ';'
+                + 'font:13px/1.35 sans-serif;outline:none;';
+            input.addEventListener('focus', function () {
+                input.style.borderColor = 'var(--dtu-ad-accent-border)';
+                input.style.boxShadow = '0 0 0 2px color-mix(in srgb, var(--dtu-ad-accent) 28%, transparent)';
+            });
+            input.addEventListener('blur', function () {
+                input.style.borderColor = palette.border;
+                input.style.boxShadow = 'none';
+            });
+            return input;
+        }
+
+        function startEditor(courseId, targetHref, defaultHref) {
+            var key = normalizeContentShortcutCourseId(courseId);
+            editorState = {
+                mode: key ? 'edit' : 'add',
+                courseId: key || '',
+                courseInput: key || '',
+                targetInput: targetHref || '',
+                defaultHref: defaultHref || (key ? '/d2l/le/lessons/' + key : ''),
+                error: ''
+            };
+            noticeText = '';
+            render();
+        }
+
+        function saveEditor(courseInput, targetInput) {
+            var rawCourse = String(courseInput || '').trim();
+            var courseId = editorState && editorState.courseId
+                ? editorState.courseId
+                : normalizeContentShortcutCourseId(rawCourse);
+            var rawTarget = String(targetInput || '').trim();
+            var target = normalizeContentShortcutTarget(rawTarget);
+
+            editorState.courseInput = rawCourse;
+            editorState.targetInput = rawTarget;
+            editorState.error = '';
+
+            if (!courseId) {
+                editorState.error = 'Paste the course page URL from DTU Learn so the course can be detected.';
+                render();
+                return;
+            }
+            if (!editorState.courseId && isLikelyDtuCourseCodeInput(rawCourse, courseId)) {
+                editorState.error = 'That looks like a DTU course code. Paste the course page URL from DTU Learn instead.';
+                render();
+                return;
+            }
+            if (!rawTarget || !target) {
+                editorState.error = 'Paste a valid DTU Learn destination URL.';
+                render();
+                return;
+            }
+
+            var defaultHref = normalizeContentShortcutTarget(editorState.defaultHref)
+                || ('/d2l/le/lessons/' + courseId);
+            if (target === defaultHref) {
+                setContentShortcutOverride(courseId, '', null);
+                noticeText = 'Course ' + courseId + ' now uses its normal Content page.';
+            } else {
+                setContentShortcutOverride(courseId, target, null);
+                noticeText = 'Custom link saved for course ' + courseId + '.';
+            }
+            editorState = null;
+            insertContentButtons();
+            render();
+        }
+
         function render() {
             while (modal.firstChild) modal.removeChild(modal.firstChild);
 
+            var header = document.createElement('div');
+            markExt(header);
+            header.style.cssText = 'display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:16px;';
+
+            var headingWrap = document.createElement('div');
+            markExt(headingWrap);
+            headingWrap.style.cssText = 'min-width:0;';
+
             var title = document.createElement('h2');
             markExt(title);
-            title.textContent = 'Content Shortcut Links';
-            title.style.cssText = 'margin:0 0 6px;font-size:22px;font-weight:700;color:' + palette.heading + ';';
-            modal.appendChild(title);
+            title.textContent = 'Content shortcuts';
+            title.style.cssText = 'margin:0 0 5px;font-size:21px;font-weight:700;color:' + palette.heading + ';';
+            headingWrap.appendChild(title);
 
             var intro = document.createElement('p');
             markExt(intro);
-            intro.style.cssText = 'margin:0 0 14px;font-size:13px;line-height:1.45;color:' + palette.muted + ';';
-            intro.textContent = 'Quick edit on dashboard: hold Ctrl/Cmd+Shift and click a course Content button. '
-                + 'Use this manager to review, add, or remove per-course overrides. '
-                + 'Tip: Add Override accepts a Learn course URL and auto-detects the Brightspace Org Unit ID (do not use DTU course code like 22050).';
-            modal.appendChild(intro);
+            intro.style.cssText = 'margin:0;font-size:13px;line-height:1.45;color:' + palette.muted + ';';
+            intro.textContent = 'Each course button opens its normal Content page. Add a custom link only when a course should open somewhere else.';
+            headingWrap.appendChild(intro);
+
+            var topCloseBtn = makeBtn('Close', 'secondary');
+            topCloseBtn.setAttribute('aria-label', 'Close Content shortcuts');
+            topCloseBtn.addEventListener('click', closeModal);
+
+            header.appendChild(headingWrap);
+            header.appendChild(topCloseBtn);
+            modal.appendChild(header);
+
+            if (noticeText) {
+                var notice = document.createElement('div');
+                markExt(notice);
+                notice.style.cssText = 'margin:0 0 12px;padding:9px 11px;border-radius:8px;'
+                    + 'background:color-mix(in srgb, var(--dtu-ad-accent) 16%, transparent);'
+                    + 'color:' + palette.text + ';font-size:12px;line-height:1.4;';
+                notice.textContent = noticeText;
+                modal.appendChild(notice);
+            }
+
+            if (editorState) {
+                var editor = document.createElement('div');
+                markExt(editor);
+                editor.style.cssText = 'margin-bottom:14px;padding:14px;border:1px solid ' + palette.border + ';'
+                    + 'border-radius:10px;background:' + palette.panel + ';';
+
+                var editorTitle = document.createElement('h3');
+                markExt(editorTitle);
+                editorTitle.style.cssText = 'margin:0 0 12px;font-size:15px;font-weight:700;color:' + palette.heading + ';';
+                editorTitle.textContent = editorState.mode === 'edit'
+                    ? 'Change course ' + editorState.courseId
+                    : 'Add a custom link';
+                editor.appendChild(editorTitle);
+
+                var courseInput = null;
+                if (editorState.mode === 'add') {
+                    var courseLabel = document.createElement('label');
+                    markExt(courseLabel);
+                    courseLabel.style.cssText = 'display:block;margin-bottom:10px;font-size:12px;font-weight:700;color:' + palette.text + ';';
+                    courseLabel.textContent = 'Course page';
+                    courseInput = makeInput(editorState.courseInput, 'Paste a DTU Learn course URL');
+                    courseInput.style.marginTop = '5px';
+                    courseLabel.appendChild(courseInput);
+
+                    var courseHelp = document.createElement('span');
+                    markExt(courseHelp);
+                    courseHelp.style.cssText = 'display:block;margin-top:5px;font-size:11px;font-weight:400;color:' + palette.muted + ';';
+                    courseHelp.textContent = 'The course is detected automatically from the URL.';
+                    courseLabel.appendChild(courseHelp);
+                    editor.appendChild(courseLabel);
+                }
+
+                var targetLabel = document.createElement('label');
+                markExt(targetLabel);
+                targetLabel.style.cssText = 'display:block;font-size:12px;font-weight:700;color:' + palette.text + ';';
+                targetLabel.textContent = 'Open this page instead';
+                var targetInput = makeInput(editorState.targetInput, 'Paste the destination URL from DTU Learn');
+                targetInput.style.marginTop = '5px';
+                targetLabel.appendChild(targetInput);
+                editor.appendChild(targetLabel);
+
+                if (editorState.error) {
+                    var error = document.createElement('div');
+                    markExt(error);
+                    error.setAttribute('role', 'alert');
+                    error.style.cssText = 'margin-top:9px;font-size:12px;line-height:1.4;color:' + palette.error + ';';
+                    error.textContent = editorState.error;
+                    editor.appendChild(error);
+                }
+
+                var editorActions = document.createElement('div');
+                markExt(editorActions);
+                editorActions.style.cssText = 'display:flex;align-items:center;gap:8px;margin-top:12px;';
+                var saveBtn = makeBtn('Save link', 'primary');
+                saveBtn.addEventListener('click', function () {
+                    saveEditor(courseInput ? courseInput.value : editorState.courseId, targetInput.value);
+                });
+                var cancelBtn = makeBtn('Cancel', 'secondary');
+                cancelBtn.addEventListener('click', function () {
+                    editorState = null;
+                    render();
+                });
+                editorActions.appendChild(saveBtn);
+                editorActions.appendChild(cancelBtn);
+                editor.appendChild(editorActions);
+                modal.appendChild(editor);
+
+                setTimeout(function () {
+                    try {
+                        var firstInput = courseInput || targetInput;
+                        firstInput.focus();
+                        firstInput.select();
+                    } catch (e0) { }
+                }, 0);
+            }
 
             var listWrap = document.createElement('div');
             markExt(listWrap);
@@ -419,16 +548,16 @@
             if (!keys.length) {
                 var empty = document.createElement('div');
                 markExt(empty);
-                empty.style.cssText = 'padding:14px;font-size:13px;color:' + palette.muted + ';background:' + palette.panel + ';';
-                empty.textContent = 'No custom links saved yet.';
+                empty.style.cssText = 'padding:18px 14px;font-size:13px;line-height:1.45;color:' + palette.muted + ';background:' + palette.panel + ';';
+                empty.textContent = 'All courses currently use their normal Content page.';
                 listWrap.appendChild(empty);
             } else {
-                keys.forEach(function (courseId, idx) {
+                keys.forEach(function (courseId) {
                     var row = document.createElement('div');
                     markExt(row);
                     row.style.cssText = 'display:flex;gap:10px;align-items:center;justify-content:space-between;'
-                        + 'padding:10px 12px;background:' + (idx % 2 ? palette.panel : 'transparent') + ';'
-                        + (idx < keys.length - 1 ? 'border-bottom:1px solid ' + palette.border + ';' : '');
+                        + 'padding:11px 12px;background:' + palette.panel + ';'
+                        + (courseId !== keys[keys.length - 1] ? 'border-bottom:1px solid ' + palette.border + ';' : '');
 
                     var left = document.createElement('div');
                     markExt(left);
@@ -437,7 +566,7 @@
                     var idEl = document.createElement('div');
                     markExt(idEl);
                     idEl.style.cssText = 'font-size:12px;font-weight:700;color:' + palette.heading + ';';
-                    idEl.textContent = 'Org Unit ' + courseId;
+                    idEl.textContent = 'Course ' + courseId;
 
                     var hrefEl = document.createElement('div');
                     markExt(hrefEl);
@@ -452,17 +581,9 @@
                     markExt(actions);
                     actions.style.cssText = 'display:flex;gap:8px;flex-shrink:0;';
 
-                    var editBtn = makeBtn('Edit', 'secondary');
+                    var editBtn = makeBtn('Change', 'secondary');
                     editBtn.addEventListener('click', function () {
-                        var nextHref = promptForContentShortcutTarget(rows[courseId]);
-                        if (nextHref === null) return;
-                        if (nextHref === '') {
-                            setContentShortcutOverride(courseId, '', null);
-                        } else {
-                            setContentShortcutOverride(courseId, nextHref, null);
-                        }
-                        insertContentButtons();
-                        render();
+                        startEditor(courseId, rows[courseId], '/d2l/le/lessons/' + courseId);
                     });
 
                     var removeBtn = makeBtn('Remove', 'danger');
@@ -480,61 +601,57 @@
                 });
             }
 
-            modal.appendChild(listWrap);
+            if (!editorState) modal.appendChild(listWrap);
 
-            var footer = document.createElement('div');
-            markExt(footer);
-            footer.style.cssText = 'display:flex;justify-content:space-between;gap:10px;margin-top:14px;flex-wrap:wrap;';
+            if (!editorState) {
+                var footer = document.createElement('div');
+                markExt(footer);
+                footer.style.cssText = 'display:flex;justify-content:flex-start;gap:8px;margin-top:12px;flex-wrap:wrap;';
 
-            var leftBtns = document.createElement('div');
-            markExt(leftBtns);
-            leftBtns.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;';
+                var addBtn = makeBtn('Add custom link', 'primary');
+                addBtn.addEventListener('click', function () {
+                    startEditor('', '', '');
+                });
+                footer.appendChild(addBtn);
 
-            var addBtn = makeBtn('Add Override', 'primary');
-            addBtn.addEventListener('click', function () {
-                var courseId = promptForCourseId('');
-                if (courseId === null) return;
-                if (!courseId) {
-                    alert('Invalid input. Paste a Learn course URL or Brightspace Org Unit ID (numbers only).');
-                    return;
+                if (keys.length > 1) {
+                    var clearBtn = makeBtn('Remove all', 'danger');
+                    clearBtn.addEventListener('click', function () {
+                        if (!confirm('Remove all custom content links?')) return;
+                        clearAllContentShortcutOverrides(null);
+                        editorState = null;
+                        noticeText = 'All courses now use their normal Content page.';
+                        insertContentButtons();
+                        render();
+                    });
+                    footer.appendChild(clearBtn);
                 }
-                var href = promptForContentShortcutTarget('/d2l/home/' + courseId);
-                if (href === null) return;
-                if (!href) return;
-                setContentShortcutOverride(courseId, href, null);
-                insertContentButtons();
-                render();
-            });
-
-            var clearBtn = makeBtn('Clear All', 'danger');
-            clearBtn.addEventListener('click', function () {
-                var hasAny = Object.keys(getContentShortcutOverridesMap()).length > 0;
-                if (!hasAny) return;
-                if (!confirm('Clear all custom content shortcut links?')) return;
-                clearAllContentShortcutOverrides(null);
-                insertContentButtons();
-                render();
-            });
-
-            leftBtns.appendChild(addBtn);
-            leftBtns.appendChild(clearBtn);
-
-            var closeBtn = makeBtn('Close', 'secondary');
-            closeBtn.addEventListener('click', closeModal);
-
-            footer.appendChild(leftBtns);
-            footer.appendChild(closeBtn);
-            modal.appendChild(footer);
+                modal.appendChild(footer);
+            }
         }
 
         overlay.addEventListener('click', function (e) {
             if (e.target === overlay) closeModal();
         });
+        overlay.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                if (editorState) {
+                    editorState = null;
+                    render();
+                } else {
+                    closeModal();
+                }
+            }
+        });
 
         render();
         overlay.appendChild(modal);
         document.body.appendChild(overlay);
-        requestAnimationFrame(function () { overlay.style.opacity = '1'; });
+        requestAnimationFrame(function () {
+            overlay.style.opacity = '1';
+            try { overlay.focus(); } catch (e0) { }
+        });
     }
 
     var contentBtnShadowCSS = `

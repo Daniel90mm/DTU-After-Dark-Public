@@ -942,7 +942,7 @@
             {
                 id: 'interface', label: 'Shortcuts & Navigation', desc: 'Quick links, nav entries, and shortcut actions', items: [
                     { tid: 'feature-learn-nav-resource-links-toggle', title: 'Navigation Quick Links', desc: 'Adds Panopto and CampusNet to the Student Resources menu' },
-                    { tid: 'feature-content-shortcut-toggle', title: 'Content Shortcut', desc: 'Direct link from course cards (Ctrl/Cmd+Shift+Click a button to set a custom link)' },
+                    { tid: 'feature-content-shortcut-toggle', title: 'Content Shortcut', desc: 'Adds a direct Content button to each course card' },
                     { tid: 'library-dropdown-toggle', title: 'Library', desc: 'Quick links and live events/news from DTU Library' },
                     { tid: 'feature-smart-room-linker-toggle', title: 'Room links', desc: 'Turn room mentions into MazeMap links (click-to-resolve)' }
                 ]
