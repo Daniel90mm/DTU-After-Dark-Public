@@ -293,11 +293,7 @@
                 if (idMatch) entry.userId = idMatch[1];
             }
 
-            var infoEl = item.querySelector('.ui-participant-additional.user-information');
-            if (infoEl) {
-                var sMatch = infoEl.textContent.match(/\b(s\d{6})\b/i);
-                if (sMatch) entry.sNumber = sMatch[1].toLowerCase();
-            }
+            entry.sNumber = deps.getCampusnetParticipantSNumber(item);
 
             var idx = null;
             var arrow = item.querySelector('.ui-participants-arrow');

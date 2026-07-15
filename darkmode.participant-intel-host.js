@@ -335,6 +335,26 @@
         return Array.from(document.querySelectorAll('.ui-participant'));
     }
 
+    function getCampusnetParticipantSNumber(item) {
+        if (!item || !item.querySelector) return '';
+
+        var candidates = [];
+        var legacyInfo = item.querySelector('.ui-participant-additional.user-information');
+        if (legacyInfo) candidates.push(legacyInfo.textContent || '');
+
+        var email = item.querySelector('.ui-participant-email');
+        if (email) candidates.push(email.textContent || '');
+
+        var mailLink = item.querySelector('a[href^="mailto:"]');
+        if (mailLink) candidates.push(mailLink.getAttribute('href') || '');
+
+        for (var i = 0; i < candidates.length; i++) {
+            var match = String(candidates[i] || '').match(/\b(s\d{6})\b/i);
+            if (match) return String(match[1]).toLowerCase();
+        }
+        return '';
+    }
+
     try {
         globalThis.DTUAfterDarkParticipantIntelHost = {
             normalizeIntelCourseCode: normalizeIntelCourseCode,
@@ -358,7 +378,8 @@
             getCampusnetUsersCountFromPage: getCampusnetUsersCountFromPage,
             getCampusnetUsersAnchorElement: getCampusnetUsersAnchorElement,
             getCampusnetParticipantsListRoot: getCampusnetParticipantsListRoot,
-            getCampusnetUsersParticipantElements: getCampusnetUsersParticipantElements
+            getCampusnetUsersParticipantElements: getCampusnetUsersParticipantElements,
+            getCampusnetParticipantSNumber: getCampusnetParticipantSNumber
         };
     } catch (eExpose) { }
 })();

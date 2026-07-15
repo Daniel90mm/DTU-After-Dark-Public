@@ -1918,6 +1918,7 @@
         normalizeIntelCourseSemester: normalizeIntelCourseSemester,
         isCampusnetLikelyAcademicCourse: isCampusnetLikelyAcademicCourse,
         getCampusnetUsersParticipantElements: getCampusnetUsersParticipantElements,
+        getCampusnetParticipantSNumber: getCampusnetParticipantSNumber,
         getCampusnetCourseCodeFromPage: getCampusnetCourseCodeFromPage,
         getCampusnetSemesterFromPage: getCampusnetSemesterFromPage,
         getCampusnetCourseNameFromPage: getCampusnetCourseNameFromPage,
@@ -2073,6 +2074,12 @@
         return api.getCampusnetUsersParticipantElements();
     }
 
+    function getCampusnetParticipantSNumber(item) {
+        var api = getParticipantIntelHostApi();
+        if (!api || typeof api.getCampusnetParticipantSNumber !== 'function') return '';
+        return api.getCampusnetParticipantSNumber(item);
+    }
+
     function ensureCampusnetParticipantsPageSizeMax() {
         var api = getParticipantIntelCoreApi();
         if (!api || typeof api.ensureCampusnetParticipantsPageSizeMax !== 'function') return false;
@@ -2125,6 +2132,7 @@
         getCampusnetCourseCodeFromPage: getCampusnetCourseCodeFromPage,
         getCampusnetSemesterFromPage: getCampusnetSemesterFromPage,
         getCampusnetUsersParticipantElements: getCampusnetUsersParticipantElements,
+        getCampusnetParticipantSNumber: getCampusnetParticipantSNumber,
         normalizeIntelCourseCode: normalizeIntelCourseCode,
         normalizeIntelCourseSemester: normalizeIntelCourseSemester,
         detectCampusnetSelfSNumberFromHeader: detectCampusnetSelfSNumberFromHeader,

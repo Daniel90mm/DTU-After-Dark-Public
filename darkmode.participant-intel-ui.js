@@ -505,17 +505,11 @@
                 if (!nameEl) continue;
 
                 var existingBadge = nameEl.querySelector('[data-dtu-shared-history]');
-                var infoEl = item.querySelector('.ui-participant-additional.user-information');
-                if (!infoEl) {
+                var sNumber = deps.getCampusnetParticipantSNumber(item);
+                if (!sNumber) {
                     if (existingBadge) existingBadge.remove();
                     continue;
                 }
-                var sMatch = infoEl.textContent.match(/\b(s\d{6})\b/i);
-                if (!sMatch) {
-                    if (existingBadge) existingBadge.remove();
-                    continue;
-                }
-                var sNumber = sMatch[1].toLowerCase();
                 if (selfSNumber && sNumber === selfSNumber) {
                     if (existingBadge) existingBadge.remove();
                     continue;

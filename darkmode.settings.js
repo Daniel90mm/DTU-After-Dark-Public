@@ -963,10 +963,10 @@
             },
             {
                 id: 'social', label: 'Social', desc: 'Participant intelligence tools', items: [
-                    { tid: 'feature-participant-intel-toggle', title: 'Participant Intelligence', desc: 'Master switch for the whole suite' },
+                    { tid: 'feature-participant-intel-toggle', title: 'Participant Intelligence', desc: 'Optional local-only insights from CampusNet participant lists' },
                     { tid: 'feature-participant-intel-demographics-toggle', title: 'Course Composition', desc: 'Program breakdown on CampusNet participant pages', subToggleOf: 'feature-participant-intel-toggle' },
-                    { tid: 'feature-participant-intel-shared-history-toggle', title: 'Shared Course History', desc: 'Badges on participant lists + profile history card', subToggleOf: 'feature-participant-intel-toggle' },
-                    { tid: 'feature-participant-intel-retention-toggle', title: 'Retention Radar', desc: 'Tracks Users enrollment count over time', subToggleOf: 'feature-participant-intel-toggle' }
+                    { tid: 'feature-participant-intel-shared-history-toggle', title: 'Shared Course History', desc: 'Shows courses you have previously shared with each student', subToggleOf: 'feature-participant-intel-toggle' },
+                    { tid: 'feature-participant-intel-retention-toggle', title: 'Retention Radar', desc: 'Tracks course enrollment changes across visits', subToggleOf: 'feature-participant-intel-toggle' }
                 ]
             },
             {
