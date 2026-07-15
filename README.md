@@ -106,6 +106,7 @@ Build artifacts are written to `dist/`.
 Public source builds work as-is with the tracked safe `config.js`.
 For local-only overrides, create an untracked `config.local.js`; the build scripts will overlay it into the packaged `config.js` and add the extra local host permission only to those private build artifacts.
 The public branch now uses a whitelist `.gitignore`, so local-only files such as `data/`, `dist/`, `infra/`, assistant notes, private changelogs, and scratch artifacts stay out of GitHub by default.
+Before committing or publishing, run `node scripts/audit-public-boundary.mjs`; it fails if a known local-only path is already tracked, which `.gitignore` cannot prevent by itself.
 Optional local datasets can still be kept beside the repo for private experiments, but they are intentionally not part of the public source/build surface.
 Shared library occupancy/crowding now requires a configured `LIVE_LIBRARY_TRENDS_URL`. Without that local/private override, the library panel still shows links, news, and events, but not live crowding.
 For release builds that must include live library crowding, set `DTU_AFTER_DARK_REQUIRE_LIBRARY_TRENDS=1` before running the build scripts. The build will then fail if the packaged `config.js` does not contain `LIVE_LIBRARY_TRENDS_URL`; otherwise it prints the included endpoint host.

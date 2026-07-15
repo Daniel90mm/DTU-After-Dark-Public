@@ -63,6 +63,7 @@
 !/scripts/
 /scripts/*
 !/scripts/audit-unused-functions.mjs
+!/scripts/audit-public-boundary.mjs
 !/scripts/build-chrome.ps1
 !/scripts/build-firefox.ps1
 !/scripts/build.mjs
