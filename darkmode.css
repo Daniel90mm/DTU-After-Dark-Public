@@ -2423,6 +2423,17 @@ form[action*="/d2l/lms/grades/my_grades/main.d2l"] .d2l-grades-individualcomment
   border-color: #404040 !important;
 }
 
+/* CampusNet Assignments retains a native pale header gradient after the table
+   rows darken. Keep the header a readable raised dark-2 data-table surface. */
+#StudentIndex .ui-assignment-panel table.arc-table--unstyled > thead,
+#StudentIndex .ui-assignment-panel table.arc-table--unstyled > thead > tr,
+#StudentIndex .ui-assignment-panel table.arc-table--unstyled > thead > tr > th {
+  background-color: #2d2d2d !important;
+  background-image: none !important;
+  color: #e0e0e0 !important;
+  border-color: #404040 !important;
+}
+
 /* Quiz attempts render inside nested same-origin frames. These are layout
    wrappers around the question, answer list, and submit area—not raised cards.
    Keeping them dark 1 removes the awkward dark-2 blocks without touching
