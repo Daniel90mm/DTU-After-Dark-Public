@@ -452,6 +452,10 @@
             .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCharCode(parseInt(h, 16) || 0));
     }
 
+    function decodeHtmlBasic(text) {
+        return normalizeSpace(decodeBasicHtmlEntities(text));
+    }
+
     function stripHtmlTags(html) {
         if (!html) return '';
         return normalizeSpace(
