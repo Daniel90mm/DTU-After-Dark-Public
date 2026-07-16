@@ -1,6 +1,6 @@
 # Privacy Policy - DTU After Dark
 
-**Last updated:** March 26, 2026
+**Last updated:** July 16, 2026
 
 ## Security and Privacy Audit (March 26, 2026)
 
@@ -141,7 +141,7 @@ You can remove stored data by clearing extension storage and site storage in you
 
 **DTU After Dark is an unofficial, community-built extension. It is not affiliated with, endorsed by, or supported by DTU, Arcanic, D2L/Brightspace, Rejseplanen, MazeMap, or any other service provider.**
 
-Information shown by the extension (exam dates, deadlines, grades, GPA calculations, bus times, course evaluations, room locations, library data) can be inaccurate, incomplete, or outdated. Always verify critical information through official DTU channels.
+Information shown by the extension (exam dates, deadlines, grades, GPA calculations, bus times, course evaluations, and library data) can be inaccurate, incomplete, or outdated. Always verify critical information through official DTU channels.
 
 ## Contact
 

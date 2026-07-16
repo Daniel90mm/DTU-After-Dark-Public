@@ -88,7 +88,7 @@ Used as data sources and integrations:
 
 DTU After Dark is unofficial and is not affiliated with, endorsed by, or supported by DTU, D2L/Brightspace, Rejseplanen, MazeMap, or any other provider.
 
-Information shown by the extension, including exam dates, deadlines, grades, room locations, library data, and bus departures, may be inaccurate, incomplete, or outdated. Always verify critical information through official DTU channels.
+Information shown by the extension, including exam dates, deadlines, grades, library data, and bus departures, may be inaccurate, incomplete, or outdated. Always verify critical information through official DTU channels.
 
 ## Build
 
@@ -114,6 +114,7 @@ A local release override can append values to the safe defaults, for example `gl
 
 Future ideas are tracked in `docs/IDEAS.md`.
 Codebase/runtime orientation for maintainers and AI agents lives in `docs/CODEBASE.md`.
+Current Firefox and Chrome store copy lives in `docs/STORE_LISTING.md`.
 If you keep private repo-local handoff notes for local agent workflows, keep them untracked and make sure `docs/CODEBASE.md` stays sufficient for the public repo on its own.
 
 ## License

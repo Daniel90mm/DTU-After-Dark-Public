@@ -3138,12 +3138,51 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
             var accentForLeg = (getComputedStyle(document.documentElement).getPropertyValue('--dtu-ad-accent') || '#1f7ae0').trim();
             var legMuted = isDarkModeEnabled() ? '#888' : '#667084';
             while (section.chartLegend.firstChild) section.chartLegend.removeChild(section.chartLegend.firstChild);
-            function makeLegItem(label, svgHtml) {
+            function makeLegendSvg(kind) {
+                var svgNs = 'http://www.w3.org/2000/svg';
+                var svg = document.createElementNS(svgNs, 'svg');
+                svg.setAttribute('width', '18');
+                svg.setAttribute('height', '8');
+                svg.setAttribute('viewBox', '0 0 18 8');
+                svg.style.display = 'block';
+
+                if (kind === 'historical') {
+                    var rect = document.createElementNS(svgNs, 'rect');
+                    rect.setAttribute('x', '0');
+                    rect.setAttribute('y', '1');
+                    rect.setAttribute('width', '18');
+                    rect.setAttribute('height', '6');
+                    rect.setAttribute('fill', 'rgba(' + accentRgbForLeg + ',0.07)');
+                    rect.setAttribute('stroke', 'rgba(' + accentRgbForLeg + ',0.28)');
+                    rect.setAttribute('stroke-width', '0.8');
+                    rect.setAttribute('rx', '1');
+                    svg.appendChild(rect);
+                    return svg;
+                }
+
+                var line = document.createElementNS(svgNs, 'line');
+                line.setAttribute('x1', '0');
+                line.setAttribute('y1', '4');
+                line.setAttribute('x2', '18');
+                line.setAttribute('y2', '4');
+                line.setAttribute('stroke-linecap', 'round');
+                if (kind === 'typical') {
+                    line.setAttribute('stroke', 'rgba(' + accentRgbForLeg + ',0.60)');
+                    line.setAttribute('stroke-width', '1.4');
+                    line.setAttribute('stroke-dasharray', '4 3');
+                } else {
+                    line.setAttribute('stroke', accentForLeg);
+                    line.setAttribute('stroke-width', '2.2');
+                }
+                svg.appendChild(line);
+                return svg;
+            }
+            function makeLegItem(label, kind) {
                 var item = document.createElement('span');
                 item.style.cssText = 'display:inline-flex !important;align-items:center !important;gap:5px !important;font-size:9px !important;color:' + legMuted + ' !important;white-space:nowrap !important;';
                 markExt(item);
                 var icon = document.createElement('span');
-                icon.innerHTML = svgHtml;
+                icon.appendChild(makeLegendSvg(kind));
                 markExt(icon);
                 var lbl = document.createElement('span');
                 lbl.textContent = label;
@@ -3153,20 +3192,14 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
                 return item;
             }
             // Solid line swatch — Current
-            section.chartLegend.appendChild(makeLegItem('Current',
-                '<svg width="18" height="8" viewBox="0 0 18 8" style="display:block"><line x1="0" y1="4" x2="18" y2="4" stroke="' + accentForLeg + '" stroke-width="2.2" stroke-linecap="round"/></svg>'
-            ));
+            section.chartLegend.appendChild(makeLegItem('Current', 'current'));
             // Dashed line swatch — Typical (only if typical data exists)
             if (chartFlags.hasTypical) {
-                section.chartLegend.appendChild(makeLegItem('Typical',
-                    '<svg width="18" height="8" viewBox="0 0 18 8" style="display:block"><line x1="0" y1="4" x2="18" y2="4" stroke="rgba(' + accentRgbForLeg + ',0.60)" stroke-width="1.4" stroke-dasharray="4 3" stroke-linecap="round"/></svg>'
-                ));
+                section.chartLegend.appendChild(makeLegItem('Typical', 'typical'));
             }
             // Shaded band swatch — only when enough historical data
             if (chartFlags.showHistoricalBand && chartFlags.hasTypical) {
-                section.chartLegend.appendChild(makeLegItem('Hist. range',
-                    '<svg width="18" height="8" viewBox="0 0 18 8" style="display:block"><rect x="0" y="1" width="18" height="6" fill="rgba(' + accentRgbForLeg + ',0.07)" stroke="rgba(' + accentRgbForLeg + ',0.28)" stroke-width="0.8" rx="1"/></svg>'
-                ));
+                section.chartLegend.appendChild(makeLegItem('Hist. range', 'historical'));
             }
         }
 

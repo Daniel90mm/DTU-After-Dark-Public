@@ -422,6 +422,16 @@
         }
     }
 
+    function appendLibraryQuickLinkIcon(target, iconName) {
+        if (!target || typeof DOMParser !== 'function') return;
+        try {
+            var doc = new DOMParser().parseFromString(getLibraryQuickLinkIconSvg(iconName), 'image/svg+xml');
+            var svg = doc && doc.documentElement;
+            if (!svg || String(svg.nodeName || '').toLowerCase() !== 'svg') return;
+            target.appendChild(document.importNode(svg, true));
+        } catch (e0) { }
+    }
+
     function showLibraryPanel(anchorBtn) {
         var deps = getDeps() || {};
 
@@ -542,7 +552,7 @@
 
             var icon = document.createElement('span');
             icon.className = 'dtu-library-link-icon';
-            icon.innerHTML = getLibraryQuickLinkIconSvg(lnk.icon);
+            appendLibraryQuickLinkIcon(icon, lnk.icon);
 
             var contentWrap = document.createElement('span');
             contentWrap.className = 'dtu-library-link-content';
@@ -557,7 +567,7 @@
 
             var arrow = document.createElement('span');
             arrow.className = 'dtu-library-link-arrow';
-            arrow.innerHTML = getLibraryQuickLinkIconSvg('arrow');
+            appendLibraryQuickLinkIcon(arrow, 'arrow');
 
             contentWrap.appendChild(label);
             contentWrap.appendChild(meta);
