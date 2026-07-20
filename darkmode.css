@@ -2574,6 +2574,29 @@ form[action*="/d2l/lms/quizzing/user/quiz_submissions_attempt.d2l"] tr.d2l-rowsh
   border: 1px solid #2d2d2d !important;
 }
 
+/* The expanded semester timetable is a real data grid, but unlike the other
+   Study Planner tables it has `.table` without `.table-bordered`. Darken its
+   cells explicitly so the site's white cell fills cannot show through. */
+table.classScheduleTable,
+table.classScheduleTable > thead,
+table.classScheduleTable > tbody,
+table.classScheduleTable > tbody > tr,
+table.classScheduleTable > tbody > tr > td {
+  background-color: #2d2d2d !important;
+  background-image: none !important;
+  color: #e0e0e0 !important;
+  border-color: #404040 !important;
+}
+
+table.classScheduleTable > thead > tr,
+table.classScheduleTable > thead > tr > th,
+table.classScheduleTable > thead > tr > td {
+  background-color: #3d3d3d !important;
+  background-image: none !important;
+  color: #ffffff !important;
+  border-color: #404040 !important;
+}
+
 .closedPeriod {
   background-color: #252525 !important;
 }
