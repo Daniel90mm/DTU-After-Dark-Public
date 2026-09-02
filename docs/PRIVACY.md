@@ -1,0 +1,148 @@
+# Privacy Policy - DTU After Dark
+
+**Last updated:** July 16, 2026
+
+## Security and Privacy Audit (March 26, 2026)
+
+A static audit of `manifest.json`, `manifest_chrome.json`, `background.js`, `darkmode.js`, and the public build scripts was completed on March 26, 2026.
+
+### Summary
+
+- No analytics, heartbeat telemetry, ad SDKs, or tracker integrations were found in the public release.
+- No remote code loading, `eval`, or `new Function` execution was found.
+- Background cross-origin fetches are behind runtime message handlers with sender allowlisting and per-feature input checks.
+- Participant Intelligence data is stored locally only (not sent to third-party services).
+- Public source builds now ship with a tracked safe `config.js`; optional private overrides stay local-only.
+
+### Findings
+
+1. **Medium - Transit integration depends on provider-side rate controls**
+   - The current client-side transit integration can be affected by shared provider rate limits in peak usage periods.
+   - Impact: temporary degradation/pauses of live bus updates for users.
+   - Recommendation: continue hardening architecture (for example stronger server-side mediation and provider-side restrictions).
+
+2. **Low - Participant Intelligence retention is open-ended**
+   - Participant metadata can persist until browser/extension data is cleared.
+   - Impact: higher privacy risk on shared devices/profiles.
+   - Recommendation: add a visible "clear participant data" action and optional retention window.
+
+3. **Low - Optional private live-data overrides are local-only**
+   - Public builds include safe defaults, while any private live-data endpoints must be added locally through an untracked override file.
+   - Impact: public source builds may show reduced live bus/library enrichment until a private local override is supplied.
+   - Recommendation: keep private overrides untracked and document the split clearly for local maintainers.
+
+## Data Collection
+
+DTU After Dark does **not** sell personal data and does **not** send personal data to advertising, analytics, or telemetry vendors.
+
+The public extension operates locally in your browser and stores settings/caches needed for features. It does not send heartbeat or usage telemetry. Participant Intelligence is disabled by default. If you enable it in Settings, the extension stores participant metadata locally for overlap and history features; nothing is collected while it is off.
+
+## What Is Stored Locally
+
+### Extension storage (`browser.storage.local` / `chrome.storage.local`)
+
+- Theme and feature preferences (dark mode mirror, accent theme, toggle states).
+- Feature caches:
+  - Grade stats cache (24h)
+  - Course evaluation cache (24h)
+  - FindIt availability cache (7d)
+  - Library events/news cache (6h)
+  - Shared library crowding cache (1m) when a shared library trends endpoint is configured
+- Participant Intelligence dataset (if enabled), including:
+  - Participant names, s-numbers, program labels
+  - Course overlap/history metadata
+  - Enrollment snapshots for retention charts
+  - Size caps in code: max 5000 student records and max 20 retention snapshots per course
+
+### Site `localStorage` (origin-scoped)
+
+- Dark mode preference (`localStorage`) plus extension storage. Older `.dtu.dk` dark-mode cookies are cleared best-effort by current builds.
+- Bus widget preferences and quota counters.
+- Deadlines widget cache/state.
+- GPA simulator entries and some UI state flags.
+
+Note: origin-scoped `localStorage` keys can be readable by scripts running on that same site origin.
+
+## Network Access and Third-Party Services
+
+### Automatic requests made by extension features
+
+- `https://www.rejseplanen.dk/*` for live bus departures.
+  - Sends stop IDs and routing parameters required for departure lookups.
+- `https://api.mazemap.com/*` for Smart Room Links resolution.
+  - Sends building/room query text and DTU campus ID.
+- DTU domain data sources for feature enrichment:
+  - `https://karakterer.dtu.dk/*`
+  - `https://findit.dtu.dk/*`
+  - `https://evaluering.dtu.dk/*`
+  - `https://student.dtu.dk/*`
+  - `https://www.dtu.dk/*`
+  - `https://www.bibliotek.dtu.dk/*`
+
+Public builds do not contact any usage or heartbeat endpoint. Optional private live-data overrides are not part of the tracked public release.
+
+### User-initiated external links
+
+Some features render optional outbound links (opened only when you click), including:
+
+- `books.google.com`
+- `polyteknisk.dk`
+- `supersaas.com`
+- `databarprint.dtu.dk`
+- `panopto.dtu.dk`
+- `use.mazemap.com`
+
+## Permissions
+
+### Manifest permissions
+
+- `storage`
+
+### Host permissions
+
+- `https://api.mazemap.com/*`
+- `https://www.rejseplanen.dk/*`
+- `https://karakterer.dtu.dk/*`
+- `https://findit.dtu.dk/*`
+- `https://evaluering.dtu.dk/*`
+- `https://student.dtu.dk/*`
+- `https://eksamensplan.dtu.dk/*`
+- `https://sts.ait.dtu.dk/*`
+- `https://www.dtu.dk/*`
+- `https://www.bibliotek.dtu.dk/*`
+
+### Content script injection hosts
+
+- `learn.inside.dtu.dk`
+- `s.brightspace.com`
+- `sts.ait.dtu.dk`
+- `studieplan.dtu.dk`
+- `kurser.dtu.dk`
+- `evaluering.dtu.dk`
+- `campusnet.dtu.dk`
+- `karakterer.dtu.dk`
+- `sites.dtu.dk`
+- `eksamensplan.dtu.dk`
+
+## Security Controls
+
+- Background message handlers allowlist sender hosts before handling requests.
+- Sensitive URL features validate host/path before fetching (for example FindIt and course-evaluation fetch paths).
+- The extension uses local code only; no remote script execution model is implemented.
+
+## Data Deletion
+
+You can remove stored data by clearing extension storage and site storage in your browser profile.
+
+- Remove extension data: browser extension settings for DTU After Dark.
+- Remove site `localStorage`/cookies: clear data for relevant DTU domains.
+
+## Disclaimer
+
+**DTU After Dark is an unofficial, community-built extension. It is not affiliated with, endorsed by, or supported by DTU, Arcanic, D2L/Brightspace, Rejseplanen, MazeMap, or any other service provider.**
+
+Information shown by the extension (exam dates, deadlines, grades, GPA calculations, bus times, course evaluations, and library data) can be inaccurate, incomplete, or outdated. Always verify critical information through official DTU channels.
+
+## Contact
+
+For privacy/security questions, open an issue on the GitHub repository or contact: `Daniel-yttesen@hotmail.com`.
