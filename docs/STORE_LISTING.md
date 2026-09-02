@@ -36,12 +36,12 @@ Privacy:
 
 DTU After Dark is unofficial and is not affiliated with or endorsed by DTU or any service provider. Information shown by the extension may be delayed, incomplete, or inaccurate; always verify critical information through official DTU channels.
 
-## Version 7.0.0 release notes
+## Version 8.0.0 release notes
 
-- Expanded dark-mode coverage across DTU Learn quizzes, surveys, grades, announcements, tasks, and legacy search panels.
-- Improved CampusNet calendar, messages, assignments, files, links, archives, and participant tools.
-- Simplified course Content shortcut management and the Course Catalog settings page.
-- Retained the Course Catalog features that work reliably: Grade Statistics, Course Evaluation, and Textbook Links.
-- Removed the unreliable Room Finder, MyLine badges, and redundant Schedule Annotation features.
-- Restored CampusNet Course Composition, Shared Course History, and Retention Radar parsing.
-- Hardened the public/private repository boundary and refreshed privacy and store documentation.
+- Redesigned the DTU Learn Deadlines widget as a compact academic roadmap with clearer periods, deadline states, accessible details, and informative hover/focus explanations.
+- Made the folded Deadlines header shorter and stable so its title and chevron stay aligned without jumping or clipping.
+- Fixed bus-line settings so removing every saved route keeps the list empty, and unified the modal's structural backgrounds.
+- Matched the Library modal backdrop to Settings with a transparent page blur instead of an extra dark wash.
+- Reduced unnecessary deadline network requests while preserving manual refreshes, partial-cache recovery, and clear stale-data notices.
+- Expanded and refined dark-mode coverage across DTU Learn, CampusNet, Study Planner, course pages, and evaluation pages.
+- Hardened the public source and release boundary to exclude credentials, private data, development tooling, logs, and build artifacts.

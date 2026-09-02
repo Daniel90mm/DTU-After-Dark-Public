@@ -77,6 +77,7 @@
 !/tests/bus-config.test.mjs
 !/tests/library-modal.test.mjs
 !/tests/public-boundary-audit.test.mjs
+!/tests/release-version.test.mjs
 
 # Local-only/private items stay ignored by default:
 # AGENTS.md
