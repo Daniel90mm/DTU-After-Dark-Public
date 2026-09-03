@@ -36,6 +36,10 @@ Privacy:
 
 DTU After Dark is unofficial and is not affiliated with or endorsed by DTU or any service provider. Information shown by the extension may be delayed, incomplete, or inaccurate; always verify critical information through official DTU channels.
 
+## Version 8.0.1 release notes
+
+- Prevented Library occupancy refreshes from exhausting the shared service's daily database allowance, without changing the current count, daily graph, historical comparison, or manual refresh controls.
+
 ## Version 8.0.0 release notes
 
 - Redesigned the DTU Learn Deadlines widget as a compact academic roadmap with clearer periods, deadline states, accessible details, and informative hover/focus explanations.

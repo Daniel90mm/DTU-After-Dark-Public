@@ -37,7 +37,7 @@
     const CACHE_PREFIX_LIB_NEWS   = 'cache_lib_news_';
     const CACHE_PREFIX_LIB_CROWD  = 'cache_lib_crowd_';
     const LIB_CACHE_TTL_MS = 1000 * 60 * 60 * 6; // 6 hours
-    const LIB_CROWD_CACHE_TTL_MS = 1000 * 60; // 60 seconds
+    const LIB_CROWD_CACHE_TTL_MS = 1000 * 60 * 5; // 5 minutes
 
     function storageGet(key) {
         return new Promise(resolve => {

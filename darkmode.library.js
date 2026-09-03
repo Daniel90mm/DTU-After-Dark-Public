@@ -670,7 +670,7 @@
                 return;
             }
             fetchLibraryCrowdingAndRender(false);
-        }, 60000);
+        }, 5 * 60 * 1000);
         writeState({ occupancyAutoTimer: occupancyAutoTimer });
     }
 

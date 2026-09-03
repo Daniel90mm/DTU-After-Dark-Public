@@ -84,6 +84,7 @@ function loadLibraryTestApi() {
     );
 
     const document = new FakeDocument();
+    const intervalDelays = [];
     const window = { addEventListener() {}, location: { hostname: 'learn.inside.dtu.dk' } };
     const sandbox = {
         clearInterval,
@@ -91,7 +92,10 @@ function loadLibraryTestApi() {
         console,
         document,
         globalThis: null,
-        setInterval() { return 1; },
+        setInterval(_callback, delay) {
+            intervalDelays.push(delay);
+            return 1;
+        },
         setTimeout,
         window
     };
@@ -103,7 +107,7 @@ function loadLibraryTestApi() {
         ensureLibraryRuntimeStyles() {},
         markExt(element) { element.setAttribute('data-dtu-ext', '1'); }
     };
-    return { ...sandbox.__libraryModalTestApi, document };
+    return { ...sandbox.__libraryModalTestApi, document, intervalDelays };
 }
 
 test('library fallback backdrop blurs without adding a dark wash', () => {
@@ -128,4 +132,12 @@ test('library modal overlay protects its transparent blur from page-level backgr
     assert.match(overlay?.style.cssText || '', /background:transparent !important/);
     assert.match(overlay?.style.cssText || '', /background-color:transparent !important/);
     assert.match(overlay?.style.cssText || '', /backdrop-filter:blur\(4px\) !important/);
+});
+
+test('library modal limits automatic occupancy refreshes to once every five minutes', () => {
+    const api = loadLibraryTestApi();
+
+    api.showLibraryPanel(null);
+
+    assert.deepEqual(api.intervalDelays, [5 * 60 * 1000]);
 });
