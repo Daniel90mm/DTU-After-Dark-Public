@@ -1251,6 +1251,39 @@ div.navigation-item .accent,
   background-color: transparent !important;
 }
 
+/* Session-expiry page message ("Are You Still There?" / "Oh, There You Are!").
+   Floating bar D2L injects at the bottom of every Learn page; it ships white
+   with a light border and would otherwise flash a bright box over dark pages.
+   The container is a full-viewport-width fixed wrapper, so it stays
+   transparent; only the visible inner card takes dark 2. */
+.d2l-page-message-container {
+  background-color: transparent !important;
+}
+
+.d2l-page-message,
+#d2l_sessionExpiryWarning,
+#d2l_sessionExpiryAlert,
+#d2l_sessionExpiryCheck,
+.d2l-page-message .d2l-container-icon,
+.d2l-page-message .d2l-container-icon-inner,
+.d2l-page-message .d2l-textblock {
+  background-color: #2d2d2d !important;
+  color: #e0e0e0 !important;
+  border-color: #404040 !important;
+}
+
+.d2l-page-message h2.d2l-heading,
+.d2l-page-message h2.vui-heading-2,
+.d2l-page-message .d2l-heading.d2l-heading-none,
+.d2l-page-message strong {
+  background-color: transparent !important;
+  color: #ffffff !important;
+}
+
+.d2l-page-message a {
+  color: #66b3ff !important;
+}
+
 /* Dialog backdrop/overlay */
 .d2l-shim,
 .d2l-shim-opaque,
@@ -5043,6 +5076,36 @@ main.main.arc-row>section.main__content {
     background-color: #2d2d2d !important;
     color: #e0e0e0 !important;
     border-color: #404040 !important;
+}
+
+/* Lessons server-error banner ("Oops! We're having trouble connecting you").
+   Native: white floating bar + pale-pink card. Keep the red left rule. */
+#app #root-wrapper .error-alert-container,
+#app #root-wrapper error-floating-container,
+#app #root-wrapper .error-floating-container,
+#app #root-wrapper .error-floating-container .inner-container {
+    background-color: transparent !important;
+}
+
+#app #root-wrapper error-floating-container.floating,
+#app #root-wrapper .error-floating-container.floating {
+    background-color: #1a1a1a !important;
+    border-bottom-color: #404040 !important;
+    box-shadow: 0 -2px 4px rgba(0, 0, 0, 0.5) !important;
+}
+
+#app #root-wrapper .server-error {
+    background-color: #2d2d2d !important;
+    color: #e0e0e0 !important;
+}
+
+#app #root-wrapper .server-error .refresh-link {
+    color: #66b3ff !important;
+}
+
+/* Session-expired "Login in a new window" link: dark 1, not the dark-2 link chip */
+html body a.d2l-link[href*="sessionExpired=1"]:not(.d2l-link-inline) {
+    background-color: #1a1a1a !important;
 }
 
 /* DTU evaluation nag modal (#nagModal): keep the native translucent scrim so

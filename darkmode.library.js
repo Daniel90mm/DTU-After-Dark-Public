@@ -181,34 +181,48 @@
         if (!mainWrapper || !navItem) return;
         applyLibraryNavItemVisibility(navItem);
 
-        var settingsItem = getNavItemByText(mainWrapper, 'Settings');
-        if (settingsItem && settingsItem.parentNode === mainWrapper && !isNavItemHidden(settingsItem)) {
-            if (settingsItem.nextSibling !== navItem) {
-                mainWrapper.insertBefore(navItem, settingsItem.nextSibling);
-            }
-            return;
-        }
-
+        // Anchor on the same item the Settings nav item anchors on, and let the
+        // shared ordering decide which of the two sits closer to it. Anchoring on
+        // the Settings item instead, as this did, meant the two chased each other
+        // around the nav on every feature pass.
         var atomicItem = getAtomicSearchNavItem(mainWrapper);
+        var helpItem = getNavItemByText(mainWrapper, 'Help');
+        var anchor = null;
         if (atomicItem && atomicItem.parentNode === mainWrapper && !isNavItemHidden(atomicItem)) {
-            if (atomicItem.nextSibling !== navItem) {
-                mainWrapper.insertBefore(navItem, atomicItem.nextSibling);
-            }
-            return;
+            anchor = atomicItem;
+        } else if (helpItem && helpItem.parentNode === mainWrapper) {
+            anchor = helpItem;
+        } else if (atomicItem && atomicItem.parentNode === mainWrapper) {
+            anchor = atomicItem;
         }
 
-        var helpItem = getNavItemByText(mainWrapper, 'Help');
-        if (helpItem && helpItem.parentNode === mainWrapper) {
-            if (helpItem.nextSibling !== navItem) {
-                mainWrapper.insertBefore(navItem, helpItem.nextSibling);
+        if (anchor) {
+            var deps = getDeps();
+            if (deps && typeof deps.placeAfterDarkNavItemAt === 'function') {
+                deps.placeAfterDarkNavItemAt(mainWrapper, anchor, navItem);
+                return;
+            }
+            var settingsItem = getNavItemByText(mainWrapper, 'Settings');
+            var fallbackRef = (settingsItem && settingsItem.parentNode === mainWrapper)
+                ? settingsItem.nextSibling
+                : anchor.nextSibling;
+            if (fallbackRef !== navItem) {
+                mainWrapper.insertBefore(navItem, fallbackRef);
             }
             return;
         }
 
         var moreItem = mainWrapper.querySelector('.d2l-navigation-s-more') || queryFirstDeep('.d2l-navigation-s-more', mainWrapper);
+        var navDeps = getDeps();
+        if (navDeps && typeof navDeps.placeAfterDarkNavItemBefore === 'function') {
+            navDeps.placeAfterDarkNavItemBefore(mainWrapper, moreItem, navItem);
+            return;
+        }
         if (moreItem && moreItem.parentNode === mainWrapper) {
-            mainWrapper.insertBefore(navItem, moreItem);
-        } else {
+            if (navItem.nextSibling !== moreItem) {
+                mainWrapper.insertBefore(navItem, moreItem);
+            }
+        } else if (navItem.parentNode !== mainWrapper || navItem.nextSibling) {
             mainWrapper.appendChild(navItem);
         }
     }

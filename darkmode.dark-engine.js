@@ -1020,10 +1020,19 @@
         'd2l-labs-slider-bar'
     ];
 
+    // tagName is already upper case, so matching against an upper-case Set skips
+    // both the per-call toLowerCase allocation and a linear scan of the list.
+    // This runs on every element of every pass.
+    const EXCLUDED_ELEMENT_TAGS = new Set(EXCLUDED_ELEMENTS.map(function (tag) {
+        return tag.toUpperCase();
+    }));
+
+    // Memoizing this per element was tried and measured slower: the styling passes
+    // ask about mostly distinct elements, so the WeakMap was pure overhead. The
+    // ancestor walk above is the opposite case and does cache.
     function shouldExcludeElement(element) {
         if (!element || !element.tagName) return false;
-        const tagName = element.tagName.toLowerCase();
-        if (EXCLUDED_ELEMENTS.includes(tagName)) return true;
+        if (EXCLUDED_ELEMENT_TAGS.has(element.tagName)) return true;
         if (element.classList) {
             if (element.classList.contains('team-widget-container')
                 || element.classList.contains('d2l-image-banner-overlay')
@@ -2288,18 +2297,65 @@
         });
     }
 
+    function isExcludedContainerItself(node) {
+        if (node.id === 'viewer'
+            || (node.classList && (node.classList.contains('pdfViewer') || node.classList.contains('pdf-viewer')))) {
+            return true;
+        }
+        if (node.tagName === 'D2L-LABS-MEDIA-PLAYER') return true;
+        if (node.id === 'player' || (node.id && node.id.includes('d2l-labs-media-player'))) return true;
+        return false;
+    }
+
+    // Walking to the root for every element made this quadratic on deep pages:
+    // it was the single most expensive function on a lessons unit page. Every
+    // ancestor visited is cached on the way, so a subtree costs one walk rather
+    // than one per element. The cache is generation-scoped, so a DOM change
+    // invalidates it wholesale.
+    let _excludedAncestorCache = new WeakMap();
+    let _excludedAncestorGeneration = -1;
+
     function isInsideExcludedContainer(element) {
-        let parent = element;
-        while (parent) {
-            if (parent.id === 'viewer'
-                || (parent.classList && (parent.classList.contains('pdfViewer') || parent.classList.contains('pdf-viewer')))) {
-                return true;
+        if (!element) return false;
+
+        if (typeof deps.domGeneration !== 'function') {
+            // No generation signal to invalidate against, so never cache: a stale
+            // answer here would leave a subtree wrongly styled or wrongly skipped.
+            let node = element;
+            while (node) {
+                if (isExcludedContainerItself(node)) return true;
+                node = node.parentElement;
             }
-            if (parent.tagName && parent.tagName.toLowerCase() === 'd2l-labs-media-player') return true;
-            if (parent.id === 'player' || (parent.id && parent.id.includes('d2l-labs-media-player'))) return true;
+            return false;
+        }
+
+        const generation = deps.domGeneration();
+        if (generation !== _excludedAncestorGeneration) {
+            _excludedAncestorGeneration = generation;
+            _excludedAncestorCache = new WeakMap();
+        }
+
+        const chain = [];
+        let parent = element;
+        let result = false;
+        while (parent) {
+            const cached = _excludedAncestorCache.get(parent);
+            if (cached !== undefined) {
+                result = cached;
+                break;
+            }
+            if (isExcludedContainerItself(parent)) {
+                result = true;
+                break;
+            }
+            chain.push(parent);
             parent = parent.parentElement;
         }
-        return false;
+
+        for (let i = 0; i < chain.length; i++) {
+            _excludedAncestorCache.set(chain[i], result);
+        }
+        return result;
     }
 
     function usesBrightspaceShadowDom() {

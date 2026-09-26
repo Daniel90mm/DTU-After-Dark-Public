@@ -662,47 +662,54 @@
         if (!mainWrapper || !navItem) return;
         applyAfterDarkNavItemVisibility(navItem);
 
-        var settingsItem = getSettingsNavItem(mainWrapper);
-        if (settingsItem && settingsItem.parentNode === mainWrapper && !isNavItemHidden(settingsItem)) {
-            if (settingsItem.nextSibling !== navItem) {
-                mainWrapper.insertBefore(navItem, settingsItem.nextSibling);
-            }
-            return;
-        }
-
+        // This used to anchor on "the Settings item", found by text, which on a
+        // course page matches D2L's own Settings entry rather than ours. That
+        // pointed the Library item at a different slot than the Settings item
+        // claimed, and the two swapped places on every feature pass. Both now go
+        // through the same anchor and ordering.
         placeAfterDarkNavItem(mainWrapper, navItem);
     }
 
     function placeAfterDarkNavItem(mainWrapper, navItem) {
         if (!mainWrapper || !navItem) return;
         applyAfterDarkNavItemVisibility(navItem);
+
         var atomicItem = getAtomicSearchNavItem(mainWrapper);
-        if (atomicItem && atomicItem.parentNode === mainWrapper && !isNavItemHidden(atomicItem)) {
-            if (atomicItem.nextSibling !== navItem) {
-                mainWrapper.insertBefore(navItem, atomicItem.nextSibling);
-            }
-            return;
-        }
-
         var helpItem = getHelpNavItem(mainWrapper);
-        if (helpItem && helpItem.parentNode === mainWrapper) {
-            if (helpItem.nextSibling !== navItem) {
-                mainWrapper.insertBefore(navItem, helpItem.nextSibling);
-            }
-            return;
+        var anchor = null;
+        if (atomicItem && atomicItem.parentNode === mainWrapper && !isNavItemHidden(atomicItem)) {
+            anchor = atomicItem;
+        } else if (helpItem && helpItem.parentNode === mainWrapper) {
+            anchor = helpItem;
+        } else if (atomicItem && atomicItem.parentNode === mainWrapper) {
+            anchor = atomicItem;
         }
 
-        if (atomicItem && atomicItem.parentNode === mainWrapper) {
-            if (atomicItem.nextSibling !== navItem) {
-                mainWrapper.insertBefore(navItem, atomicItem.nextSibling);
+        if (anchor) {
+            // Shared placement keeps our items in one fixed order behind the
+            // anchor, so this item and the Library item cannot displace each other.
+            var deps = getDeps();
+            if (deps && typeof deps.placeAfterDarkNavItemAt === 'function') {
+                deps.placeAfterDarkNavItemAt(mainWrapper, anchor, navItem);
+                return;
+            }
+            if (anchor.nextSibling !== navItem) {
+                mainWrapper.insertBefore(navItem, anchor.nextSibling);
             }
             return;
         }
 
         var moreItem = mainWrapper.querySelector('.d2l-navigation-s-more') || queryFirstDeep('.d2l-navigation-s-more', mainWrapper);
+        var navDeps = getDeps();
+        if (navDeps && typeof navDeps.placeAfterDarkNavItemBefore === 'function') {
+            navDeps.placeAfterDarkNavItemBefore(mainWrapper, moreItem, navItem);
+            return;
+        }
         if (moreItem && moreItem.parentNode === mainWrapper) {
-            mainWrapper.insertBefore(navItem, moreItem);
-        } else {
+            if (navItem.nextSibling !== moreItem) {
+                mainWrapper.insertBefore(navItem, moreItem);
+            }
+        } else if (navItem.parentNode !== mainWrapper || navItem.nextSibling) {
             mainWrapper.appendChild(navItem);
         }
     }

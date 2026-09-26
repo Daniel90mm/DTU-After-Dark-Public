@@ -75,6 +75,17 @@
     function findAllMojanglesImages(root) {
         var images = [];
         if (!root) return images;
+
+        // This is a deep query by hand, and it ran its own full shadow-tree walk
+        // on every call -- roughly 15,000 calls in eight seconds on the homepage.
+        // The shared walker memoizes the root list, so use it when it is wired up.
+        var deps = getDeps();
+        if (deps && typeof deps.deepQueryAll === 'function') {
+            try {
+                return deps.deepQueryAll('.mojangles-text-img', root);
+            } catch (eDeep) { }
+        }
+
         root.querySelectorAll('.mojangles-text-img').forEach(function (img) { images.push(img); });
         root.querySelectorAll('*').forEach(function (el) {
             if (el.shadowRoot) {

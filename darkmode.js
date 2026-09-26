@@ -1216,6 +1216,9 @@
     }
 
     globalThis.DTUAfterDarkDarkEngineDeps = {
+        // Bumped whenever a mutation flush begins, so per-element caches in the
+        // dark engine can be dropped wholesale when the DOM has moved on.
+        domGeneration: function () { return _deepRootsGeneration; },
         isDarkModeEnabled: function () { return !!darkModeEnabled; },
         isLegacyHeavyPage: isDTULearnLegacyHeavyCourseToolPage,
         forceDTULearnAccentInRoot: forceDTULearnAccentInRoot,
@@ -1323,6 +1326,8 @@
     try {
         globalThis.DTUAfterDarkLearnNavDeps = {
             isTopWindow: function () { return IS_TOP_WINDOW; },
+            placeAfterDarkNavItemAt: placeAfterDarkNavItemAt,
+            placeAfterDarkNavItemBefore: placeAfterDarkNavItemBefore,
             isFeatureFlagEnabled: isFeatureFlagEnabled,
             isDarkModeEnabled: function () { return !!darkModeEnabled; },
             normalizeWhitespace: normalizeWhitespace,
@@ -1395,6 +1400,8 @@
     try {
         globalThis.DTUAfterDarkLibraryDeps = {
             isTopWindow: function () { return IS_TOP_WINDOW; },
+            placeAfterDarkNavItemAt: placeAfterDarkNavItemAt,
+            placeAfterDarkNavItemBefore: placeAfterDarkNavItemBefore,
             isLibraryEnabled: function () { return isFeatureFlagEnabled(FEATURE_LIBRARY_DROPDOWN_KEY); },
             isDTULearnHomepage: isDTULearnHomepage,
             deepQueryAll: deepQueryAll,
@@ -1715,7 +1722,8 @@
         saveDarkModePreference: saveDarkModePreference,
         showSettingsModal: showSettingsModal,
         isDTULearnHomepage: isDTULearnHomepage,
-        isContextCaptureDevToolEnabled: function () { return ENABLE_CONTEXT_CAPTURE_DEV_TOOL; }
+        isContextCaptureDevToolEnabled: function () { return ENABLE_CONTEXT_CAPTURE_DEV_TOOL; },
+        deepQueryAll: deepQueryAll
     };
 
     function insertMojanglesText() {
@@ -2345,31 +2353,121 @@
     // Adds a small "Content" button to each course card on the homepage
     // that links directly to /d2l/le/lessons/{courseId}
 
-    // Recursively find all elements matching a selector, traversing shadow roots
-    function deepQueryAll(selector, root) {
-        const results = [];
-        if (!root) return results;
-        if (root.matches && root.matches(selector)) {
-            results.push(root);
+    // Enumerating shadow roots means walking every element under every root, so it
+    // dominates deepQueryAll: on the Learn homepage four modules asked for nav
+    // elements several times per mutation batch and each call repeated the whole
+    // walk. The root list is memoized instead; the matching itself still runs
+    // fresh on every call, so newly added elements inside known roots are never
+    // missed. The cache is dropped whenever a mutation batch adds nodes, and in
+    // any case after DEEP_ROOTS_TTL_MS, because attaching a shadow root to an
+    // element already in the DOM produces no mutation record of its own.
+    const DEEP_ROOTS_TTL_MS = 400;
+    let _deepRootsCache = new WeakMap();
+    let _deepRootsGeneration = 0;
+
+    // Matches are memoized too. Feature checks ask the same few questions
+    // repeatedly -- the course-search poller alone runs every 400 ms and queries
+    // the nav twice per tick -- and re-running querySelectorAll across every
+    // shadow root each time is the remaining cost.
+    //
+    // Only non-empty results are cached, deliberately. A stale non-empty answer
+    // is harmless: the element is verified to still be connected before reuse.
+    // A stale *empty* answer is not, because "is my UI already there?" is exactly
+    // how the insert paths guard themselves, and answering no twice would insert
+    // twice. A miss for something that does not exist yet is cheap anyway.
+    const DEEP_RESULTS_TTL_MS = 400;
+    const DEEP_RESULTS_MAX_CACHED = 64;
+    let _deepResultsCache = new WeakMap();
+
+    function invalidateDeepRoots() {
+        _deepRootsGeneration++;
+    }
+
+    function collectDeepRoots(startRoot) {
+        const cached = _deepRootsCache.get(startRoot);
+        const now = Date.now();
+        if (cached && cached.generation === _deepRootsGeneration &&
+            (now - cached.at) < DEEP_ROOTS_TTL_MS) {
+            return cached.roots;
         }
 
-        const pendingRoots = [root.shadowRoot || root];
-        while (pendingRoots.length > 0) {
-            const searchRoot = pendingRoots.pop();
+        const roots = [];
+        const pending = [startRoot];
+        while (pending.length > 0) {
+            const searchRoot = pending.pop();
             if (!searchRoot || !searchRoot.querySelectorAll) continue;
-
-            searchRoot.querySelectorAll(selector).forEach(match => results.push(match));
+            roots.push(searchRoot);
 
             const walker = document.createTreeWalker(searchRoot, NodeFilter.SHOW_ELEMENT, null);
             let el = walker.nextNode();
             while (el) {
-                if (el.shadowRoot) {
-                    pendingRoots.push(el.shadowRoot);
-                }
+                if (el.shadowRoot) pending.push(el.shadowRoot);
                 el = walker.nextNode();
             }
         }
 
+        try {
+            _deepRootsCache.set(startRoot, {
+                roots: roots,
+                generation: _deepRootsGeneration,
+                at: now
+            });
+        } catch (eCache) { }
+        return roots;
+    }
+
+    function cachedDeepResults(root, selector) {
+        const perRoot = _deepResultsCache.get(root);
+        if (!perRoot) return null;
+        const entry = perRoot.get(selector);
+        if (!entry) return null;
+        if (entry.generation !== _deepRootsGeneration) return null;
+        if ((Date.now() - entry.at) >= DEEP_RESULTS_TTL_MS) return null;
+        // A cached node that has since left the document would be handed back as
+        // a live match, so verify before reuse rather than trusting the clock.
+        for (let i = 0; i < entry.results.length; i++) {
+            const el = entry.results[i];
+            if (!el || el.isConnected === false) return null;
+        }
+        return entry.results;
+    }
+
+    function storeDeepResults(root, selector, results) {
+        if (!results.length) return;
+        if (results.length > DEEP_RESULTS_MAX_CACHED) return;
+        let perRoot = _deepResultsCache.get(root);
+        if (!perRoot) {
+            perRoot = new Map();
+            try { _deepResultsCache.set(root, perRoot); } catch (eStore) { return; }
+        }
+        perRoot.set(selector, {
+            // Callers get their own array and some mutate it, so keep a private copy.
+            results: results.slice(),
+            generation: _deepRootsGeneration,
+            at: Date.now()
+        });
+    }
+
+    // Recursively find all elements matching a selector, traversing shadow roots
+    function deepQueryAll(selector, root) {
+        if (!root) return [];
+
+        const cacheRoot = root.shadowRoot || root;
+        const cached = cachedDeepResults(cacheRoot, selector);
+        if (cached) return cached.slice();
+
+        const results = [];
+        if (root.matches && root.matches(selector)) {
+            results.push(root);
+        }
+
+        const roots = collectDeepRoots(cacheRoot);
+        for (const searchRoot of roots) {
+            if (!searchRoot.querySelectorAll) continue;
+            searchRoot.querySelectorAll(selector).forEach(match => results.push(match));
+        }
+
+        storeDeepResults(cacheRoot, selector, results);
         return results;
     }
 
@@ -2457,17 +2555,39 @@
     // Live bus departure information for DTU-area stops, shown on the DTU Learn homepage.
     // Runtime/config/polling now lives in darkmode.bus.js so future fixes stay localized.
 
+    // These answer questions about the URL alone, but the styling passes ask them
+    // once per element, hundreds of thousands of times on a busy course page --
+    // enough that the regexes alone cost tens of milliseconds. Memoize per URL.
+    var _pagePredicateHref = '';
+    var _pagePredicateValues = {};
+
+    function pagePredicate(key, compute) {
+        var href = window.location.href;
+        if (_pagePredicateHref !== href) {
+            _pagePredicateHref = href;
+            _pagePredicateValues = {};
+        }
+        if (!(key in _pagePredicateValues)) {
+            _pagePredicateValues[key] = compute();
+        }
+        return _pagePredicateValues[key];
+    }
+
     function isDTULearnHomepage() {
-        return window.location.hostname === 'learn.inside.dtu.dk'
-            && (
-                /^\/d2l\/home\/?$/.test(window.location.pathname)
-                || /^\/d2l\/lp\/ouHome\/defaultHome\.d2l\/?$/i.test(window.location.pathname)
-            );
+        return pagePredicate('learnHome', function () {
+            return window.location.hostname === 'learn.inside.dtu.dk'
+                && (
+                    /^\/d2l\/home\/?$/.test(window.location.pathname)
+                    || /^\/d2l\/lp\/ouHome\/defaultHome\.d2l\/?$/i.test(window.location.pathname)
+                );
+        });
     }
 
     function isDTULearnLegacyHeavyCourseToolPage() {
-        return window.location.hostname === 'learn.inside.dtu.dk'
-            && /^\/d2l\/lms\/(dropbox|classlist|group|news)\//i.test(window.location.pathname);
+        return pagePredicate('legacyHeavy', function () {
+            return window.location.hostname === 'learn.inside.dtu.dk'
+                && /^\/d2l\/lms\/(dropbox|classlist|group|news)\//i.test(window.location.pathname);
+        });
     }
 
     function getBusApi() {
@@ -2726,6 +2846,77 @@
 
     function markExt(el) {
         if (el && el.setAttribute) el.setAttribute('data-dtu-ext', '1');
+    }
+
+    // The extension's own DTU Learn nav items, in the order they must appear
+    // after the anchor item. Each module used to assert its own rule -- Settings
+    // wanted to sit right after Atomic Search, Library wanted to sit right after
+    // Settings -- so on a page where the anchor appears late, every feature pass
+    // moved one of them and the two visibly traded places until the passes
+    // stopped. Ranking them here makes the resting order the only stable one.
+    const AFTER_DARK_NAV_ORDER = ['dtu-settings-nav-item', 'dtu-library-nav-item'];
+
+    function afterDarkNavRank(el) {
+        if (!el || !el.classList) return -1;
+        for (var i = 0; i < AFTER_DARK_NAV_ORDER.length; i++) {
+            if (el.classList.contains(AFTER_DARK_NAV_ORDER[i])) return i;
+        }
+        return -1;
+    }
+
+    // Returns the node navItem should be inserted before to sit directly after
+    // anchorItem, behind any of our items that outrank it.
+    function afterDarkNavInsertRef(mainWrapper, anchorItem, navItem) {
+        var rank = afterDarkNavRank(navItem);
+        var ref = anchorItem ? anchorItem.nextSibling : (mainWrapper ? mainWrapper.firstChild : null);
+        while (ref) {
+            if (ref === navItem) {
+                ref = ref.nextSibling;
+                continue;
+            }
+            var otherRank = afterDarkNavRank(ref);
+            if (otherRank >= 0 && otherRank < rank) {
+                ref = ref.nextSibling;
+                continue;
+            }
+            break;
+        }
+        return ref;
+    }
+
+    function placeAfterDarkNavItemAt(mainWrapper, anchorItem, navItem) {
+        if (!mainWrapper || !navItem) return;
+        var ref = afterDarkNavInsertRef(mainWrapper, anchorItem, navItem);
+        // Re-inserting a node that is already in place still counts as a mutation,
+        // which would wake the observer and schedule the next pass. Leave it alone.
+        if (navItem.parentNode === mainWrapper && navItem.nextSibling === ref) return;
+        try { mainWrapper.insertBefore(navItem, ref); } catch (ePlace) { }
+    }
+
+    // Same ordering, for the no-anchor case: our items form a block ending just
+    // before beforeItem (D2L's overflow "more" entry), or at the end of the nav.
+    // The old fallback inserted straight before that item every pass, so whichever
+    // of our two ran last ended up in front -- the visible swapping on course and
+    // lessons pages, where no Atomic Search anchor exists.
+    function placeAfterDarkNavItemBefore(mainWrapper, beforeItem, navItem) {
+        if (!mainWrapper || !navItem) return;
+        var rank = afterDarkNavRank(navItem);
+        var ref = (beforeItem && beforeItem.parentNode === mainWrapper) ? beforeItem : null;
+        var probe = ref ? ref.previousSibling : mainWrapper.lastChild;
+        while (probe) {
+            if (probe === navItem) {
+                probe = probe.previousSibling;
+                continue;
+            }
+            if (afterDarkNavRank(probe) > rank) {
+                ref = probe;
+                probe = probe.previousSibling;
+                continue;
+            }
+            break;
+        }
+        if (navItem.parentNode === mainWrapper && navItem.nextSibling === ref) return;
+        try { mainWrapper.insertBefore(navItem, ref); } catch (ePlaceBefore) { }
     }
 
     function getKurserWidgetsApi() {
@@ -3168,7 +3359,9 @@
         getLightAccentBadgeStyles: function () { return lightAccentBadgeStyles; },
         isLegacyHeavyPage: isDTULearnLegacyHeavyCourseToolPage,
         getDarkText: getDarkText,
-        getDarkBorder: getDarkBorder
+        getDarkBorder: getDarkBorder,
+        deepRoots: collectDeepRoots,
+        deepQueryAll: deepQueryAll
     };
 
     function forceDTULearnAccentInRoot(root) {
@@ -3590,6 +3783,10 @@
         if (needsHeavyWork && !_heavyWorkTimer) {
             _heavyWorkTimer = setTimeout(() => {
                 _heavyWorkTimer = null;
+                // The DOM has changed since the last flush, so every feature check
+                // below must see a freshly enumerated shadow-root list. They then
+                // share that one walk instead of repeating it per caller.
+                invalidateDeepRoots();
 
                 var queueOverflow = _mutationQueueOverflow;
                 _mutationQueueOverflow = false;

@@ -36,6 +36,18 @@ Privacy:
 
 DTU After Dark is unofficial and is not affiliated with or endorsed by DTU or any service provider. Information shown by the extension may be delayed, incomplete, or inaccurate; always verify critical information through official DTU channels.
 
+## Version 8.0.3 release notes
+
+- Made lesson bulk downloads much faster to start. The scan no longer downloads every file once just to look inside it, and it checks several pages at a time.
+- Added a Cancel button while a bulk download runs. Cancelling, or leaving the lessons view, stops the run, discards what it had collected, and starts no download afterwards.
+
+## Version 8.0.2 release notes
+
+- Made DTU Learn noticeably faster. Repeated searches of the page structure are now cached and shared between features, so course, lessons, and homepage views spend far less time waiting on the extension.
+- Stopped the lesson download control from scanning pages that can never use it.
+- Fixed the Library and Settings menu entries swapping places while a course or lessons page loaded; they now appear once and stay put.
+- Darkened the "Are You Still There?" session-expiry message so an idle page no longer flashes a white box.
+
 ## Version 8.0.1 release notes
 
 - Prevented Library occupancy refreshes from exhausting the shared service's daily database allowance, without changing the current count, daily graph, historical comparison, or manual refresh controls.

@@ -47,6 +47,12 @@
     const LESSONS_BULK_ROOT_ID = 'dtu-lessons-bulk-download-root';
     const LESSONS_BULK_STYLE_ID = 'dtu-lessons-bulk-download-style';
 
+    // True once this module has actually put a root or style element in the page.
+    // While it is false there is nothing to remove, so the removal paths can skip
+    // their full shadow-DOM walks -- which is every mutation batch on pages that
+    // have no lessons UI at all, such as /d2l/home.
+    let _lessonsBulkUiInserted = false;
+
     let _lessonsBulkUiState = {
         sections: [],
         selectedKeys: new Set(),
@@ -110,6 +116,10 @@
         var path = window.location.pathname || '';
         if (/^\/d2l\/le\/lessons\/\d+(?:\/.*)?$/i.test(path)) return true;
         if (/^\/d2l\/le\/content\/\d+(?:\/.*)?$/i.test(path)) return true;
+        // The deep walk below is the expensive fallback for other course-content
+        // routes. Outside /d2l/le/ a lessons TOC cannot exist, so don't pay for it
+        // on the homepage and friends -- that walk ran on every mutation batch.
+        if (!/^\/d2l\/le\//i.test(path)) return false;
         try {
             return deepQueryAll('d2l-lessons-toc', document).length > 0;
         } catch (e0) {
@@ -135,6 +145,7 @@
             style.id = LESSONS_BULK_STYLE_ID;
             markExt(style);
             parentRoot.appendChild(style);
+            _lessonsBulkUiInserted = true;
         }
 
         var panelBg = isDarkModeEnabled() ? '#2d2d2d' : '#ffffff';
@@ -185,6 +196,8 @@
             + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-run:hover{background:var(--dtu-ad-accent-deep-hover);border-color:var(--dtu-ad-accent-deep-hover);}'
             + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-run:disabled,'
             + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-mini:disabled{opacity:0.55;cursor:not-allowed;}'
+            + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-cancel{display:none;}'
+            + '#' + LESSONS_BULK_ROOT_ID + '.dtu-lbd-running .dtu-lbd-cancel{display:inline-block;}'
             + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-status{display:block;width:100%;max-width:100%;margin-top:8px;min-height:14px;font-size:11px;line-height:1.3;color:' + mutedColor + ';white-space:normal !important;overflow-wrap:anywhere !important;word-break:break-word !important;}'
             + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-empty{font-size:11px;color:' + mutedColor + ';padding:4px 2px 6px;}';
     }
@@ -1737,7 +1750,7 @@
 
     async function fetchLessonsUnitDownloadUrls(unitUrl) {
         try {
-            var resp = await fetch(unitUrl, { credentials: 'include', cache: 'no-store' });
+            var resp = await lessonsBulkFetch(unitUrl, { credentials: 'include', cache: 'no-store' });
             if (!resp || !resp.ok) {
                 logLessonsBulkDebug('fetch_unit_http_fail', {
                     unitUrl: unitUrl,
@@ -2003,7 +2016,7 @@
                     try {
                         var abs = toAbsoluteSamePageUrl(endpoints[j], window.location.origin);
                         if (!abs) continue;
-                        var resp = await fetch(abs, {
+                        var resp = await lessonsBulkFetch(abs, {
                             credentials: 'include',
                             cache: 'no-store',
                             headers: { 'Accept': 'application/json' }
@@ -2066,7 +2079,7 @@
     async function fetchUnitTopicUrlsFromUnitPage(unitUrl) {
         var out = new Set();
         try {
-            var resp = await fetch(unitUrl, { credentials: 'include', cache: 'no-store' });
+            var resp = await lessonsBulkFetch(unitUrl, { credentials: 'include', cache: 'no-store' });
             if (!resp || !resp.ok) {
                 logLessonsBulkDebug('unit_page_topics_http_fail', {
                     unitUrl: unitUrl,
@@ -2126,6 +2139,16 @@
         }
     }
 
+    function isHtmlLikeResponse(resp) {
+        var ct = '';
+        try { ct = String(resp.headers.get('content-type') || '').toLowerCase(); } catch (e0) { ct = ''; }
+        if (!ct) return true;
+        return /(text\/html|application\/xhtml|text\/plain|json|xml)/.test(ct);
+    }
+
+    // First LE API version that answered for this page; later topics try it before the rest.
+    var _lessonsTopicApiVersion = '';
+
     async function fetchTopicApiDownloadUrls(topicUrl) {
         var ids = parseLessonsTopicIds(topicUrl);
         if (!ids) {
@@ -2135,12 +2158,13 @@
 
         var out = new Set();
         var versions = ['1.75', '1.74', '1.73', '1.72', '1.71', '1.70', '1.69', '1.68', '1.67'];
+        if (_lessonsTopicApiVersion) versions = [_lessonsTopicApiVersion];
         for (var i = 0; i < versions.length; i++) {
             var apiUrl = '/d2l/api/le/' + versions[i] + '/' + ids.orgUnitId + '/content/topics/' + ids.topicId;
             try {
                 var abs = toAbsoluteSamePageUrl(apiUrl, window.location.origin);
                 if (!abs) continue;
-                var resp = await fetch(abs, {
+                var resp = await lessonsBulkFetch(abs, {
                     credentials: 'include',
                     cache: 'no-store',
                     headers: { 'Accept': 'application/json' }
@@ -2157,6 +2181,7 @@
                 var json = null;
                 try { json = await resp.json(); } catch (e1) { json = null; }
                 if (!json) continue;
+                _lessonsTopicApiVersion = versions[i];
                 collectDownloadUrlsFromJsonValue(json, topicUrl, out, new WeakSet());
                 logLessonsBulkDebug('topic_api_scan', {
                     topicUrl: topicUrl,
@@ -2165,7 +2190,8 @@
                     finalUrl: resp.url || abs,
                     runningFound: out.size
                 });
-                if (out.size) break;
+                // A version that answered has told us everything this topic has.
+                break;
             } catch (e2) {
                 logLessonsBulkDebug('topic_api_error', {
                     topicUrl: topicUrl,
@@ -2194,7 +2220,17 @@
             try {
                 var abs = toAbsoluteSamePageUrl(candidates[i], window.location.origin);
                 if (!abs) continue;
-                var resp = await fetch(abs, { credentials: 'include', cache: 'no-store' });
+                var resp = await lessonsBulkFetch(abs, { credentials: 'include', cache: 'no-store' });
+                if (resp && resp.ok && !isHtmlLikeResponse(resp)) {
+                    // The download endpoint streams the file itself; reading it as text only burns bandwidth.
+                    try { if (resp.body) resp.body.cancel(); } catch (eCancel) { }
+                    logLessonsBulkDebug('viewcontent_skip_non_html', {
+                        topicUrl: topicUrl,
+                        candidateUrl: abs,
+                        contentType: resp.headers.get('content-type') || ''
+                    });
+                    continue;
+                }
                 if (!resp || !resp.ok) {
                     logLessonsBulkDebug('viewcontent_http_fail', {
                         topicUrl: topicUrl,
@@ -2216,6 +2252,7 @@
                     finalUrl: resp.url || abs,
                     runningFound: out.size
                 });
+                if (out.size) break;
             } catch (e1) { }
         }
         logLessonsBulkDebug('viewcontent_done', { topicUrl: topicUrl, found: out.size });
@@ -2312,6 +2349,7 @@
                 if (topicUrls && topicUrls.length) {
                     var fromTopics = new Set();
                     for (var ut = 0; ut < topicUrls.length; ut++) {
+                        if (isLessonsBulkRunAborted()) break;
                         var tRes = await fetchLessonsUnitDownloadResult(topicUrls[ut], depth + 1);
                         (tRes && tRes.links ? tRes.links : []).forEach(function (u) { fromTopics.add(u); });
                         if (ut % 4 === 3) await lessonsBulkDelay(45);
@@ -2853,7 +2891,7 @@
     async function fetchFileForBundle(url, index) {
         try {
             if (!isStrictFileDownloadUrl(url)) return { ok: false, reason: 'invalid-url' };
-            var resp = await fetch(url, { credentials: 'include', cache: 'no-store' });
+            var resp = await lessonsBulkFetch(url, { credentials: 'include', cache: 'no-store' });
             if (!resp || !resp.ok) {
                 return { ok: false, reason: 'http', status: resp ? resp.status : 'no_response', finalUrl: resp && resp.url ? resp.url : '' };
             }
@@ -2926,6 +2964,7 @@
         var usedNames = new Map();
 
         for (var i = 0; i < list.length; i++) {
+            throwIfLessonsBulkAborted();
             setLessonsBulkStatus(rootEl, 'Bundling file ' + (i + 1) + ' / ' + list.length + '...', 'work');
             var r = await fetchFileForBundle(list[i], i);
             if (!r || !r.ok) {
@@ -2946,6 +2985,7 @@
             fileEntries.push({ name: finalName, bytes: r.bytes, date: new Date() });
         }
 
+        throwIfLessonsBulkAborted();
         if (!fileEntries.length) return { ok: false, reason: 'fetch-failed', failByReason: failByReason };
 
         var zipBlob = buildStoreOnlyZipBlob(fileEntries);
@@ -2991,7 +3031,7 @@
                 logLessonsBulkDebug('download_skip_invalid', { url: url, index: index });
                 return { ok: false, reason: 'invalid-url' };
             }
-            var resp = await fetch(url, { credentials: 'include', cache: 'no-store' });
+            var resp = await lessonsBulkFetch(url, { credentials: 'include', cache: 'no-store' });
             if (!resp || !resp.ok) {
                 logLessonsBulkDebug('download_http_fail', {
                     url: url,
@@ -3027,6 +3067,7 @@
             logLessonsBulkDebug('download_ok_blob', { url: url, index: index, finalUrl: resp.url || url, fileName: fileName, blobSize: blob.size });
             return { ok: true, mode: 'blob' };
         } catch (e3) {
+            throwIfLessonsBulkAborted();
             if (!isStrictFileDownloadUrl(url)) {
                 logLessonsBulkDebug('download_exception_invalid', { url: url, index: index, error: String(e3 && e3.message ? e3.message : e3) });
                 return { ok: false, reason: 'invalid-url' };
@@ -3042,6 +3083,35 @@
             });
             return triggered2 ? { ok: true, mode: 'anchor-fallback' } : { ok: false, reason: 'fetch' };
         }
+    }
+
+    var LESSONS_BULK_SCAN_CONCURRENCY = 4;
+
+    // Set while a bulk run is active; aborting it cancels in-flight fetches and drops buffered file bytes.
+    var _lessonsBulkRunAbort = null;
+
+    function isLessonsBulkRunAborted() {
+        return !!(_lessonsBulkRunAbort && _lessonsBulkRunAbort.signal.aborted);
+    }
+
+    function throwIfLessonsBulkAborted() {
+        if (isLessonsBulkRunAborted()) {
+            var err = new Error('Bulk download cancelled');
+            err.name = 'AbortError';
+            throw err;
+        }
+    }
+
+    function cancelLessonsBulkRun() {
+        if (_lessonsBulkRunAbort && !_lessonsBulkRunAbort.signal.aborted) {
+            try { _lessonsBulkRunAbort.abort(); } catch (e0) { }
+        }
+    }
+
+    function lessonsBulkFetch(url, opts) {
+        var o = Object.assign({}, opts || {});
+        if (_lessonsBulkRunAbort) o.signal = _lessonsBulkRunAbort.signal;
+        return fetch(url, o);
     }
 
     function lessonsBulkDelay(ms) {
@@ -3075,9 +3145,10 @@
 
     function setLessonsBulkControlsDisabled(rootEl, disabled) {
         if (!rootEl) return;
-        rootEl.querySelectorAll('.dtu-lbd-mini, .dtu-lbd-run, .dtu-lbd-list input[type="checkbox"]').forEach(function (el) {
+        rootEl.querySelectorAll('.dtu-lbd-mini:not(.dtu-lbd-cancel), .dtu-lbd-run, .dtu-lbd-list input[type="checkbox"]').forEach(function (el) {
             el.disabled = !!disabled;
         });
+        rootEl.classList.toggle('dtu-lbd-running', !!disabled);
     }
 
     async function runLessonsBulkDownload(rootEl) {
@@ -3185,15 +3256,35 @@
         }
 
         _lessonsBulkUiState.running = true;
+        _lessonsBulkRunAbort = new AbortController();
         setLessonsBulkControlsDisabled(rootEl, true);
         setLessonsBulkStatus(rootEl, 'Scanning lesson pages for downloadable files...', 'work');
 
         try {
             var downloadUrlSet = new Set();
             var nativeFallbackTopics = [];
+            var scanResults = new Array(unitUrls.length);
+            var scanNext = 0;
+            var scanDone = 0;
+            async function scanWorker() {
+                while (scanNext < unitUrls.length && !isLessonsBulkRunAborted()) {
+                    var idx = scanNext++;
+                    try {
+                        scanResults[idx] = await fetchLessonsUnitDownloadResult(unitUrls[idx]);
+                    } catch (eScan) {
+                        scanResults[idx] = { links: [] };
+                    }
+                    scanDone++;
+                    setLessonsBulkStatus(rootEl, 'Scanning page ' + scanDone + ' / ' + unitUrls.length + '...', 'work');
+                }
+            }
+            var scanWorkers = [];
+            for (var w = 0; w < Math.min(LESSONS_BULK_SCAN_CONCURRENCY, unitUrls.length); w++) scanWorkers.push(scanWorker());
+            await Promise.all(scanWorkers);
+            throwIfLessonsBulkAborted();
+
             for (var i = 0; i < unitUrls.length; i++) {
-                setLessonsBulkStatus(rootEl, 'Scanning page ' + (i + 1) + ' / ' + unitUrls.length + '...', 'work');
-                var result = await fetchLessonsUnitDownloadResult(unitUrls[i]);
+                var result = scanResults[i] || { links: [] };
                 (result.links || []).forEach(function (url) { downloadUrlSet.add(url); });
                 if (/\/topics\//i.test(unitUrls[i]) && result && result.links && result.links.length) {
                     var topicHint = getTopicLabelHintFromTopicUrl(unitUrls[i]);
@@ -3218,7 +3309,6 @@
                     foundForPage: (result.links || []).length,
                     cumulativeUnique: downloadUrlSet.size
                 });
-                if (i % 4 === 3) await lessonsBulkDelay(60);
             }
 
             var downloadUrls = Array.from(downloadUrlSet).filter(function (u) { return isStrictFileDownloadUrl(u); });
@@ -3232,6 +3322,7 @@
                 if (nativeFallbackTopics.length) {
                     setLessonsBulkStatus(rootEl, 'Resolving topic files for one ZIP bundle...', 'work');
                     for (var rf = 0; rf < nativeFallbackTopics.length; rf++) {
+                        throwIfLessonsBulkAborted();
                         setLessonsBulkStatus(rootEl, 'Resolving topic ' + (rf + 1) + ' / ' + nativeFallbackTopics.length + '...', 'work');
                         var recovered = await collectTopicFileUrlsInCurrentPage(nativeFallbackTopics[rf]);
                         var topicHintRf = getTopicLabelHintFromTopicUrl(nativeFallbackTopics[rf]);
@@ -3288,6 +3379,7 @@
                 if (nativeFallbackTopics.length) {
                     setLessonsBulkStatus(rootEl, 'Trying native download buttons...', 'work');
                     for (var nf = 0; nf < nativeFallbackTopics.length; nf++) {
+                        throwIfLessonsBulkAborted();
                         setLessonsBulkStatus(rootEl, 'Trying native download ' + (nf + 1) + ' / ' + nativeFallbackTopics.length + '...', 'work');
                         var nd = await triggerTopicNativeDownloadInCurrentPage(nativeFallbackTopics[nf]);
                         if ((!nd || !nd.ok) && isLessonsBulkHeavyFallbackEnabled()) {
@@ -3322,6 +3414,7 @@
             var fallbackCount = 0;
             var failByReason = {};
             for (var j = 0; j < downloadUrls.length; j++) {
+                throwIfLessonsBulkAborted();
                 var dl = await downloadFileUrl(downloadUrls[j], j);
                 if (dl && dl.ok) {
                     okCount++;
@@ -3347,7 +3440,12 @@
                 setLessonsBulkStatus(rootEl, 'Could not download files automatically from selected topics.' + reasonText, 'error');
                 logLessonsBulkDebug('run_done_fail', { failByReason: failByReason, attempted: downloadUrls.length, urls: downloadUrls });
             }
+        } catch (eRun) {
+            if (!isLessonsBulkRunAborted()) throw eRun;
+            setLessonsBulkStatus(rootEl, 'Cancelled. Nothing was saved.', 'error');
+            logLessonsBulkDebug('run_cancelled', {});
         } finally {
+            _lessonsBulkRunAbort = null;
             _lessonsBulkUiState.running = false;
             setLessonsBulkControlsDisabled(rootEl, false);
             updateLessonsBulkRunButton(rootEl);
@@ -3510,6 +3608,7 @@
     }
 
     function resetLessonsBulkState() {
+        cancelLessonsBulkRun();
         _lessonsBulkUiState = {
             sections: [],
             selectedKeys: new Set(),
@@ -3539,6 +3638,10 @@
     }
 
     function removeLessonsBulkDownloadControl() {
+        if (!_lessonsBulkUiInserted) {
+            resetLessonsBulkState();
+            return;
+        }
         var docs = getLessonsCandidateDocuments(document);
         docs.forEach(function (doc) {
             var roots = [];
@@ -3552,10 +3655,12 @@
                 if (styleEl && styleEl.remove) styleEl.remove();
             });
         });
+        _lessonsBulkUiInserted = false;
         resetLessonsBulkState();
     }
 
     function cleanupLessonsBulkOutsideScope(scopeDoc) {
+        if (!_lessonsBulkUiInserted) return;
         var targetDoc = scopeDoc || getLessonsRuntimeDocument(document);
         var docs = getLessonsCandidateDocuments(targetDoc);
         docs.forEach(function (doc) {
@@ -3691,6 +3796,7 @@
             root = scopeDoc.createElement('div');
             markExt(root);
             root.id = LESSONS_BULK_ROOT_ID;
+            _lessonsBulkUiInserted = true;
             root.className = 'dtu-lbd-root';
 
             var toggle = scopeDoc.createElement('button');
@@ -3757,6 +3863,16 @@
                 runLessonsBulkDownload(root);
             });
 
+            var cancelBtn = scopeDoc.createElement('button');
+            markExt(cancelBtn);
+            cancelBtn.type = 'button';
+            cancelBtn.className = 'dtu-lbd-mini dtu-lbd-cancel';
+            cancelBtn.textContent = 'Cancel';
+            cancelBtn.addEventListener('click', function () {
+                cancelLessonsBulkRun();
+                setLessonsBulkStatus(root, 'Cancelling...', 'work');
+            });
+
             var status = scopeDoc.createElement('div');
             markExt(status);
             status.className = 'dtu-lbd-status';
@@ -3764,6 +3880,7 @@
             actions.appendChild(allBtn);
             actions.appendChild(noneBtn);
             actions.appendChild(runBtn);
+            actions.appendChild(cancelBtn);
             panel.appendChild(hint);
             panel.appendChild(list);
             panel.appendChild(actions);

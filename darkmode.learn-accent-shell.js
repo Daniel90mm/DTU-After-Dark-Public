@@ -104,9 +104,58 @@
         } catch (e0) { }
     }
 
+    // Union of every top-level selector forceDTULearnAccentInRoot queries. Keep
+    // this in sync when adding a pass there, or the new pass will be skipped on
+    // roots that match nothing else.
+    var ACCENT_ROOT_GUARD_SELECTOR = [
+        'd2l-labs-navigation-band',
+        '.d2l-navigation-s-mobile-menu',
+        '.d2l-navigation-s-mobile-menu-mask',
+        '.d2l-navigation-s-mobile-menu-content',
+        '.d2l-navigation-s-mobile-menu-nav',
+        '.d2l-navigation-s-mobile-menu-course-menu',
+        '.d2l-navigation-s-mobile-menu-mask-close',
+        '.d2l-navigation-s-mobile-menu-color-strip',
+        '.d2l-navigation-s-mobile-menu-header',
+        '.d2l-navigation-s-mobile-menu-branded-header',
+        '.d2l-navigation-s-mobile-menu-course-selector',
+        '.d2l-navigation-s-mobile-menu-header-course-menu',
+        '.d2l-navigation-s-gutter',
+        '.d2l-navigation-s-header-logo-area',
+        '.d2l-navigation-s-header-no-home-icon',
+        '.d2l-navigation-s-logo-divider',
+        '.d2l-w2d-count',
+        '.d2l-w2d-heading-3-count',
+        '.d2l-count-badge-number',
+        '.d2l-labs-navigation-notification-icon-indicator',
+        'd2l-icon[icon="tier3:notification-bell"]',
+        '.uw-text',
+        'a.d2l-homepage-heading-link',
+        'a.d2l-navigation-s-link',
+        '.d2l-navigation-s-group',
+        '.d2l-navigation-s-group-text',
+        '.d2l-widget-content-padding'
+    ].join(', ');
+
     function forceDTULearnAccentInRoot(root) {
         if (!root || !root.querySelectorAll) return;
         if (window.location.hostname !== 'learn.inside.dtu.dk') return;
+
+        try {
+            if (root.nodeType === 11 && root.host && root.host.matches && root.host.matches('d2l-labs-navigation-band')) {
+                applyDTULearnNavigationBandAccent(root.host);
+            }
+        } catch (eHost) { }
+
+        // This function runs against every shadow root on the page, and the page
+        // has hundreds; almost none of them hold anything it styles. One combined
+        // query answers "is there anything here at all", so those roots skip both
+        // the colour resolution below and the twelve passes after it. The guard is
+        // a deliberate superset: every pass below is a descendant query within
+        // this same root, so if a pass can match, its key element matches here too.
+        try {
+            if (!root.querySelector(ACCENT_ROOT_GUARD_SELECTOR)) return;
+        } catch (eGuard) { }
 
         var darkModeEnabled = isDarkModeEnabled();
         var badgeBg = darkModeEnabled ? 'var(--dtu-ad-accent)' : 'var(--dtu-ad-accent-deep)';
@@ -142,9 +191,6 @@
         }
 
         try {
-            if (root.nodeType === 11 && root.host && root.host.matches && root.host.matches('d2l-labs-navigation-band')) {
-                applyDTULearnNavigationBandAccent(root.host);
-            }
             root.querySelectorAll('d2l-labs-navigation-band').forEach(function (el) {
                 applyDTULearnNavigationBandAccent(el);
             });
@@ -273,6 +319,13 @@
         shadowRoot.appendChild(style);
     }
 
+    function applyAccentToShadowRoot(shadowRoot) {
+        try { forceDTULearnAccentInRoot(shadowRoot); } catch (e0) { }
+        if (!isDarkModeEnabled()) {
+            try { injectLightAccentBadgeStyles(shadowRoot); } catch (e1) { }
+        }
+    }
+
     function walkShadowRootsForAccent(rootEl, visited, depth) {
         if (!rootEl || depth > 12) return;
         if (!visited) visited = new WeakSet();
@@ -280,10 +333,41 @@
         if (scope.nodeType !== 1 && scope.nodeType !== 9 && scope.nodeType !== 11) return;
 
         if (scope.nodeType === 11) {
-            try { forceDTULearnAccentInRoot(scope); } catch (e0) { }
-            if (!isDarkModeEnabled()) {
-                try { injectLightAccentBadgeStyles(scope); } catch (e1) { }
-            }
+            applyAccentToShadowRoot(scope);
+        }
+
+        // Preferred path: ask the shared walker which elements exist anywhere under
+        // this scope, then style only the shadow roots that actually hold one.
+        // The page carries several hundred shadow roots and a handful contain
+        // anything accent-related, so visiting them all -- which the recursion
+        // below did, roughly 15,000 times in eight seconds on the homepage,
+        // re-walking the tree on each entry -- is almost entirely wasted work.
+        // A root that gains a relevant element later is picked up on the next
+        // mutation flush, and both applications are idempotent.
+        var deps = getDeps();
+        if (deps && typeof deps.deepQueryAll === 'function') {
+            try {
+                var interesting = deps.deepQueryAll(ACCENT_ROOT_GUARD_SELECTOR, scope);
+                for (var m = 0; m < interesting.length; m++) {
+                    var el = interesting[m];
+                    if (!el || typeof el.getRootNode !== 'function') continue;
+                    var owner = el.getRootNode();
+                    if (!owner || owner.nodeType !== 11) continue;
+                    if (owner === scope || visited.has(owner)) continue;
+                    visited.add(owner);
+                    applyAccentToShadowRoot(owner);
+                }
+                // A navigation band styles its own shadow root through its host,
+                // which no descendant query would surface.
+                var bands = deps.deepQueryAll('d2l-labs-navigation-band', scope);
+                for (var b = 0; b < bands.length; b++) {
+                    var bandRoot = bands[b] && bands[b].shadowRoot;
+                    if (!bandRoot || bandRoot === scope || visited.has(bandRoot)) continue;
+                    visited.add(bandRoot);
+                    applyAccentToShadowRoot(bandRoot);
+                }
+                return;
+            } catch (eShared) { }
         }
 
         try {

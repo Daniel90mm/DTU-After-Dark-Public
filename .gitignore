@@ -78,6 +78,14 @@
 !/tests/library-modal.test.mjs
 !/tests/public-boundary-audit.test.mjs
 !/tests/release-version.test.mjs
+!/tests/_harness.mjs
+!/tests/background.test.mjs
+!/tests/lessons-bulk.test.mjs
+!/tests/packaging.test.mjs
+!/tests/smart-room-linker.test.mjs
+!/tests/stylesheet.test.mjs
+!/tests/textbooks.test.mjs
+!/tests/url-pause.test.mjs
 
 # Local-only/private items stay ignored by default:
 # AGENTS.md
