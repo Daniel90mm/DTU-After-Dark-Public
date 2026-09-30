@@ -62,7 +62,7 @@ class FakeElement {
     }
 }
 
-function loadDeadlineUi({ dark = false } = {}) {
+function loadDeadlineUi({ dark = false, messages = null } = {}) {
     const fileUrl = new URL('darkmode.deadlines.js', ROOT);
     let source = fs.readFileSync(fileUrl, 'utf8');
     source = source.replace(
@@ -81,7 +81,8 @@ function loadDeadlineUi({ dark = false } = {}) {
             placeDeadlinesHomepageWidget,
             setDeadlinesWidgetExpandedState,
             formatDeadlineChip,
-            getDeadlineState
+            getDeadlineState,
+            scheduleDailyDeadlinesCheck
         };})();`
     );
 
@@ -105,7 +106,9 @@ function loadDeadlineUi({ dark = false } = {}) {
         }
     };
     sandbox.DTUAfterDarkDeadlinesDeps = {
-        isDarkMode() { return dark; }
+        isDarkMode() { return dark; },
+        isTopWindow() { return true; },
+        sendRuntimeMessage(message) { if (messages) messages.push(message); }
     };
     sandbox.globalThis = sandbox;
     vm.runInNewContext(source, sandbox, { filename: fileUrl.pathname });
@@ -259,6 +262,53 @@ test('a clipped active deadline range does not mask its tooltip', () => {
     assert.match(registrationBar.className, /\bis-clipped-start\b/);
     assert.equal(registrationBar.style.maskImage, 'none');
     assert.equal(registrationBar.style.webkitMaskImage, 'none');
+});
+
+test('a deadline range running past the timeline end fades out at the right edge', () => {
+    const api = loadDeadlineUi();
+    const today = utc('2026-09-30');
+    const rows = api.buildTopDeadlines(responseWith({
+        course: [{
+            heading: 'Spring 2027',
+            items: [deadlineItem({ label: 'Supplementary registration period', start: '2027-01-20', end: '2027-03-01' })]
+        }]
+    }), today, 3);
+    const model = api.buildDeadlineTimelineModel(rows, today);
+    assert.equal(model.items[0].continuesAfter, true);
+    assert.equal(model.items[0].endPercent, 100);
+
+    const timeline = api.createDeadlinesTimeline(rows, today);
+    const bar = (function findByClass(element) {
+        if (/\bdtu-deadline-timeline-bar\b/.test(element.className)) return element;
+        for (const child of element.children) {
+            const match = findByClass(child);
+            if (match) return match;
+        }
+        return null;
+    })(timeline);
+    assert.match(bar.className, /\bis-clipped-end\b/);
+    assert.doesNotMatch(bar.className, /\bis-clipped-start\b/);
+});
+
+test('deadlines are checked again once the held copy is a day old', () => {
+    const messages = [];
+    const api = loadDeadlineUi({ messages });
+    const today = utc('2026-09-30');
+    const course = [{ heading: 'Fall 2029', items: [deadlineItem({ label: 'Registration period', start: '2029-07-08', end: '2029-08-05' })] }];
+    const fresh = Object.assign(responseWith({ course }), { ok: true, fetchedAt: Date.now() - 2 * 3600000 });
+    api.scheduleDailyDeadlinesCheck({}, fresh, today);
+    assert.equal(messages.length, 0, 'a copy fetched 2 hours ago is kept');
+
+    const dayOld = Object.assign(responseWith({ course }), { ok: true, fetchedAt: Date.now() - 25 * 3600000 });
+    api.scheduleDailyDeadlinesCheck({}, dayOld, today);
+    assert.equal(messages.length, 1, 'a copy older than a day is refetched');
+    assert.equal(messages[0].type, 'dtu-student-deadlines');
+    assert.equal(messages[0].forceRefresh, false);
+});
+
+test('the deadlines widget has no manual refresh button', () => {
+    const source = fs.readFileSync(new URL('darkmode.deadlines.js', ROOT), 'utf8');
+    assert.doesNotMatch(source, /data-dtu-deadlines-refresh/);
 });
 
 function colorFromStyle(element) {

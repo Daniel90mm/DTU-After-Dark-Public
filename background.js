@@ -8,7 +8,7 @@
     const EXAM_CALENDAR_CACHE_TTL_MS = 1000 * 60 * 60 * 12; // 12 hours
     // Deadlines are published years ahead; the content script decides when newer data is
     // actually needed. This is a long-stop, not a polling interval.
-    const STUDENT_DEADLINES_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
+    const STUDENT_DEADLINES_CACHE_TTL_MS = 1000 * 60 * 60 * 24; // one check a day
     const STUDENT_DEADLINES_RETRY_AFTER_FAILURE_MS = 1000 * 60 * 10; // back off a failing source
     const STUDENT_COURSE_REG_DEADLINES_URL = 'https://student.dtu.dk/en/courses-and-teaching/course-registration/course-registration-deadlines';
     const STUDENT_EXAM_REG_DEADLINES_URL = 'https://student.dtu.dk/en/exam/exam-registration/-deadlines-for-exams';
@@ -152,18 +152,22 @@
             return null;
         }
 
+        // Whole-cell matches only: the summary table above the results has rows
+        // like "Antal best\u00e5et" (number passed) that must not read as a result row.
         function isFailLabel(text) {
-            return /\b(ikke\s+best[\u00e5a]et|not\s+passed|failed?)\b/i.test(text || '');
+            return /^(ikke\s+best[\u00e5a]et|not\s+passed|failed?)$/i.test(text || '');
         }
 
         function isNoShowLabel(text) {
-            return /\b(ej\s*m[\u00f8o]dt|no[\s-]?show|absent)\b/i.test(text || '');
+            return /^(ej\s*m[\u00f8o]dt|no[\s-]?show|absent)$/i.test(text || '');
         }
 
         function isPassLabel(text) {
-            if (!text) return false;
-            if (isFailLabel(text)) return false;
-            return /\b(best[\u00e5a]et|pass(?:ed)?|godkendt)\b/i.test(text);
+            return /^(best[\u00e5a]et|pass(?:ed)?|godkendt)$/i.test(text || '');
+        }
+
+        function isRegisteredLabel(text) {
+            return /^(antal\s+tilmeldte|registered(\s+students)?|number\s+of\s+registered(\s+students)?)$/i.test(text || '');
         }
 
         function parseRows(rowsCells) {
@@ -172,11 +176,17 @@
             const passFailCounts = { passed: 0, failed: 0, noShow: 0 };
             let gradeRowsFound = 0;
             let passFailRowsFound = 0;
+            let registered = null;
 
             rowsCells.forEach(cells => {
                 if (!Array.isArray(cells) || cells.length < 2) return;
                 const firstCell = normalizeCellText(cells[0]);
                 const firstToken = normalizeGradeToken(firstCell);
+
+                if (registered === null && isRegisteredLabel(firstCell)) {
+                    registered = extractCountFromCells(cells, 1);
+                    return;
+                }
 
                 if (GRADES.indexOf(firstToken) !== -1) {
                     const n = extractCountFromCells(cells, 1);
@@ -214,7 +224,7 @@
                 }
             });
 
-            return { counts, passFailCounts, gradeRowsFound, passFailRowsFound };
+            return { counts, passFailCounts, gradeRowsFound, passFailRowsFound, registered };
         }
 
         let parsed = null;
@@ -243,11 +253,12 @@
                 const cellMatches = rowHtml.matchAll(/<(?:td|th)[^>]*>([\s\S]*?)<\/(?:td|th)>/gi);
                 const cells = [];
                 for (const cell of cellMatches) {
-                    const text = normalizeCellText(
-                        String(cell[1] || '')
-                            .replace(/<[^>]+>/g, ' ')
-                            .replace(/&nbsp;/gi, ' ')
-                    );
+                    // Decode entities too: the pages spell "Bestået" and "Ej mødt"
+                    // as "Best&#229;et" and "Ej m&#248;dt", and the Chrome service
+                    // worker has no DOMParser, so this path is the only one there.
+                    const text = normalizeCellText(decodeBasicHtmlEntities(
+                        String(cell[1] || '').replace(/<[^>]+>/g, ' ')
+                    ));
                     cells.push(text);
                 }
                 if (cells.length >= 2) rowsCells.push(cells);
@@ -258,76 +269,141 @@
         if (!parsed) return null;
 
         const counts = parsed.counts || {};
-        const numericTotal = GRADES.reduce((sum, g) => sum + (counts[g] || 0), 0);
-        if (numericTotal > 0) {
-            // DTU does not show usable grade distribution for very small cohorts.
-            if (numericTotal <= 3) return null;
-            let weighted = 0;
-            let passed = 0;
-            GRADES.forEach(g => {
-                const c = counts[g] || 0;
-                weighted += (GRADE_VALUES[g] * c);
-                if (GRADE_VALUES[g] > 0) passed += c;
-            });
-            const average = weighted / numericTotal;
-            const passRate = (passed / numericTotal) * 100;
-            return { mode: 'graded', counts, total: numericTotal, average, passRate };
-        }
-
         const pf = parsed.passFailCounts || { passed: 0, failed: 0, noShow: 0 };
-        const pfTotal = (pf.passed || 0) + (pf.failed || 0) + (pf.noShow || 0);
-        if (pfTotal <= 0) return null;
-        if (pfTotal <= 3) return null;
-
-        const evaluated = (pf.passed || 0) + (pf.failed || 0);
-        const passRate = evaluated > 0 ? ((pf.passed || 0) / evaluated) * 100 : 0;
+        // Many exams mix both scales: a pass/fail course with a few graded
+        // students, or a graded exam listing some students only as "Ikke
+        // bestået". Count every student who sat the exam in the pass rate, and
+        // let whichever scale most of them got decide the mode.
+        let gradedTotal = 0;
+        let gradedPassed = 0;
+        let weighted = 0;
+        GRADES.forEach(g => {
+            const c = counts[g] || 0;
+            gradedTotal += c;
+            weighted += GRADE_VALUES[g] * c;
+            if (GRADE_VALUES[g] > 0) gradedPassed += c;
+        });
+        const passFailTotal = (pf.passed || 0) + (pf.failed || 0);
+        const total = gradedTotal + passFailTotal;
+        // DTU does not show usable grade distribution for very small cohorts.
+        if (total <= 3) return null;
+        const passedTotal = gradedPassed + (pf.passed || 0);
+        const mode = gradedTotal >= passFailTotal ? 'graded' : 'pass_fail';
         return {
-            mode: 'pass_fail',
+            mode,
             counts,
-            total: pfTotal,
-            average: null,
-            passRate,
-            passFailCounts: pf
+            total,
+            gradedTotal,
+            passedTotal,
+            failedTotal: total - passedTotal,
+            average: (mode === 'graded' && gradedTotal > 0) ? weighted / gradedTotal : null,
+            passRate: (passedTotal / total) * 100,
+            passFailCounts: pf,
+            registered: (typeof parsed.registered === 'number' && parsed.registered > 0) ? parsed.registered : null
         };
     }
 
+    function gradePeriodSortKey(semester) {
+        const m = /^(Winter|Summer)-(\d{4})$/i.exec(String(semester || ''));
+        if (!m) return -1;
+        // The winter exam (December) comes after the summer exam of the same year.
+        return parseInt(m[2], 10) * 2 + (/^winter$/i.test(m[1]) ? 1 : 0);
+    }
+
+    // Every karakterer page links the course's other exam periods ("Andre
+    // versioner"), so one page is enough to know which periods exist.
+    function parseGradePeriodLinks(html, codeVariant) {
+        const out = [];
+        const code = String(codeVariant || '').toLowerCase();
+        const regex = /Histogram\/1\/([^\/"'\s]+)\/((?:Winter|Summer)-\d{4})/gi;
+        let m;
+        while ((m = regex.exec(html || '')) !== null) {
+            if (decodeURIComponent(m[1]).toLowerCase() !== code) continue;
+            const semester = m[2].charAt(0).toUpperCase() + m[2].slice(1).toLowerCase();
+            if (out.indexOf(semester) === -1) out.push(semester);
+        }
+        return out;
+    }
+
+    async function fetchGradePage(codeVariant, semester) {
+        const url = `https://karakterer.dtu.dk/Histogram/1/${encodeURIComponent(codeVariant)}/${semester}`;
+        try {
+            const res = await fetch(url, { cache: 'no-store', credentials: 'omit' });
+            if (!res || !res.ok) return null;
+            return await res.text();
+        } catch (e) {
+            return null;
+        }
+    }
+
+    // A small sitting next to a much bigger one is usually a re-exam: a few
+    // students who failed the main exam. Showing it as "the" result makes a
+    // course look far harder or easier than it is, so the default is the
+    // newest exam at least a third the size of the biggest one in the list.
+    function pickMainGradeIteration(iterations) {
+        const size = (it) => (it.data && (it.data.registered || it.data.total)) || 0;
+        const biggest = iterations.reduce((m, it) => Math.max(m, size(it)), 0);
+        iterations.forEach(it => { it.small = size(it) < biggest / 3; });
+        const mainIndex = iterations.findIndex(it => !it.small);
+        return mainIndex === -1 ? 0 : mainIndex;
+    }
+
     async function fetchLatestIterations(courseCode, semesterCandidates, maxIterations) {
-        const semesters = (Array.isArray(semesterCandidates) && semesterCandidates.length)
-            ? semesterCandidates
-            : buildDefaultSemesters();
-        const wanted = (typeof maxIterations === 'number' && maxIterations > 0) ? maxIterations : 3;
-        const iterations = [];
+        const semesters = ((Array.isArray(semesterCandidates) && semesterCandidates.length)
+            ? semesterCandidates.slice()
+            : buildDefaultSemesters()).sort((a, b) => gradePeriodSortKey(b) - gradePeriodSortKey(a));
+        const wanted = (typeof maxIterations === 'number' && maxIterations > 0) ? maxIterations : 4;
         const codeVariants = getCourseCodeVariants(courseCode);
 
-        for (let i = 0; i < semesters.length; i++) {
-            const semester = semesters[i];
-            for (let v = 0; v < codeVariants.length; v++) {
-                const codeVariant = codeVariants[v];
-                const url = `https://karakterer.dtu.dk/Histogram/1/${encodeURIComponent(codeVariant)}/${semester}`;
-                try {
-                    const res = await fetch(url, { cache: 'no-store', credentials: 'omit' });
-                    if (!res || !res.ok) continue;
-                    const html = await res.text();
-                    const parsed = parseGradeDistribution(html);
-                    if (parsed) {
-                        iterations.push({ semester, data: parsed, courseId: codeVariant });
-                        break;
-                    }
-                } catch (e) {
-                    // Try next variant or semester
-                }
+        for (let v = 0; v < codeVariants.length; v++) {
+            const codeVariant = codeVariants[v];
+
+            // Find the newest page that exists; a missing period is a 404.
+            let first = null;
+            for (let i = 0; i < semesters.length && !first; i++) {
+                const html = await fetchGradePage(codeVariant, semesters[i]);
+                if (html) first = { semester: semesters[i], index: i, html };
             }
-            if (iterations.length >= wanted) break;
+            if (!first) continue;
+
+            const links = parseGradePeriodLinks(first.html, codeVariant);
+            // A page always links itself, so no links at all means the layout
+            // changed: fall back to walking the older candidates. Links but no
+            // older period means this is the course's first exam.
+            const older = links.length
+                ? links.filter(sem => gradePeriodSortKey(sem) < gradePeriodSortKey(first.semester))
+                : semesters.slice(first.index + 1);
+            older.sort((a, b) => gradePeriodSortKey(b) - gradePeriodSortKey(a));
+
+            const iterations = [];
+            const firstData = parseGradeDistribution(first.html);
+            if (firstData) iterations.push({ semester: first.semester, data: firstData, courseId: codeVariant });
+
+            // Periods DTU hides (three or fewer students) parse to null, so
+            // fetch in small batches until enough usable ones are found.
+            for (let i = 0; i < older.length && iterations.length < wanted; i += 4) {
+                const batch = older.slice(i, i + 4);
+                const pages = await Promise.all(batch.map(sem => fetchGradePage(codeVariant, sem)));
+                pages.forEach((html, k) => {
+                    if (iterations.length >= wanted) return;
+                    const data = parseGradeDistribution(html);
+                    if (data) iterations.push({ semester: batch[k], data, courseId: codeVariant });
+                });
+            }
+
+            if (!iterations.length) continue;
+            const mainIndex = pickMainGradeIteration(iterations);
+            return {
+                ok: true,
+                iterations,
+                mainIndex,
+                // Backward-compatible fields for consumers expecting one result.
+                semester: iterations[mainIndex].semester,
+                data: iterations[mainIndex].data
+            };
         }
 
-        if (!iterations.length) return { ok: false, error: 'no_data' };
-        return {
-            ok: true,
-            iterations,
-            // Backward-compatible fields for consumers expecting one result.
-            semester: iterations[0].semester,
-            data: iterations[0].data
-        };
+        return { ok: false, error: 'no_data' };
     }
 
     function isAllowedFinditUrl(rawUrl) {
@@ -898,7 +974,10 @@
             result.title = normalizeSpace(stripHtmlTags(titleMatch[1]));
             // Extract period token like "F25" from the end of the title
             const periodMatch = result.title.match(/\b([FE]\d{2})\s*$/);
+            // Three-week courses end in a month instead: "... Jan 26".
+            const monthMatch = result.title.match(/\b(Jan|Jun|Jul|Aug)\s+(\d{2})\s*$/i);
             if (periodMatch) result.period = periodMatch[1];
+            else if (monthMatch) result.period = monthMatch[1] + ' ' + monthMatch[2];
         }
 
         // --- Extract statistics ---
@@ -1193,6 +1272,8 @@
         roomVariants.push(rm);
         const padded = zeroPadRoom(rm, 3);
         if (padded && padded !== rm) roomVariants.push(padded);
+        // Dotted DTU room codes are written "R0.15.A"; MazeMap names the room "0.15.A".
+        if (/^R\d+\./i.test(rm)) roomVariants.push(rm.slice(1));
 
         const queryVariants = [];
         for (const rv of roomVariants) {
@@ -1203,7 +1284,11 @@
         for (const q of queryVariants) {
             const resp = await fetchMazemapEquery(q);
             if (!resp || !resp.ok) continue;
-            const best = pickBestRoomResult(resp.results, bld, rm) || pickBestRoomResult(resp.results, bld, padded);
+            let best = null;
+            for (const rv of roomVariants) {
+                best = pickBestRoomResult(resp.results, bld, rv);
+                if (best) break;
+            }
             if (best) {
                 return {
                     ok: true,
@@ -1492,14 +1577,18 @@
                 }
                 const cacheId = courseCode.toUpperCase();
                 storageCacheGet(CACHE_PREFIX_GRADE, cacheId, GRADE_STATS_CACHE_TTL_MS).then(cached => {
-                    if (cached) {
+                    // Entries cached before mainIndex existed picked the newest
+                    // sitting, re-exams included; refetch those.
+                    if (cached && (typeof cached.mainIndex === 'number' || cached.error === 'no_data')) {
                         cached.cached = true;
                         sendResponse(cached);
                         return;
                     }
-                    fetchLatestIterations(courseCode, message.semesters, 3)
+                    fetchLatestIterations(courseCode, message.semesters, 4)
                         .then(result => {
-                            if (result && result.ok) storageCacheSet(CACHE_PREFIX_GRADE, cacheId, result);
+                            // Cache "no exams yet" too: a new course otherwise costs
+                            // two dozen 404s on every visit to its page.
+                            if (result && (result.ok || result.error === 'no_data')) storageCacheSet(CACHE_PREFIX_GRADE, cacheId, result);
                             sendResponse(result);
                         })
                         .catch(() => sendResponse({ ok: false, error: 'fetch_failed' }));

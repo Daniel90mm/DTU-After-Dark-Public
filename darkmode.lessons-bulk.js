@@ -43,7 +43,6 @@
     }
 
     var FEATURE_LEARN_LESSONS_BULK_DOWNLOAD_KEY = 'dtuAfterDarkFeatureLearnLessonsBulkDownload';
-    var FEATURE_LEARN_LESSONS_BULK_SINGLE_ZIP_KEY = 'dtuAfterDarkFeatureLearnLessonsBulkSingleZip';
     const LESSONS_BULK_ROOT_ID = 'dtu-lessons-bulk-download-root';
     const LESSONS_BULK_STYLE_ID = 'dtu-lessons-bulk-download-style';
 
@@ -105,10 +104,6 @@
 
     function isLessonsBulkDownloadEnabled() {
         return isFeatureFlagEnabled(FEATURE_LEARN_LESSONS_BULK_DOWNLOAD_KEY);
-    }
-
-    function isLessonsBulkSingleZipEnabled() {
-        return isFeatureFlagEnabled(FEATURE_LEARN_LESSONS_BULK_SINGLE_ZIP_KEY);
     }
 
     function isDTULearnLessonsPage() {
@@ -180,6 +175,12 @@
             + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-row{display:flex;align-items:flex-start;gap:8px;padding:4px 3px;border-radius:6px;min-width:0;}'
             + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-row:hover{background:rgba(var(--dtu-ad-accent-rgb),0.08);}'
             + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-row input{margin-top:1px;accent-color:var(--dtu-ad-accent);cursor:pointer;}'
+            // The lessons app ships `#app #root-wrapper :focus{outline:none}`; the
+            // #app #root-wrapper prefix out-ranks it where the control lives there.
+            + '#' + LESSONS_BULK_ROOT_ID + ' input:focus-visible,#' + LESSONS_BULK_ROOT_ID + ' button:focus-visible,'
+            + '#app #root-wrapper #' + LESSONS_BULK_ROOT_ID + ' input:focus-visible,#app #root-wrapper #' + LESSONS_BULK_ROOT_ID + ' button:focus-visible'
+            + '{outline:2px solid currentColor !important;outline-offset:2px !important;}'
+            + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-hint{hyphens:manual !important;-webkit-hyphens:manual !important;}'
             + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-label{display:flex;flex-direction:column;gap:1px;cursor:pointer;min-width:0;flex:1 1 auto;}'
             + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-name{font-size:12px;line-height:1.2;white-space:normal;overflow-wrap:anywhere;word-break:break-word;max-width:100%;}'
             + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-meta{font-size:11px;line-height:1.2;color:' + mutedColor + ';white-space:normal;overflow-wrap:anywhere;word-break:break-word;max-width:100%;}'
@@ -2204,6 +2205,76 @@
         return Array.from(out);
     }
 
+    // The course table of contents answers, in one request, what every topic is
+    // and where its file lives. Loaded once per run; topics it can classify skip
+    // the per-topic page, viewContent and API fetches, and links skip the slow
+    // in-page resolve step entirely (a 349-page course spent ~25 minutes there).
+    var _lessonsTocIndex = { orgUnitId: '', index: null };
+
+    function buildLessonsTocIndex(toc) {
+        var index = new Map();
+        function walk(modules) {
+            if (!Array.isArray(modules)) return;
+            modules.forEach(function (mod) {
+                if (!mod || typeof mod !== 'object') return;
+                (Array.isArray(mod.Topics) ? mod.Topics : []).forEach(function (topic) {
+                    if (!topic || topic.TopicId == null) return;
+                    index.set(String(topic.TopicId), {
+                        type: String(topic.TypeIdentifier || ''),
+                        url: String(topic.Url || ''),
+                        title: String(topic.Title || '')
+                    });
+                });
+                walk(mod.Modules);
+            });
+        }
+        walk(toc && toc.Modules);
+        return index;
+    }
+
+    // { links, notFile } when the TOC settles the topic, otherwise null so the
+    // caller keeps its older discovery chain.
+    function classifyTopicFromTocIndex(index, topicUrl) {
+        if (!index || !index.size) return null;
+        var ids = parseLessonsTopicIds(topicUrl);
+        if (!ids) return null;
+        var entry = index.get(ids.topicId);
+        if (!entry) return null;
+        if (/^link$/i.test(entry.type)) return { links: [], notFile: true };
+        if (/^file$/i.test(entry.type)) {
+            var abs = toAbsoluteSamePageUrl(entry.url, window.location.origin);
+            if (abs && isStrictFileDownloadUrl(abs)) return { links: [abs], notFile: false };
+        }
+        return null;
+    }
+
+    async function loadLessonsTocIndex(orgUnitId) {
+        if (!orgUnitId) return null;
+        if (_lessonsTocIndex.orgUnitId === orgUnitId && _lessonsTocIndex.index) return _lessonsTocIndex.index;
+        var versions = ['1.75', '1.74', '1.73', '1.72', '1.71', '1.70', '1.69', '1.68', '1.67'];
+        if (_lessonsTopicApiVersion) versions = [_lessonsTopicApiVersion].concat(versions.filter(function (v) { return v !== _lessonsTopicApiVersion; }));
+        for (var i = 0; i < versions.length; i++) {
+            throwIfLessonsBulkAborted();
+            try {
+                var resp = await lessonsBulkFetch(window.location.origin + '/d2l/api/le/' + versions[i] + '/' + orgUnitId + '/content/toc', {
+                    credentials: 'include',
+                    cache: 'no-store',
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (!resp || !resp.ok) continue;
+                var index = buildLessonsTocIndex(await resp.json());
+                _lessonsTopicApiVersion = versions[i];
+                _lessonsTocIndex = { orgUnitId: orgUnitId, index: index };
+                logLessonsBulkDebug('toc_index_loaded', { orgUnitId: orgUnitId, version: versions[i], topics: index.size });
+                return index;
+            } catch (e0) {
+                if (e0 && e0.name === 'AbortError') throw e0;
+            }
+        }
+        logLessonsBulkDebug('toc_index_unavailable', { orgUnitId: orgUnitId });
+        return null;
+    }
+
     async function fetchTopicViewContentDownloadUrls(topicUrl) {
         var ids = parseLessonsTopicIds(topicUrl);
         if (!ids) {
@@ -2340,6 +2411,12 @@
         if (depth < 0) depth = 0;
         if (depth > 3) return { links: [] };
 
+        var fromToc = classifyTopicFromTocIndex(_lessonsTocIndex.index, unitUrl);
+        if (fromToc) {
+            logLessonsBulkDebug('unit_result_toc', { unitUrl: unitUrl, found: fromToc.links.length, notFile: fromToc.notFile });
+            return fromToc;
+        }
+
         if (/\/units\//i.test(unitUrl)) {
             try {
                 var topicUrls = await fetchUnitTopicUrlsFromUnitPage(unitUrl);
@@ -2398,102 +2475,6 @@
         return { links: links || [] };
     }
 
-    async function triggerTopicNativeDownloadViaIframe(topicUrl) {
-        return new Promise(function (resolve) {
-            var done = false;
-            var iframe = document.createElement('iframe');
-            markExt(iframe);
-            iframe.style.cssText = 'position:fixed !important;left:-10000px !important;top:0 !important;'
-                + 'width:1280px !important;height:900px !important;opacity:0.01 !important;pointer-events:none !important;'
-                + 'z-index:-2147483647 !important;border:0 !important;';
-
-            function finish(ok, reason) {
-                if (done) return;
-                done = true;
-                try { iframe.remove(); } catch (e0) { }
-                logLessonsBulkDebug('native_download_done', { topicUrl: topicUrl, ok: !!ok, reason: reason || '' });
-                resolve({ ok: !!ok, reason: reason || '' });
-            }
-
-            function deepQueryInDoc(root) {
-                var out = [];
-                var seen = new Set();
-                function walk(node) {
-                    if (!node || seen.has(node)) return;
-                    seen.add(node);
-                    try {
-                        if (node.querySelectorAll) {
-                            node.querySelectorAll('.download-content-button, d2l-button-icon.download-content-button').forEach(function (el) {
-                                out.push(el);
-                            });
-                        }
-                    } catch (e1) { }
-                    try {
-                        if (node.querySelectorAll) {
-                            node.querySelectorAll('*').forEach(function (el) {
-                                if (el && el.shadowRoot) walk(el.shadowRoot);
-                            });
-                        }
-                    } catch (e2) { }
-                }
-                walk(root);
-                return out;
-            }
-
-            var timeoutId = setTimeout(function () {
-                finish(false, 'timeout');
-            }, 13000);
-
-            iframe.onload = function () {
-                var tries = 0;
-                (function pollForButton() {
-                    tries++;
-                    var doc = null;
-                    try { doc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document); } catch (e3) { doc = null; }
-                    if (!doc) {
-                        if (tries >= 70) {
-                            clearTimeout(timeoutId);
-                            finish(false, 'no-doc');
-                            return;
-                        }
-                        setTimeout(pollForButton, 160);
-                        return;
-                    }
-
-                    var btns = deepQueryInDoc(doc);
-                    var btn = btns && btns.length ? btns[0] : null;
-                    if (btn) {
-                        try {
-                            btn.click();
-                            clearTimeout(timeoutId);
-                            finish(true, 'clicked-download-button');
-                            return;
-                        } catch (e4) {
-                            clearTimeout(timeoutId);
-                            finish(false, 'click-failed');
-                            return;
-                        }
-                    }
-
-                    if (tries >= 70) {
-                        clearTimeout(timeoutId);
-                        finish(false, 'button-not-found');
-                        return;
-                    }
-                    setTimeout(pollForButton, 160);
-                })();
-            };
-
-            try {
-                iframe.src = topicUrl;
-                document.body.appendChild(iframe);
-            } catch (e5) {
-                clearTimeout(timeoutId);
-                finish(false, 'iframe-error');
-            }
-        });
-    }
-
     function normalizeTopicCompareUrl(urlStr) {
         try {
             var u = new URL(urlStr, window.location.href);
@@ -2519,73 +2500,6 @@
             if (normalizeTopicCompareUrl(abs) === target) return items[i];
         }
         return null;
-    }
-
-    function findTopicDownloadButtonInPage(ids) {
-        if (!ids) return null;
-        var runtimeDoc = getLessonsRuntimeDocument(document);
-        var panelId = 'd2l_content_' + ids.orgUnitId + '_' + ids.topicId;
-        var panel = runtimeDoc.getElementById(panelId);
-        if (panel) {
-            var btn0 = panel.querySelector('.download-content-button, d2l-button-icon.download-content-button');
-            if (btn0) return btn0;
-        }
-        var globalBtns = [];
-        try { globalBtns = deepQueryAll('.download-content-button, d2l-button-icon.download-content-button', runtimeDoc); } catch (e0) { globalBtns = []; }
-        for (var i = 0; i < globalBtns.length; i++) {
-            var b = globalBtns[i];
-            var p = null;
-            try { p = b.closest ? b.closest('.content-panel') : null; } catch (e1) { p = null; }
-            if (p && p.id === panelId) return b;
-        }
-        return globalBtns.length ? globalBtns[0] : null;
-    }
-
-    async function triggerTopicNativeDownloadInCurrentPage(topicUrl) {
-        var ids = parseLessonsTopicIds(topicUrl);
-        if (!ids) {
-            logLessonsBulkDebug('native_page_skip_no_ids', { topicUrl: topicUrl });
-            return { ok: false, reason: 'no-ids' };
-        }
-
-        var btn = findTopicDownloadButtonInPage(ids);
-        if (btn) {
-            try {
-                btn.click();
-                logLessonsBulkDebug('native_page_clicked_existing', { topicUrl: topicUrl });
-                return { ok: true, reason: 'clicked-existing' };
-            } catch (e0) { }
-        }
-
-        var nav = findTopicNavItem(topicUrl);
-        if (!nav) {
-            logLessonsBulkDebug('native_page_nav_not_found', { topicUrl: topicUrl });
-            return { ok: false, reason: 'nav-not-found' };
-        }
-        try {
-            nav.click();
-            logLessonsBulkDebug('native_page_nav_clicked', { topicUrl: topicUrl });
-        } catch (e1) {
-            logLessonsBulkDebug('native_page_nav_click_fail', { topicUrl: topicUrl, error: String(e1 && e1.message ? e1.message : e1) });
-            return { ok: false, reason: 'nav-click-fail' };
-        }
-
-        for (var t = 0; t < 70; t++) {
-            await lessonsBulkDelay(260);
-            var btnAfter = findTopicDownloadButtonInPage(ids);
-            if (!btnAfter) continue;
-            try {
-                btnAfter.click();
-                logLessonsBulkDebug('native_page_clicked_after_nav', { topicUrl: topicUrl, tries: t + 1 });
-                return { ok: true, reason: 'clicked-after-nav' };
-            } catch (e2) {
-                logLessonsBulkDebug('native_page_button_click_fail', { topicUrl: topicUrl, error: String(e2 && e2.message ? e2.message : e2) });
-                return { ok: false, reason: 'button-click-fail' };
-            }
-        }
-
-        logLessonsBulkDebug('native_page_button_timeout', { topicUrl: topicUrl });
-        return { ok: false, reason: 'button-timeout' };
     }
 
     async function collectTopicFileUrlsInCurrentPage(topicUrl) {
@@ -2895,9 +2809,15 @@
             if (!resp || !resp.ok) {
                 return { ok: false, reason: 'http', status: resp ? resp.status : 'no_response', finalUrl: resp && resp.url ? resp.url : '' };
             }
+            var declared = resp.headers && resp.headers.get ? Number(resp.headers.get('content-length')) : NaN;
+            if (isTooLargeForZipEntry(declared)) {
+                try { if (resp.body) resp.body.cancel(); } catch (eBig) { }
+                return { ok: false, reason: 'too-large', size: declared };
+            }
             var ab = await resp.arrayBuffer();
             var bytes = new Uint8Array(ab || new ArrayBuffer(0));
             if (!bytes.length) return { ok: false, reason: 'empty' };
+            if (isTooLargeForZipEntry(bytes.length)) return { ok: false, reason: 'too-large', size: bytes.length };
 
             var finalUrl = (resp && resp.url) ? resp.url : url;
             var cd = resp && resp.headers && resp.headers.get ? resp.headers.get('content-disposition') : '';
@@ -2955,41 +2875,44 @@
         return (title + ' - Course Content - ' + stamp).slice(0, 120);
     }
 
-    async function downloadSingleBundledZipFromUrls(rootEl, urls) {
-        var list = Array.from(new Set((urls || []).filter(function (u) { return isStrictFileDownloadUrl(u); })));
-        if (!list.length) return { ok: false, reason: 'no-files' };
+    // The ZIP writer is ZIP32 (no ZIP64): sizes, offsets and the entry count are
+    // 32/16-bit, so one archive must stay well under 4 GiB and 65535 entries or
+    // it comes out corrupt. Courses are therefore split into parts, and each
+    // part is saved and released as soon as it is full, which also caps memory
+    // at about one part instead of the whole course.
+    var LESSONS_BULK_ZIP_PART_MAX_BYTES = 2e9;
+    var LESSONS_BULK_ZIP_PART_MAX_ENTRIES = 65000;
 
-        var fileEntries = [];
-        var failByReason = {};
-        var usedNames = new Map();
+    function getLessonsBulkZipPartLimits() {
+        var maxBytes = LESSONS_BULK_ZIP_PART_MAX_BYTES;
+        // Debug-only override (MB) so the split can be exercised on small courses.
+        try {
+            var mb = Number(localStorage.getItem('dtu_after_dark_bulk_zip_part_mb'));
+            if (isFinite(mb) && mb > 0) maxBytes = Math.min(maxBytes, mb * 1e6);
+        } catch (e0) { }
+        return { maxBytes: maxBytes, maxEntries: LESSONS_BULK_ZIP_PART_MAX_ENTRIES };
+    }
 
-        for (var i = 0; i < list.length; i++) {
-            throwIfLessonsBulkAborted();
-            setLessonsBulkStatus(rootEl, 'Bundling file ' + (i + 1) + ' / ' + list.length + '...', 'work');
-            var r = await fetchFileForBundle(list[i], i);
-            if (!r || !r.ok) {
-                var reason = (r && r.reason) ? r.reason : 'unknown';
-                failByReason[reason] = (failByReason[reason] || 0) + 1;
-                logLessonsBulkDebug('bundle_fetch_fail', { url: list[i], result: r || null });
-                continue;
-            }
-            var baseName = sanitizeZipEntryName(r.name, 'file-' + String(i + 1));
-            var finalName = baseName;
-            var count = usedNames.get(baseName) || 0;
-            if (count > 0) {
-                var dot = baseName.lastIndexOf('.');
-                if (dot > 0) finalName = baseName.slice(0, dot) + ' (' + count + ')' + baseName.slice(dot);
-                else finalName = baseName + ' (' + count + ')';
-            }
-            usedNames.set(baseName, count + 1);
-            fileEntries.push({ name: finalName, bytes: r.bytes, date: new Date() });
-        }
+    function shouldStartNewZipPart(partBytes, partEntries, nextSize, limits) {
+        var lim = limits || { maxBytes: LESSONS_BULK_ZIP_PART_MAX_BYTES, maxEntries: LESSONS_BULK_ZIP_PART_MAX_ENTRIES };
+        if (!partEntries) return false;
+        if (partEntries >= lim.maxEntries) return true;
+        return partBytes + nextSize > lim.maxBytes;
+    }
 
-        throwIfLessonsBulkAborted();
-        if (!fileEntries.length) return { ok: false, reason: 'fetch-failed', failByReason: failByReason };
+    function isTooLargeForZipEntry(size) {
+        var n = Number(size);
+        // Leave room for this entry's own headers inside the 32-bit fields.
+        return isFinite(n) && n > 0xFFFFFFFF - 0x10000;
+    }
 
-        var zipBlob = buildStoreOnlyZipBlob(fileEntries);
-        var zipName = sanitizeZipEntryName(getLessonsBulkZipNameBase(), 'DTU-Learn-Bulk-Download') + '.zip';
+    function getZipPartFileName(baseName, partNumber, isSplit) {
+        var base = sanitizeZipEntryName(baseName, 'DTU-Learn-Bulk-Download');
+        return base + (isSplit ? ' - part ' + partNumber : '') + '.zip';
+    }
+
+    function saveZipBlob(entries, zipName) {
+        var zipBlob = buildStoreOnlyZipBlob(entries);
         var blobUrl = URL.createObjectURL(zipBlob);
         var a = document.createElement('a');
         markExt(a);
@@ -3002,7 +2925,92 @@
             try { a.remove(); } catch (e0) { }
             try { URL.revokeObjectURL(blobUrl); } catch (e1) { }
         }, 2500);
-        return { ok: true, fileCount: fileEntries.length, failByReason: failByReason, zipName: zipName };
+    }
+
+    // Parts saved by the current run; the cancel message reports them.
+    var _lessonsBulkZipPartsSaved = 0;
+
+    async function downloadSingleBundledZipFromUrls(rootEl, urls) {
+        var list = Array.from(new Set((urls || []).filter(function (u) { return isStrictFileDownloadUrl(u); })));
+        if (!list.length) return { ok: false, reason: 'no-files' };
+
+        var limits = getLessonsBulkZipPartLimits();
+        var baseName = getLessonsBulkZipNameBase();
+        var failByReason = {};
+        var usedNames = new Map();
+        var partEntries = [];
+        var partBytes = 0;
+        var zipNames = [];
+        var fileCount = 0;
+        _lessonsBulkZipPartsSaved = 0;
+
+        function savePart(isFinal) {
+            var isSplit = !isFinal || zipNames.length > 0;
+            var zipName = getZipPartFileName(baseName, zipNames.length + 1, isSplit);
+            saveZipBlob(partEntries, zipName);
+            logLessonsBulkDebug('bundle_part_saved', { zipName: zipName, entries: partEntries.length, bytes: partBytes });
+            zipNames.push(zipName);
+            _lessonsBulkZipPartsSaved = zipNames.length;
+            partEntries = [];
+            partBytes = 0;
+        }
+
+        function addToPart(r, i) {
+            if (!r || !r.ok) {
+                var reason = (r && r.reason) ? r.reason : 'unknown';
+                failByReason[reason] = (failByReason[reason] || 0) + 1;
+                logLessonsBulkDebug('bundle_fetch_fail', { url: list[i], result: r || null });
+                return;
+            }
+            var entryName = sanitizeZipEntryName(r.name, 'file-' + String(i + 1));
+            var finalName = entryName;
+            var count = usedNames.get(entryName) || 0;
+            if (count > 0) {
+                var dot = entryName.lastIndexOf('.');
+                if (dot > 0) finalName = entryName.slice(0, dot) + ' (' + count + ')' + entryName.slice(dot);
+                else finalName = entryName + ' (' + count + ')';
+            }
+            usedNames.set(entryName, count + 1);
+            if (shouldStartNewZipPart(partBytes, partEntries.length, r.bytes.length, limits)) savePart(false);
+            partEntries.push({ name: finalName, bytes: r.bytes, date: new Date() });
+            partBytes += r.bytes.length;
+            fileCount++;
+        }
+
+        // Fetch a few files at once, but add them to parts strictly in list
+        // order so entry order and duplicate-name numbering match a one-by-one
+        // run. A result is dropped from `fetched` as soon as it is placed.
+        var fetched = new Array(list.length);
+        var nextFetch = 0;
+        var nextPlace = 0;
+        var fetchedCount = 0;
+        function placeReady() {
+            while (nextPlace < list.length && fetched[nextPlace] !== undefined) {
+                if (isLessonsBulkRunAborted()) return;
+                addToPart(fetched[nextPlace], nextPlace);
+                fetched[nextPlace] = null;
+                nextPlace++;
+            }
+        }
+        async function bundleWorker() {
+            while (nextFetch < list.length && !isLessonsBulkRunAborted()) {
+                var idx = nextFetch++;
+                fetched[idx] = await fetchFileForBundle(list[idx], idx);
+                fetchedCount++;
+                setLessonsBulkStatus(rootEl, 'Bundling file ' + fetchedCount + ' / ' + list.length
+                    + (zipNames.length ? ' (' + zipNames.length + ' part' + (zipNames.length === 1 ? '' : 's') + ' saved)' : '') + '...', 'work');
+                placeReady();
+            }
+        }
+        var bundleWorkers = [];
+        for (var w = 0; w < Math.min(LESSONS_BULK_FETCH_CONCURRENCY, list.length); w++) bundleWorkers.push(bundleWorker());
+        await Promise.all(bundleWorkers);
+        placeReady();
+
+        throwIfLessonsBulkAborted();
+        if (partEntries.length) savePart(true);
+        if (!zipNames.length) return { ok: false, reason: 'fetch-failed', failByReason: failByReason };
+        return { ok: true, fileCount: fileCount, parts: zipNames.length, failByReason: failByReason, zipName: zipNames[0], zipNames: zipNames };
     }
 
     function triggerDirectFileDownload(url, filename, index) {
@@ -3025,67 +3033,8 @@
         }
     }
 
-    async function downloadFileUrl(url, index) {
-        try {
-            if (!isStrictFileDownloadUrl(url)) {
-                logLessonsBulkDebug('download_skip_invalid', { url: url, index: index });
-                return { ok: false, reason: 'invalid-url' };
-            }
-            var resp = await lessonsBulkFetch(url, { credentials: 'include', cache: 'no-store' });
-            if (!resp || !resp.ok) {
-                logLessonsBulkDebug('download_http_fail', {
-                    url: url,
-                    index: index,
-                    status: resp ? resp.status : 'no_response',
-                    finalUrl: resp && resp.url ? resp.url : ''
-                });
-                return { ok: false, reason: 'http' };
-            }
-            var blob = await resp.blob();
-            if (!blob || !blob.size) {
-                logLessonsBulkDebug('download_empty_blob', { url: url, index: index, status: resp.status, finalUrl: resp.url || url });
-                return { ok: false, reason: 'empty' };
-            }
-
-            var finalUrl = (resp && resp.url) ? resp.url : url;
-            var cd = resp && resp.headers && resp.headers.get ? resp.headers.get('content-disposition') : '';
-            var ct = resp && resp.headers && resp.headers.get ? resp.headers.get('content-type') : '';
-            var fileName = resolveDownloadFileName(url || finalUrl, cd, ct, index, finalUrl);
-
-            var blobUrl = URL.createObjectURL(blob);
-            var a = document.createElement('a');
-            markExt(a);
-            a.style.display = 'none';
-            a.href = blobUrl;
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            setTimeout(function () {
-                try { a.remove(); } catch (e1) { }
-                try { URL.revokeObjectURL(blobUrl); } catch (e2) { }
-            }, 1200);
-            logLessonsBulkDebug('download_ok_blob', { url: url, index: index, finalUrl: resp.url || url, fileName: fileName, blobSize: blob.size });
-            return { ok: true, mode: 'blob' };
-        } catch (e3) {
-            throwIfLessonsBulkAborted();
-            if (!isStrictFileDownloadUrl(url)) {
-                logLessonsBulkDebug('download_exception_invalid', { url: url, index: index, error: String(e3 && e3.message ? e3.message : e3) });
-                return { ok: false, reason: 'invalid-url' };
-            }
-            var fallbackName2 = getFilenameFromUrl(url);
-            var triggered2 = triggerDirectFileDownload(url, fallbackName2, index);
-            logLessonsBulkDebug('download_fallback', {
-                url: url,
-                index: index,
-                fallbackName: fallbackName2,
-                triggered: !!triggered2,
-                error: String(e3 && e3.message ? e3.message : e3)
-            });
-            return triggered2 ? { ok: true, mode: 'anchor-fallback' } : { ok: false, reason: 'fetch' };
-        }
-    }
-
     var LESSONS_BULK_SCAN_CONCURRENCY = 4;
+    var LESSONS_BULK_FETCH_CONCURRENCY = 4;
 
     // Set while a bulk run is active; aborting it cancels in-flight fetches and drops buffered file bytes.
     var _lessonsBulkRunAbort = null;
@@ -3257,10 +3206,20 @@
 
         _lessonsBulkUiState.running = true;
         _lessonsBulkRunAbort = new AbortController();
+        _lessonsBulkZipPartsSaved = 0;
         setLessonsBulkControlsDisabled(rootEl, true);
-        setLessonsBulkStatus(rootEl, 'Scanning lesson pages for downloadable files...', 'work');
+        setLessonsBulkStatus(rootEl, 'Reading course contents...', 'work');
 
         try {
+            var tocOrgUnitId = getCurrentLessonsOrgUnitId(_lessonsBulkUiState.activeDoc);
+            if (!tocOrgUnitId) {
+                var firstIds = parseLessonsTopicIds(unitUrls[0]);
+                if (firstIds) tocOrgUnitId = firstIds.orgUnitId;
+            }
+            await loadLessonsTocIndex(tocOrgUnitId);
+            throwIfLessonsBulkAborted();
+            setLessonsBulkStatus(rootEl, 'Scanning lesson pages for downloadable files...', 'work');
+
             var downloadUrlSet = new Set();
             var nativeFallbackTopics = [];
             var scanResults = new Array(unitUrls.length);
@@ -3299,7 +3258,7 @@
                         });
                     }
                 }
-                if ((!result.links || !result.links.length) && /\/topics\//i.test(unitUrls[i])) {
+                if ((!result.links || !result.links.length) && !result.notFile && /\/topics\//i.test(unitUrls[i])) {
                     nativeFallbackTopics.push(unitUrls[i]);
                 }
                 logLessonsBulkDebug('run_scan_result', {
@@ -3317,89 +3276,38 @@
                 strictUnique: downloadUrls.length,
                 urls: downloadUrls
             });
-            if (isLessonsBulkSingleZipEnabled()) {
-                var bundledUrlSet = new Set(downloadUrls);
-                if (nativeFallbackTopics.length) {
-                    setLessonsBulkStatus(rootEl, 'Resolving topic files for one ZIP bundle...', 'work');
-                    for (var rf = 0; rf < nativeFallbackTopics.length; rf++) {
-                        throwIfLessonsBulkAborted();
-                        setLessonsBulkStatus(rootEl, 'Resolving topic ' + (rf + 1) + ' / ' + nativeFallbackTopics.length + '...', 'work');
-                        var recovered = await collectTopicFileUrlsInCurrentPage(nativeFallbackTopics[rf]);
-                        var topicHintRf = getTopicLabelHintFromTopicUrl(nativeFallbackTopics[rf]);
-                        (recovered || []).forEach(function (u) {
-                            if (isStrictFileDownloadUrl(u)) {
-                                bundledUrlSet.add(u);
-                                if (topicHintRf) {
-                                    if (!_lessonsBulkUrlNameHints.has(u)) _lessonsBulkUrlNameHints.set(u, topicHintRf);
-                                    try {
-                                        var uParsed2 = new URL(u, window.location.href);
-                                        var canonical2 = uParsed2.origin + uParsed2.pathname;
-                                        if (!_lessonsBulkUrlNameHints.has(canonical2)) _lessonsBulkUrlNameHints.set(canonical2, topicHintRf);
-                                    } catch (eUH1) { }
-                                }
+            var bundledUrlSet = new Set(downloadUrls);
+            if (nativeFallbackTopics.length) {
+                setLessonsBulkStatus(rootEl, 'Resolving topic files for one ZIP bundle...', 'work');
+                for (var rf = 0; rf < nativeFallbackTopics.length; rf++) {
+                    throwIfLessonsBulkAborted();
+                    setLessonsBulkStatus(rootEl, 'Resolving topic ' + (rf + 1) + ' / ' + nativeFallbackTopics.length + '...', 'work');
+                    var recovered = await collectTopicFileUrlsInCurrentPage(nativeFallbackTopics[rf]);
+                    var topicHintRf = getTopicLabelHintFromTopicUrl(nativeFallbackTopics[rf]);
+                    (recovered || []).forEach(function (u) {
+                        if (isStrictFileDownloadUrl(u)) {
+                            bundledUrlSet.add(u);
+                            if (topicHintRf) {
+                                if (!_lessonsBulkUrlNameHints.has(u)) _lessonsBulkUrlNameHints.set(u, topicHintRf);
+                                try {
+                                    var uParsed2 = new URL(u, window.location.href);
+                                    var canonical2 = uParsed2.origin + uParsed2.pathname;
+                                    if (!_lessonsBulkUrlNameHints.has(canonical2)) _lessonsBulkUrlNameHints.set(canonical2, topicHintRf);
+                                } catch (eUH1) { }
                             }
-                        });
-                        await lessonsBulkDelay(220);
-                    }
-                }
-
-                var bundledUrls = Array.from(bundledUrlSet).filter(function (u) { return isStrictFileDownloadUrl(u); });
-                logLessonsBulkDebug('run_single_zip_resolved', {
-                    initialFound: downloadUrls.length,
-                    nativeTopics: nativeFallbackTopics.length,
-                    bundledResolved: bundledUrls.length
-                });
-                if (!bundledUrls.length) {
-                    setLessonsBulkStatus(rootEl, 'No downloadable files found in selected sections.', 'error');
-                    logLessonsBulkDebug('run_no_downloadable_files', {
-                        selectedKeys: selectedKeys,
-                        unitUrls: unitUrls,
-                        nativeAttempted: nativeFallbackTopics.length
+                        }
                     });
-                    return;
+                    await lessonsBulkDelay(220);
                 }
-
-                setLessonsBulkStatus(rootEl, 'Building one ZIP bundle (' + bundledUrls.length + ' file(s))...', 'work');
-                var bundle = await downloadSingleBundledZipFromUrls(rootEl, bundledUrls);
-                if (bundle && bundle.ok) {
-                    setLessonsBulkStatus(rootEl, 'Started 1 bundled ZIP download (' + bundle.fileCount + ' file' + (bundle.fileCount === 1 ? '' : 's') + ').', 'ok');
-                    logLessonsBulkDebug('run_single_zip_ok', bundle);
-                } else {
-                    var bundleFail = (bundle && bundle.failByReason) ? bundle.failByReason : {};
-                    var bundleParts = Object.keys(bundleFail).map(function (k) { return k + ':' + bundleFail[k]; });
-                    var bundleTxt = bundleParts.length ? (' (' + bundleParts.join(', ') + ')') : '';
-                    setLessonsBulkStatus(rootEl, 'Could not create bundled ZIP from selected topics.' + bundleTxt, 'error');
-                    logLessonsBulkDebug('run_single_zip_fail', bundle || null);
-                }
-                return;
             }
 
-            if (!downloadUrls.length) {
-                var nativeOk = 0;
-                if (nativeFallbackTopics.length) {
-                    setLessonsBulkStatus(rootEl, 'Trying native download buttons...', 'work');
-                    for (var nf = 0; nf < nativeFallbackTopics.length; nf++) {
-                        throwIfLessonsBulkAborted();
-                        setLessonsBulkStatus(rootEl, 'Trying native download ' + (nf + 1) + ' / ' + nativeFallbackTopics.length + '...', 'work');
-                        var nd = await triggerTopicNativeDownloadInCurrentPage(nativeFallbackTopics[nf]);
-                        if ((!nd || !nd.ok) && isLessonsBulkHeavyFallbackEnabled()) {
-                            nd = await triggerTopicNativeDownloadViaIframe(nativeFallbackTopics[nf]);
-                        } else if (!nd || !nd.ok) {
-                            logLessonsBulkDebug('native_iframe_fallback_skipped', {
-                                topicUrl: nativeFallbackTopics[nf],
-                                reason: 'heavy_fallback_disabled'
-                            });
-                        }
-                        if (nd && nd.ok) nativeOk++;
-                        await lessonsBulkDelay(650);
-                    }
-                }
-                if (nativeOk > 0) {
-                    setLessonsBulkStatus(rootEl, 'Started ' + nativeOk + ' native file download' + (nativeOk === 1 ? '' : 's') + '.', 'ok');
-                    logLessonsBulkDebug('run_native_fallback_ok', { nativeOk: nativeOk, nativeAttempted: nativeFallbackTopics.length });
-                    return;
-                }
-
+            var bundledUrls = Array.from(bundledUrlSet).filter(function (u) { return isStrictFileDownloadUrl(u); });
+            logLessonsBulkDebug('run_single_zip_resolved', {
+                initialFound: downloadUrls.length,
+                nativeTopics: nativeFallbackTopics.length,
+                bundledResolved: bundledUrls.length
+            });
+            if (!bundledUrls.length) {
                 setLessonsBulkStatus(rootEl, 'No downloadable files found in selected sections.', 'error');
                 logLessonsBulkDebug('run_no_downloadable_files', {
                     selectedKeys: selectedKeys,
@@ -3409,40 +3317,27 @@
                 return;
             }
 
-            setLessonsBulkStatus(rootEl, 'Downloading ' + downloadUrls.length + ' file(s)...', 'work');
-            var okCount = 0;
-            var fallbackCount = 0;
-            var failByReason = {};
-            for (var j = 0; j < downloadUrls.length; j++) {
-                throwIfLessonsBulkAborted();
-                var dl = await downloadFileUrl(downloadUrls[j], j);
-                if (dl && dl.ok) {
-                    okCount++;
-                    if (dl.mode === 'anchor-fallback') fallbackCount++;
-                } else {
-                    var reason = (dl && dl.reason) ? dl.reason : 'unknown';
-                    failByReason[reason] = (failByReason[reason] || 0) + 1;
-                }
-                setLessonsBulkStatus(rootEl, 'Downloading ' + (j + 1) + ' / ' + downloadUrls.length + '...', 'work');
-                await lessonsBulkDelay(180);
-            }
-
-            if (okCount > 0) {
-                var msg = 'Started ' + okCount + ' file download' + (okCount === 1 ? '' : 's') + '.';
-                if (fallbackCount > 0) {
-                    msg += ' (' + fallbackCount + ' used fallback download mode.)';
-                }
-                setLessonsBulkStatus(rootEl, msg, 'ok');
-                logLessonsBulkDebug('run_done_ok', { okCount: okCount, fallbackCount: fallbackCount, failByReason: failByReason });
+            setLessonsBulkStatus(rootEl, 'Building one ZIP bundle (' + bundledUrls.length + ' file(s))...', 'work');
+            var bundle = await downloadSingleBundledZipFromUrls(rootEl, bundledUrls);
+            if (bundle && bundle.ok) {
+                var skippedLarge = bundle.failByReason && bundle.failByReason['too-large'] ? bundle.failByReason['too-large'] : 0;
+                setLessonsBulkStatus(rootEl, (bundle.parts > 1
+                    ? 'Started ' + bundle.parts + ' ZIP downloads (' + bundle.fileCount + ' files, split into parts of up to 2 GB).'
+                    : 'Started 1 bundled ZIP download (' + bundle.fileCount + ' file' + (bundle.fileCount === 1 ? '' : 's') + ').')
+                    + (skippedLarge ? ' Skipped ' + skippedLarge + ' file' + (skippedLarge === 1 ? '' : 's') + ' over 4 GB.' : ''), 'ok');
+                logLessonsBulkDebug('run_single_zip_ok', bundle);
             } else {
-                var reasonParts = Object.keys(failByReason).map(function (k) { return k + ':' + failByReason[k]; });
-                var reasonText = reasonParts.length ? (' (' + reasonParts.join(', ') + ')') : '';
-                setLessonsBulkStatus(rootEl, 'Could not download files automatically from selected topics.' + reasonText, 'error');
-                logLessonsBulkDebug('run_done_fail', { failByReason: failByReason, attempted: downloadUrls.length, urls: downloadUrls });
+                var bundleFail = (bundle && bundle.failByReason) ? bundle.failByReason : {};
+                var bundleParts = Object.keys(bundleFail).map(function (k) { return k + ':' + bundleFail[k]; });
+                var bundleTxt = bundleParts.length ? (' (' + bundleParts.join(', ') + ')') : '';
+                setLessonsBulkStatus(rootEl, 'Could not create bundled ZIP from selected topics.' + bundleTxt, 'error');
+                logLessonsBulkDebug('run_single_zip_fail', bundle || null);
             }
         } catch (eRun) {
             if (!isLessonsBulkRunAborted()) throw eRun;
-            setLessonsBulkStatus(rootEl, 'Cancelled. Nothing was saved.', 'error');
+            setLessonsBulkStatus(rootEl, _lessonsBulkZipPartsSaved
+                ? 'Cancelled. ' + _lessonsBulkZipPartsSaved + ' ZIP part' + (_lessonsBulkZipPartsSaved === 1 ? ' was' : 's were') + ' already saved; nothing more will be.'
+                : 'Cancelled. Nothing was saved.', 'error');
             logLessonsBulkDebug('run_cancelled', {});
         } finally {
             _lessonsBulkRunAbort = null;

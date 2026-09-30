@@ -24,12 +24,19 @@
         var oldRetentionFallback = document.querySelector('[data-dtu-retention-indicator]');
         if (oldRetentionFallback) oldRetentionFallback.remove();
 
-        var participants = deps.parseParticipantList();
-        if (!participants.length) return;
+        deps.getFullParticipantList(function (participants, listInfo) {
+            renderParticipantDemographics(participants, listInfo || {});
+        });
+    }
 
-        var totalUsers = deps.getCampusnetUsersCountFromPage();
-        if (totalUsers && totalUsers < participants.length) totalUsers = participants.length;
-        if (!totalUsers) totalUsers = participants.length;
+    function renderParticipantDemographics(participants, listInfo) {
+        var deps = getDeps();
+        if (!deps || !participants.length) return;
+        if (!deps.isFeatureFlagEnabled(deps.featureParticipantIntelKey)
+            || !deps.isFeatureFlagEnabled(deps.featureParticipantIntelDemographicsKey)) return;
+
+        var totalUsers = listInfo.total || deps.getCampusnetUsersCountFromPage() || 0;
+        if (totalUsers < participants.length) totalUsers = participants.length;
 
         var programCounts = {};
         var totalWithProgram = 0;
@@ -51,7 +58,10 @@
             if (deps.isFeatureFlagEnabled(deps.featureParticipantIntelRetentionKey)) {
                 retentionSummary = buildRetentionRadarSummary(getCurrentCourseRetentionSnapshots(intel), totalUsers);
             }
-            renderDemographicsCard(sorted, totalWithProgram, totalUsers, participants.length, selfProgram, retentionSummary);
+            // Users (N) also counts staff without an s-number, whom the parser skips,
+            // so "loaded" is measured in the same unit as the total.
+            var loadedUsers = listInfo.complete ? totalUsers : deps.getCampusnetUsersParticipantElements().length;
+            renderDemographicsCard(sorted, totalWithProgram, totalUsers, loadedUsers, selfProgram, retentionSummary);
         });
     }
 
@@ -136,129 +146,289 @@
             peakCount: peak,
             lowCount: low,
             snapshotCount: safe.length,
-            latestTs: latest.ts
+            baselineTs: baseline.ts,
+            latestTs: latest.ts,
+            snapshots: safe
         };
     }
 
-    function appendRetentionRadarSection(host, summary, isDark, hasFollowingSection) {
+    // Participant-page widget: Retention Radar and Course Composition as two
+    // open columns split by a hairline, no box, in the same visual language as
+    // the kurser.dtu.dk course widgets. Colours come from custom properties set
+    // on the host, so dark mode, light mode and the user's accent flow through
+    // one stylesheet. Bars stay neutral; the accent marks only the viewer's own
+    // program and the disclosure button.
+
+    var PARTICIPANT_INTEL_STYLE_ID = 'dtu-participant-intel-style';
+
+    var PARTICIPANT_INTEL_CSS = [
+        '.dtu-pi-host{display:block;margin:4px 0 20px!important;padding:0 0 20px!important;background:transparent!important;border:0!important;border-bottom:1px solid var(--dtu-pi-divider)!important;border-radius:0!important;box-shadow:none!important;color:var(--dtu-pi-ink)!important;font-size:14px;font-weight:400;line-height:1.4;font-variant-numeric:tabular-nums;text-align:left;container-type:inline-size}',
+        '.dtu-pi-host *{box-sizing:border-box}',
+        '.dtu-pi-grid{display:grid;grid-template-columns:minmax(200px,240px) minmax(0,1fr);align-items:start}',
+        '.dtu-pi-grid[data-single]{grid-template-columns:minmax(0,1fr)}',
+        '.dtu-pi-col{min-width:0;display:flex;flex-direction:column;gap:12px}',
+        '.dtu-pi-grid:not([data-single]) > .dtu-pi-col:first-child{padding-right:32px}',
+        '.dtu-pi-grid:not([data-single]) > .dtu-pi-col + .dtu-pi-col{padding-left:32px;border-left:1px solid var(--dtu-pi-divider)}',
+        '@container (max-width:600px){.dtu-pi-grid{grid-template-columns:minmax(0,1fr)}.dtu-pi-grid:not([data-single]) > .dtu-pi-col:first-child{padding-right:0}.dtu-pi-grid:not([data-single]) > .dtu-pi-col + .dtu-pi-col{padding-left:0;border-left:0;border-top:1px solid var(--dtu-pi-divider);margin-top:20px;padding-top:20px}}',
+        '.dtu-pi-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;min-width:0}',
+        '.dtu-pi-title{font-size:15px;font-weight:700;color:var(--dtu-pi-ink)!important}',
+        '.dtu-pi-meta{font-size:13px;color:var(--dtu-pi-muted)!important;text-align:right;min-width:0}',
+        '.dtu-pi-hero{display:flex;align-items:baseline;gap:8px}',
+        '.dtu-pi-big{font-size:42px;font-weight:600;line-height:1;color:var(--dtu-pi-ink)!important}',
+        '.dtu-pi-unit{font-size:14px;color:var(--dtu-pi-muted)!important}',
+        '.dtu-pi-change{font-size:14px;color:var(--dtu-pi-ink)!important}',
+        '.dtu-pi-change b{font-weight:700}',
+        '.dtu-pi-note{font-size:13px;line-height:1.45;color:var(--dtu-pi-muted)!important}',
+        '.dtu-pi-spark{display:block;width:100%;height:48px;overflow:visible}',
+        '.dtu-pi-spark polyline{fill:none!important;stroke:var(--dtu-pi-bar)!important;stroke-width:1.5;stroke-linejoin:round}',
+        '.dtu-pi-spark line{stroke:var(--dtu-pi-hair)!important;stroke-width:1}',
+        '.dtu-pi-spark circle{fill:var(--dtu-pi-ink)!important;stroke:none!important}',
+        '.dtu-pi-foot{padding-top:10px;border-top:1px solid var(--dtu-pi-hair);font-size:13px;color:var(--dtu-pi-muted)!important}',
+        '.dtu-pi-foot b{font-weight:400;color:var(--dtu-pi-ink)!important}',
+        '.dtu-pi-rows{display:flex;flex-direction:column;gap:10px;margin:0;padding:0;list-style:none}',
+        '.dtu-pi-row{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:12px;row-gap:4px;align-items:baseline;margin:0;padding:0}',
+        '.dtu-pi-row[hidden]{display:none}',
+        '.dtu-pi-label{font-size:13px;line-height:1.3;color:var(--dtu-pi-ink)!important;min-width:0;overflow-wrap:anywhere}',
+        '.dtu-pi-mine{margin-left:6px;font-size:12px;color:var(--dtu-pi-accent)!important;white-space:nowrap}',
+        '.dtu-pi-num{font-size:13px;color:var(--dtu-pi-muted)!important;white-space:nowrap;text-align:right}',
+        '.dtu-pi-num b{margin-right:8px;font-weight:700;color:var(--dtu-pi-ink)!important}',
+        '.dtu-pi-track{grid-column:1 / -1;height:6px;border-radius:3px;background:var(--dtu-pi-track)!important;overflow:hidden}',
+        '.dtu-pi-fill{display:block;height:100%;border-radius:3px;background:var(--dtu-pi-bar)!important}',
+        '.dtu-pi-row[data-mine] .dtu-pi-fill{background:var(--dtu-pi-accent)!important}',
+        'button.dtu-pi-more{appearance:none;-webkit-appearance:none;align-self:flex-start;margin:0;padding:4px 0;min-height:24px;border:0!important;border-radius:2px;background:transparent!important;box-shadow:none!important;color:var(--dtu-pi-accent)!important;font:inherit;font-size:13px;font-weight:700;text-transform:none;letter-spacing:0;cursor:pointer}',
+        'button.dtu-pi-more:hover{text-decoration:underline}',
+        'button.dtu-pi-more:active{opacity:.8}',
+        '.dtu-pi-host button:focus-visible{outline:2px solid var(--dtu-pi-ink)!important;outline-offset:2px}'
+    ].join('\n');
+
+    function ensureParticipantIntelStyles() {
+        if (document.getElementById(PARTICIPANT_INTEL_STYLE_ID)) return;
         var deps = getDeps();
-        if (!deps || !host || !summary) return;
-        var text = isDark ? '#f1f3f6' : '#1f2937';
-        var subtle = isDark ? '#c9d1db' : '#334155';
-        var muted = isDark ? '#9ba6b2' : '#64748b';
-        var divider = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.10)';
-        var trendColor = '#90a4ae';
-        var trendValueText = 'Tracking';
-        var trendMetaText = 'Need another snapshot before showing change.';
+        var style = document.createElement('style');
+        style.id = PARTICIPANT_INTEL_STYLE_ID;
+        if (deps) deps.markExt(style);
+        style.textContent = PARTICIPANT_INTEL_CSS;
+        (document.head || document.documentElement).appendChild(style);
+    }
 
-        if (summary.windowDeltaCount !== null) {
-            if (summary.windowDeltaCount > 0) trendColor = '#4caf50';
-            else if (summary.windowDeltaCount < 0) trendColor = '#ef5350';
-            var trendPctText = formatRetentionPercent(summary.windowDeltaPct);
-            var sign = summary.windowDeltaCount > 0 ? '+' : '';
-            trendValueText = trendPctText || (sign + String(summary.windowDeltaCount));
-            trendMetaText = sign + summary.windowDeltaCount + ' users ' + summary.windowLabel;
-        }
-
-        var latestMoveText = 'No previous snapshot yet.';
-        var latestMoveColor = muted;
-        if (summary.previousDeltaCount !== null) {
-            if (summary.previousDeltaCount > 0) latestMoveColor = '#4caf50';
-            else if (summary.previousDeltaCount < 0) latestMoveColor = '#ef5350';
-            else latestMoveColor = muted;
-            var sign2 = summary.previousDeltaCount > 0 ? '+' : '';
-            var pct2 = formatRetentionPercent(summary.previousDeltaPct);
-            latestMoveText = 'Latest move: ' + sign2 + summary.previousDeltaCount + ' users'
-                + (pct2 ? ' (' + pct2 + ')' : '')
-                + ' ' + summary.previousLabel + '.';
-        }
-
-        var section = document.createElement('div');
-        deps.markExt(section);
-        section.setAttribute('data-dtu-intel-section', 'retention');
-        section.style.cssText = 'margin:0;padding:0 0 ' + (hasFollowingSection ? '18px' : '0') + ';border-radius:0;box-shadow:none;'
-            + (hasFollowingSection ? 'border-bottom:1px solid ' + divider + ';' : 'border:0;');
-
-        var header = document.createElement('div');
-        deps.markExt(header);
-        header.style.cssText = 'display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:12px;';
-
-        var titleWrap = document.createElement('div');
-        deps.markExt(titleWrap);
-
-        var title = document.createElement('div');
-        deps.markExt(title);
-        title.textContent = 'Retention Radar';
-        title.style.cssText = 'font-size:14px;font-weight:760;line-height:1.15;color:' + text + ';';
-        titleWrap.appendChild(title);
-
-        var subtitle = document.createElement('div');
-        deps.markExt(subtitle);
-        subtitle.textContent = summary.snapshotCount > 1
-            ? 'Enrollment trend based on ' + summary.snapshotCount + ' stored snapshots.'
-            : 'Enrollment monitoring started for this course.';
-        subtitle.style.cssText = 'margin-top:3px;font-size:12px;line-height:1.35;color:' + muted + ';';
-        titleWrap.appendChild(subtitle);
-
-        var meta = document.createElement('div');
-        deps.markExt(meta);
+    function readParticipantIntelAccent(isDark) {
+        var accent = isDark ? '#60a5fa' : '#1f7ae0';
         try {
-            meta.textContent = 'Updated ' + new Date(summary.latestTs).toLocaleDateString();
-        } catch (e) {
-            meta.textContent = 'Latest snapshot';
+            var styles = getComputedStyle(document.documentElement);
+            // The base accent is too dark to read as text on the dark surface,
+            // and the soft one too light on white.
+            var primary = isDark ? '--dtu-ad-accent-soft' : '--dtu-ad-accent-deep';
+            accent = (styles.getPropertyValue(primary) || styles.getPropertyValue('--dtu-ad-accent') || accent).trim() || accent;
+        } catch (e0) { }
+        return accent;
+    }
+
+    function prepareParticipantIntelHost(host, isDark) {
+        ensureParticipantIntelStyles();
+        host.className = 'dtu-pi-host';
+        host.style.cssText = '';
+        var tokens = isDark ? {
+            ink: '#f0eee8',
+            muted: 'rgba(240,238,232,.64)',
+            hair: 'rgba(240,238,232,.13)',
+            divider: 'rgba(240,238,232,.16)',
+            track: 'rgba(240,238,232,.10)',
+            bar: '#cfcdc8'
+        } : {
+            ink: '#1a1a1a',
+            muted: 'rgba(26,26,26,.66)',
+            hair: 'rgba(26,26,26,.10)',
+            divider: 'rgba(26,26,26,.14)',
+            track: 'rgba(26,26,26,.08)',
+            bar: '#8c8a85'
+        };
+        tokens.accent = readParticipantIntelAccent(isDark);
+        Object.keys(tokens).forEach(function (k) {
+            host.style.setProperty('--dtu-pi-' + k, tokens[k]);
+        });
+        while (host.firstChild) host.removeChild(host.firstChild);
+        var grid = makePiEl('div', 'dtu-pi-grid');
+        host.appendChild(grid);
+        return grid;
+    }
+
+    function makePiEl(tag, className, text) {
+        var el = document.createElement(tag);
+        var deps = getDeps();
+        if (deps) deps.markExt(el);
+        if (className) el.className = className;
+        if (text != null) el.textContent = text;
+        return el;
+    }
+
+    function makePiHead(title, meta) {
+        var head = makePiEl('div', 'dtu-pi-head');
+        head.appendChild(makePiEl('span', 'dtu-pi-title', title));
+        if (meta) head.appendChild(makePiEl('span', 'dtu-pi-meta', meta));
+        return head;
+    }
+
+    var PI_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    function formatPiDate(ts) {
+        var d = new Date(ts);
+        if (isNaN(d.getTime())) return '';
+        return d.getDate() + ' ' + PI_MONTHS[d.getMonth()];
+    }
+
+    function formatPiSigned(n) {
+        return (n > 0 ? '+' : n < 0 ? '\u2212' : '') + Math.abs(n);
+    }
+
+    // Step line of every stored count, placed by time so a long gap between
+    // visits reads as one.
+    function buildRetentionSparkline(snapshots) {
+        var ns = 'http://www.w3.org/2000/svg';
+        var w = 240, h = 48, pad = 4;
+        var svg = document.createElementNS(ns, 'svg');
+        svg.setAttribute('class', 'dtu-pi-spark');
+        svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+        svg.setAttribute('preserveAspectRatio', 'none');
+        svg.setAttribute('aria-hidden', 'true');
+        var t0 = snapshots[0].ts;
+        var t1 = snapshots[snapshots.length - 1].ts;
+        var lo = Infinity, hi = -Infinity;
+        snapshots.forEach(function (s) { lo = Math.min(lo, s.count); hi = Math.max(hi, s.count); });
+        var span = hi - lo || 1;
+        function x(ts) { return t1 > t0 ? pad + (ts - t0) / (t1 - t0) * (w - 2 * pad) : w / 2; }
+        function y(c) { return hi === lo ? h / 2 : pad + (hi - c) / span * (h - 2 * pad); }
+        var base = document.createElementNS(ns, 'line');
+        base.setAttribute('x1', '0'); base.setAttribute('x2', String(w));
+        base.setAttribute('y1', String(h - 0.5)); base.setAttribute('y2', String(h - 0.5));
+        base.setAttribute('vector-effect', 'non-scaling-stroke');
+        svg.appendChild(base);
+        var pts = [];
+        snapshots.forEach(function (s, i) {
+            if (i > 0) pts.push(x(s.ts).toFixed(1) + ',' + y(snapshots[i - 1].count).toFixed(1));
+            pts.push(x(s.ts).toFixed(1) + ',' + y(s.count).toFixed(1));
+        });
+        var line = document.createElementNS(ns, 'polyline');
+        line.setAttribute('points', pts.join(' '));
+        line.setAttribute('vector-effect', 'non-scaling-stroke');
+        svg.appendChild(line);
+        var last = snapshots[snapshots.length - 1];
+        var dot = document.createElementNS(ns, 'circle');
+        dot.setAttribute('cx', x(last.ts).toFixed(1));
+        dot.setAttribute('cy', y(last.count).toFixed(1));
+        dot.setAttribute('r', '2.5');
+        svg.appendChild(dot);
+        return svg;
+    }
+
+    function buildRetentionColumn(summary) {
+        var col = makePiEl('section', 'dtu-pi-col');
+        col.setAttribute('data-dtu-intel-section', 'retention');
+        col.setAttribute('aria-label', 'Retention Radar');
+        var tracked = summary.snapshotCount > 1;
+        col.appendChild(makePiHead('Retention Radar', tracked ? 'Since ' + formatPiDate(summary.baselineTs) : null));
+
+        var hero = makePiEl('div', 'dtu-pi-hero');
+        hero.appendChild(makePiEl('span', 'dtu-pi-big', String(summary.latestCount)));
+        hero.appendChild(makePiEl('span', 'dtu-pi-unit', summary.latestCount === 1 ? 'user' : 'users'));
+        col.appendChild(hero);
+
+        if (!tracked) {
+            col.appendChild(makePiEl('div', 'dtu-pi-note',
+                'First count saved ' + formatPiDate(summary.latestTs) + '. Changes show when you open this page again at least 6 hours later.'));
+            return col;
         }
-        meta.style.cssText = 'font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:' + muted + ';text-align:right;';
 
-        header.appendChild(titleWrap);
-        header.appendChild(meta);
-        section.appendChild(header);
+        var change = makePiEl('div', 'dtu-pi-change');
+        var delta = summary.windowDeltaCount;
+        if (delta === 0) {
+            change.textContent = 'No change since ' + formatPiDate(summary.baselineTs);
+        } else {
+            var b = makePiEl('b', null, formatPiSigned(delta) + ' ' + (Math.abs(delta) === 1 ? 'user' : 'users'));
+            change.appendChild(b);
+            var pct = formatRetentionPercent(summary.windowDeltaPct);
+            if (pct) pct = pct.replace('-', '\u2212');
+            change.appendChild(document.createTextNode((pct ? ' (' + pct + ')' : '') + ' since ' + formatPiDate(summary.baselineTs)));
+        }
+        col.appendChild(change);
+        col.appendChild(buildRetentionSparkline(summary.snapshots));
 
-        var metrics = document.createElement('div');
-        deps.markExt(metrics);
-        metrics.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:0;';
+        var foot = makePiEl('div', 'dtu-pi-foot');
+        foot.appendChild(document.createTextNode('Peak '));
+        foot.appendChild(makePiEl('b', null, String(summary.peakCount)));
+        foot.appendChild(document.createTextNode(', low '));
+        foot.appendChild(makePiEl('b', null, String(summary.lowCount)));
+        foot.appendChild(document.createTextNode(', ' + summary.snapshotCount + ' counts'));
+        col.appendChild(foot);
+        return col;
+    }
 
-        function buildMetric(labelText, valueText, metaText, valueColor, metricIndex) {
-            var box = document.createElement('div');
-            deps.markExt(box);
-            box.setAttribute('data-dtu-retention-metric', labelText.toLowerCase().replace(/\s+/g, '-'));
-            box.style.cssText = 'min-width:0;padding:2px 18px 0;';
-            if (metricIndex === 0) box.style.paddingLeft = '0';
-            else box.style.borderLeft = '1px solid ' + divider;
+    var PI_VISIBLE_PROGRAMS = 6;
+    var piShowAllPrograms = false;
 
-            var label = document.createElement('div');
-            deps.markExt(label);
-            label.textContent = labelText;
-            label.style.cssText = 'font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:' + muted + ';';
-            box.appendChild(label);
+    function buildCompositionColumn(sorted, totalWithProgram, totalUsers, loadedUsers, selfProgram) {
+        var col = makePiEl('section', 'dtu-pi-col');
+        col.setAttribute('data-dtu-intel-section', 'composition');
+        col.setAttribute('aria-label', 'Course composition');
+        var meta = loadedUsers < totalUsers
+            ? 'First ' + loadedUsers + ' of ' + totalUsers + ' users, ' + totalWithProgram + ' with a program listed'
+            : totalWithProgram + ' of ' + totalUsers + ' ' + (totalUsers === 1 ? 'user has' : 'users have') + ' a program listed';
+        col.appendChild(makePiHead('Course composition', meta));
 
-            var value = document.createElement('div');
-            deps.markExt(value);
-            value.textContent = valueText;
-            value.style.cssText = 'margin-top:6px;font-size:30px;line-height:0.95;font-weight:800;color:' + (valueColor || text) + ';';
-            box.appendChild(value);
+        if (!sorted.length) {
+            col.appendChild(makePiEl('div', 'dtu-pi-note', 'No study programs are listed for the users on this page.'));
+            return col;
+        }
 
-            if (metaText) {
-                var metaLine = document.createElement('div');
-                deps.markExt(metaLine);
-                metaLine.textContent = metaText;
-                metaLine.style.cssText = 'margin-top:5px;font-size:12px;line-height:1.35;color:' + subtle + ';';
-                box.appendChild(metaLine);
+        var maxCount = sorted[0].count || 1;
+        var list = makePiEl('ul', 'dtu-pi-rows');
+        var hiddenRows = [];
+        var hiddenUsers = 0;
+        sorted.forEach(function (entry, i) {
+            var row = makePiEl('li', 'dtu-pi-row');
+            var isSelf = !!(selfProgram && entry.program === selfProgram);
+            if (isSelf) row.setAttribute('data-mine', '1');
+            var label = makePiEl('span', 'dtu-pi-label', entry.program);
+            if (isSelf) label.appendChild(makePiEl('span', 'dtu-pi-mine', 'Your program'));
+            row.appendChild(label);
+            var pct = totalWithProgram > 0 ? Math.round(entry.count / totalWithProgram * 100) : 0;
+            var num = makePiEl('span', 'dtu-pi-num');
+            num.appendChild(makePiEl('b', null, String(entry.count)));
+            num.appendChild(document.createTextNode(pct + '%'));
+            row.appendChild(num);
+            var track = makePiEl('span', 'dtu-pi-track');
+            track.setAttribute('aria-hidden', 'true');
+            var fill = makePiEl('span', 'dtu-pi-fill');
+            fill.style.width = Math.max(2, Math.round(entry.count / maxCount * 100)) + '%';
+            track.appendChild(fill);
+            row.appendChild(track);
+            if (i >= PI_VISIBLE_PROGRAMS && sorted.length > PI_VISIBLE_PROGRAMS + 1) {
+                hiddenRows.push(row);
+                hiddenUsers += entry.count;
+                row.hidden = !piShowAllPrograms;
             }
-            return box;
+            list.appendChild(row);
+        });
+        if (hiddenRows.length) list.id = 'dtu-pi-program-list';
+        col.appendChild(list);
+
+        if (hiddenRows.length) {
+            var more = makePiEl('button', 'dtu-pi-more');
+            more.type = 'button';
+            more.setAttribute('aria-controls', 'dtu-pi-program-list');
+            var collapsedText = 'Show ' + hiddenRows.length + ' more programs (' + hiddenUsers + ' ' + (hiddenUsers === 1 ? 'user' : 'users') + ')';
+            function sync() {
+                more.setAttribute('aria-expanded', piShowAllPrograms ? 'true' : 'false');
+                more.textContent = piShowAllPrograms ? 'Show fewer programs' : collapsedText;
+                hiddenRows.forEach(function (r) { r.hidden = !piShowAllPrograms; });
+            }
+            more.addEventListener('click', function () {
+                piShowAllPrograms = !piShowAllPrograms;
+                sync();
+            });
+            sync();
+            col.appendChild(more);
         }
-
-        metrics.appendChild(buildMetric('Current users', String(summary.latestCount), 'Enrolled on this course page.', text, 0));
-        metrics.appendChild(buildMetric('Net change', trendValueText, trendMetaText, trendColor, 1));
-        metrics.appendChild(buildMetric('Peak seen', String(summary.peakCount), 'Range ' + summary.lowCount + '-' + summary.peakCount + ' users.', text, 2));
-        section.appendChild(metrics);
-
-        var note = document.createElement('div');
-        deps.markExt(note);
-        note.textContent = latestMoveText;
-        note.style.cssText = 'margin-top:12px;padding-top:12px;border-top:1px solid ' + divider + ';font-size:12px;line-height:1.4;color:' + latestMoveColor + ';';
-        section.appendChild(note);
-
-        host.appendChild(section);
+        return col;
     }
 
     function renderDemographicsCard(sorted, totalWithProgram, totalUsers, loadedUsers, selfProgram, retentionSummary) {
@@ -283,203 +453,26 @@
             card.setAttribute('data-dtu-participant-demographics', '1');
             deps.markExt(card);
         }
+        placeParticipantIntelHost(card, listRoot);
 
+        if (card.getAttribute('data-dtu-demographics-sig') === sig) return;
+        card.setAttribute('data-dtu-demographics-sig', sig);
+
+        var grid = prepareParticipantIntelHost(card, isDark);
+        if (retentionSummary) grid.appendChild(buildRetentionColumn(retentionSummary));
+        else grid.setAttribute('data-single', '1');
+        grid.appendChild(buildCompositionColumn(sorted, totalWithProgram, totalUsers, loadedUsers, selfProgram));
+    }
+
+    function placeParticipantIntelHost(card, listRoot) {
         var insertionAnchor = listRoot.querySelector('.ui-participants-list-category') || listRoot.querySelector('.ui-participant-categorybar');
         if (insertionAnchor && insertionAnchor !== card) {
             if (card.parentNode !== listRoot || card.nextSibling !== insertionAnchor) {
                 listRoot.insertBefore(card, insertionAnchor);
             }
-        } else {
-            if (card.parentNode !== listRoot) {
-                listRoot.insertBefore(card, listRoot.firstChild);
-            } else if (listRoot.firstChild !== card) {
-                listRoot.insertBefore(card, listRoot.firstChild);
-            }
+        } else if (card.parentNode !== listRoot || listRoot.firstChild !== card) {
+            listRoot.insertBefore(card, listRoot.firstChild);
         }
-
-        if (card.getAttribute('data-dtu-demographics-sig') === sig) return;
-        card.setAttribute('data-dtu-demographics-sig', sig);
-
-        card.style.cssText = 'margin:0 0 18px;padding:18px 20px;border-radius:2px;font-family:inherit;';
-        card.style.setProperty('background', isDark ? '#292929' : '#ffffff', 'important');
-        card.style.setProperty('background-color', isDark ? '#292929' : '#ffffff', 'important');
-        card.style.setProperty('border', isDark ? '1px solid #3a3a3a' : '1px solid #dddddd', 'important');
-        card.style.setProperty('color', isDark ? '#e0e0e0' : '#222', 'important');
-
-        while (card.firstChild) card.removeChild(card.firstChild);
-
-        if (retentionSummary) {
-            appendRetentionRadarSection(card, retentionSummary, isDark, true);
-        }
-
-        var composition = document.createElement('section');
-        deps.markExt(composition);
-        composition.setAttribute('data-dtu-intel-section', 'composition');
-        composition.style.cssText = 'padding:' + (retentionSummary ? '18px' : '0') + ' 0 0;';
-
-        var title = document.createElement('div');
-        deps.markExt(title);
-        title.textContent = 'Course Composition';
-        title.style.cssText = 'font-weight:760;font-size:14px;line-height:1.15;margin-bottom:4px;';
-        title.style.setProperty('color', isDark ? '#f1f3f6' : '#1f2937', 'important');
-        composition.appendChild(title);
-
-        var compositionSubtitle = document.createElement('div');
-        deps.markExt(compositionSubtitle);
-        compositionSubtitle.textContent = 'Study-program distribution for participants with available program information.';
-        compositionSubtitle.style.cssText = 'font-size:12px;line-height:1.35;margin-bottom:14px;';
-        compositionSubtitle.style.setProperty('color', isDark ? '#9ba6b2' : '#64748b', 'important');
-        composition.appendChild(compositionSubtitle);
-
-        var palette = isDark
-            ? ['#60a5fa', '#34d399', '#fbbf24', '#a78bfa', '#22d3ee', '#fb7185', '#a3e635']
-            : ['#2563eb', '#059669', '#d97706', '#7c3aed', '#0891b2', '#e11d48', '#65a30d'];
-        var paletteIdx = 0;
-
-        var maxBars = 6;
-        var otherCount = 0;
-        var otherPrograms = [];
-        for (var i = 0; i < sorted.length; i++) {
-            if (i >= maxBars) { otherCount += sorted[i].count; otherPrograms.push(sorted[i]); continue; }
-            var pct = totalWithProgram > 0 ? Math.round(sorted[i].count / totalWithProgram * 100) : 0;
-            var isSelf = selfProgram && sorted[i].program === selfProgram;
-            var fill = isSelf
-                ? (isDark ? 'var(--dtu-ad-accent-soft, #60a5fa)' : 'var(--dtu-ad-accent-deep, #2563eb)')
-                : palette[paletteIdx++ % palette.length];
-            composition.appendChild(buildDemoBar(sorted[i].program, sorted[i].count, pct, isSelf, isDark, fill, null));
-        }
-        if (otherCount > 0) {
-            var otherPct = totalWithProgram > 0 ? Math.round(otherCount / totalWithProgram * 100) : 0;
-            var otherLabel = 'Other' + (otherPrograms.length ? ' (' + otherPrograms.length + ' programs)' : '');
-            var stripe = isDark
-                ? 'repeating-linear-gradient(135deg, rgba(148,163,184,0.75) 0, rgba(148,163,184,0.75) 6px, rgba(148,163,184,0.30) 6px, rgba(148,163,184,0.30) 12px)'
-                : 'repeating-linear-gradient(135deg, rgba(100,116,139,0.55) 0, rgba(100,116,139,0.55) 6px, rgba(100,116,139,0.20) 6px, rgba(100,116,139,0.20) 12px)';
-            composition.appendChild(buildDemoBar(otherLabel, otherCount, otherPct, false, isDark, stripe, { isOther: true }));
-
-            if (otherPrograms.length) {
-                var details = document.createElement('details');
-                deps.markExt(details);
-                details.style.cssText = 'margin-top:8px;padding-top:8px;';
-                details.style.setProperty('border-top', '1px solid ' + (isDark ? '#404040' : '#eee'), 'important');
-
-                var summary = document.createElement('summary');
-                deps.markExt(summary);
-                var showN = Math.min(10, otherPrograms.length);
-                summary.textContent = 'Other breakdown (top ' + showN + ' of ' + otherPrograms.length + ')';
-                summary.style.cssText = 'cursor:pointer;font-size:12px;opacity:0.85;user-select:none;padding:6px 8px;'
-                    + 'margin-left:-8px;border-radius:2px;outline:none;transition:background-color .16s ease,color .16s ease;';
-                summary.style.setProperty('color', isDark ? '#e0e0e0' : '#222', 'important');
-                function setSummaryActive(active) {
-                    summary.style.setProperty('background-color', active
-                        ? (isDark ? 'rgba(var(--dtu-ad-accent-rgb, 31,122,224),0.12)' : 'rgba(var(--dtu-ad-accent-rgb, 31,122,224),0.07)')
-                        : 'transparent', 'important');
-                    summary.style.setProperty('color', active
-                        ? (isDark ? 'var(--dtu-ad-accent-soft, #60a5fa)' : 'var(--dtu-ad-accent-deep, #2563eb)')
-                        : (isDark ? '#e0e0e0' : '#222'), 'important');
-                }
-                summary.addEventListener('mouseenter', function () { setSummaryActive(true); });
-                summary.addEventListener('mouseleave', function () { if (document.activeElement !== summary) setSummaryActive(false); });
-                summary.addEventListener('focus', function () { setSummaryActive(true); });
-                summary.addEventListener('blur', function () { setSummaryActive(false); });
-                details.appendChild(summary);
-
-                var list = document.createElement('div');
-                deps.markExt(list);
-                list.style.cssText = 'margin-top:8px;display:flex;flex-direction:column;gap:6px;';
-
-                for (var k = 0; k < showN; k++) {
-                    var it = otherPrograms[k];
-                    var lpct = totalWithProgram > 0 ? Math.round(it.count / totalWithProgram * 100) : 0;
-
-                    var line = document.createElement('div');
-                    deps.markExt(line);
-                    line.style.cssText = 'display:flex;justify-content:space-between;gap:12px;font-size:12px;line-height:1.25;';
-
-                    var left = document.createElement('span');
-                    deps.markExt(left);
-                    left.textContent = it.program;
-                    left.style.cssText = 'flex:1;min-width:0;white-space:normal;word-break:break-word;opacity:0.9;';
-
-                    var right = document.createElement('span');
-                    deps.markExt(right);
-                    right.textContent = it.count + ' (' + lpct + '%)';
-                    right.style.cssText = 'flex:0 0 auto;white-space:nowrap;opacity:0.75;';
-
-                    line.appendChild(left);
-                    line.appendChild(right);
-                    list.appendChild(line);
-                }
-
-                if (otherPrograms.length > showN) {
-                    var more = document.createElement('div');
-                    deps.markExt(more);
-                    more.textContent = '... and ' + (otherPrograms.length - showN) + ' more';
-                    more.style.cssText = 'font-size:11px;opacity:0.6;margin-top:2px;';
-                    list.appendChild(more);
-                }
-
-                details.appendChild(list);
-                composition.appendChild(details);
-            }
-        }
-
-        var footer = document.createElement('div');
-        deps.markExt(footer);
-        var footerText = totalUsers + ' users';
-        if (loadedUsers && loadedUsers !== totalUsers) footerText += ' (showing ' + loadedUsers + ')';
-        if (totalWithProgram < loadedUsers) footerText += ' (' + totalWithProgram + ' with program info)';
-        footer.textContent = footerText;
-        footer.style.cssText = 'font-size:11px;opacity:0.6;margin-top:8px;';
-        composition.appendChild(footer);
-        card.appendChild(composition);
-    }
-
-    function buildDemoBar(label, count, pct, isSelf, isDark, fillStyle, meta) {
-        var deps = getDeps();
-        if (!deps) return document.createElement('div');
-        var row = document.createElement('div');
-        deps.markExt(row);
-        row.style.cssText = 'display:grid;grid-template-columns:clamp(220px,38%,440px) 1fr 74px;'
-            + 'column-gap:10px;align-items:center;margin:6px 0;';
-        if (meta && meta.isOther) {
-            row.style.setProperty('opacity', isDark ? '0.92' : '0.95', 'important');
-        }
-
-        var lbl = document.createElement('span');
-        deps.markExt(lbl);
-        lbl.textContent = label;
-        lbl.title = label;
-        lbl.style.cssText = 'font-size:12px;line-height:1.25;white-space:normal;overflow:visible;word-break:break-word;';
-        lbl.style.setProperty('color', isDark ? '#e0e0e0' : '#333', 'important');
-
-        var barBg = document.createElement('div');
-        deps.markExt(barBg);
-        barBg.style.cssText = 'height:14px;border-radius:3px;overflow:hidden;align-self:center;';
-        barBg.style.setProperty('background', isDark ? '#1a1a1a' : '#f0f0f0', 'important');
-        barBg.style.setProperty('background-color', isDark ? '#1a1a1a' : '#f0f0f0', 'important');
-
-        var barFill = document.createElement('div');
-        deps.markExt(barFill);
-        barFill.style.cssText = 'height:100%;border-radius:3px;transition:width .3s;width:' + pct + '%;';
-        var bg = fillStyle || (isSelf ? (isDark ? '#ef5350' : '#c62828') : (isDark ? '#666' : '#999'));
-        barFill.style.setProperty('background', bg, 'important');
-        if (!/gradient/i.test(bg)) {
-            barFill.style.setProperty('background-color', bg, 'important');
-        }
-        if (meta && meta.isOther) {
-            barFill.style.setProperty('opacity', isDark ? '0.7' : '0.75', 'important');
-        }
-        barBg.appendChild(barFill);
-
-        var countLbl = document.createElement('span');
-        deps.markExt(countLbl);
-        countLbl.textContent = count + ' (' + pct + '%)';
-        countLbl.style.cssText = 'text-align:right;font-size:11px;opacity:0.8;white-space:nowrap;';
-
-        row.appendChild(lbl);
-        row.appendChild(barBg);
-        row.appendChild(countLbl);
-        return row;
     }
 
     function annotateParticipantHistory() {
@@ -744,25 +737,11 @@
             card.setAttribute('data-dtu-retention-indicator', '1');
             deps.markExt(card);
         }
+        placeParticipantIntelHost(card, listRoot);
 
-        var insertionAnchor = listRoot.querySelector('.ui-participants-list-category') || listRoot.querySelector('.ui-participant-categorybar');
-        if (insertionAnchor && insertionAnchor !== card) {
-            if (card.parentNode !== listRoot || card.nextSibling !== insertionAnchor) {
-                listRoot.insertBefore(card, insertionAnchor);
-            }
-        } else if (card.parentNode !== listRoot) {
-            listRoot.insertBefore(card, listRoot.firstChild);
-        }
-
-        var isDark = getIsDark();
-        card.style.cssText = 'margin:0 0 18px;padding:18px 20px;border-radius:2px;font-family:inherit;';
-        card.style.setProperty('background', isDark ? '#292929' : '#ffffff', 'important');
-        card.style.setProperty('background-color', isDark ? '#292929' : '#ffffff', 'important');
-        card.style.setProperty('border', isDark ? '1px solid #3a3a3a' : '1px solid #dddddd', 'important');
-        card.style.setProperty('color', isDark ? '#e0e0e0' : '#222', 'important');
-
-        while (card.firstChild) card.removeChild(card.firstChild);
-        appendRetentionRadarSection(card, summary, isDark, false);
+        var grid = prepareParticipantIntelHost(card, getIsDark());
+        grid.setAttribute('data-single', '1');
+        grid.appendChild(buildRetentionColumn(summary));
     }
 
     globalThis.DTUAfterDarkParticipantIntelUi = {

@@ -261,9 +261,9 @@
         return p;
     }
 
-    function getCampusnetParticipantCategoryMeta(labelRegex) {
+    function getCampusnetParticipantCategoryMeta(labelRegex, rootDoc) {
         if (!labelRegex) return null;
-        var headings = document.querySelectorAll('.ui-participant-categorybar h3');
+        var headings = (rootDoc || document).querySelectorAll('.ui-participant-categorybar h3');
         for (var i = 0; i < headings.length; i++) {
             var txt = normalizeWhitespace(headings[i].textContent);
             if (!labelRegex.test(txt)) continue;
@@ -279,12 +279,12 @@
         return null;
     }
 
-    function getCampusnetUsersCategoryMeta() {
-        return getCampusnetParticipantCategoryMeta(/^(Users|Brugere)\b/i);
+    function getCampusnetUsersCategoryMeta(rootDoc) {
+        return getCampusnetParticipantCategoryMeta(/^(Users|Brugere)\b/i, rootDoc);
     }
 
-    function getCampusnetUsersCountFromPage() {
-        var meta = getCampusnetUsersCategoryMeta();
+    function getCampusnetUsersCountFromPage(rootDoc) {
+        var meta = getCampusnetUsersCategoryMeta(rootDoc);
         return meta ? meta.count : null;
     }
 
@@ -304,8 +304,9 @@
         return null;
     }
 
-    function getCampusnetUsersParticipantElements() {
-        var meta = getCampusnetUsersCategoryMeta();
+    function getCampusnetUsersParticipantElements(rootDoc) {
+        var doc = rootDoc || document;
+        var meta = getCampusnetUsersCategoryMeta(doc);
         if (meta && meta.containerEl) {
             var within = Array.from(meta.containerEl.querySelectorAll('.ui-participant'));
             if (within.length) return within;
@@ -332,7 +333,7 @@
             if (items.length) return items;
         }
 
-        return Array.from(document.querySelectorAll('.ui-participant'));
+        return Array.from(doc.querySelectorAll('.ui-participant'));
     }
 
     function getCampusnetParticipantSNumber(item) {

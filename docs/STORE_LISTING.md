@@ -36,6 +36,15 @@ Privacy:
 
 DTU After Dark is unofficial and is not affiliated with or endorsed by DTU or any service provider. Information shown by the extension may be delayed, incomplete, or inaccurate; always verify critical information through official DTU channels.
 
+## Version 8.1.0 release notes
+
+- Redesigned the grade and evaluation widgets on kurser.dtu.dk. Grade statistics now default to the main exam instead of a small re-exam sitting, pass/fail courses are read correctly, and you can switch between the last four exams.
+- Course content downloads handle large courses: scanning takes seconds instead of minutes, downloads always produce a ZIP, and courses over 2 GB are split into parts.
+- Darkened the Lessons table of contents, the public course evaluation results on evaluering.dtu.dk, and made links in course text visible again.
+- Room links now recognise codes like "R0.15.A" and show in the link colour.
+- Settings and the Library panel work fully by keyboard, with visible focus and better contrast in both modes.
+- Redesigned Retention Radar and Course Composition on CampusNet participant lists. The extension no longer changes the participant page size, so big courses load faster and do not wait on hundreds of profile pictures.
+
 ## Version 8.0.3 release notes
 
 - Made lesson bulk downloads much faster to start. The scan no longer downloads every file once just to look inside it, and it checks several pages at a time.

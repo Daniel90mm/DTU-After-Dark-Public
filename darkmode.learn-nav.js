@@ -431,6 +431,13 @@
 
     function configureAfterDarkLibraryNavItem(navItem) {
         if (!navItem) return;
+        // Already wired: rebuilding would replace the opener on every feature
+        // pass and drop keyboard focus from it (e.g. after closing the panel).
+        var wiredOpener = navItem._dtuLibraryOpener;
+        if (wiredOpener && wiredOpener.isConnected && navItem.contains(wiredOpener)) {
+            applyAfterDarkNavItemVisibility(navItem);
+            return;
+        }
         navItem.className = 'd2l-navigation-s-item dtu-library-nav-item';
         navItem.setAttribute('role', 'listitem');
         markExt(navItem);
@@ -460,6 +467,7 @@
         openerBtn.appendChild(wrapper);
         dropdown.appendChild(openerBtn);
         navItem.appendChild(dropdown);
+        navItem._dtuLibraryOpener = openerBtn;
 
         function blockD2LDropdown(event) {
             try { event.stopPropagation(); } catch (e1) { }
@@ -518,6 +526,13 @@
 
     function configureAfterDarkSettingsNavItem(navItem, mainWrapper) {
         if (!navItem) return;
+        // Already wired: rebuilding would replace the opener on every feature
+        // pass and drop keyboard focus from it (e.g. after closing Settings).
+        var wiredOpener = navItem._dtuSettingsOpener;
+        if (wiredOpener && wiredOpener.isConnected && navItem.contains(wiredOpener)) {
+            applyAfterDarkNavItemVisibility(navItem);
+            return;
+        }
         navItem.className = 'd2l-navigation-s-item dtu-settings-nav-item';
         navItem.setAttribute('role', 'listitem');
         markExt(navItem);
@@ -547,6 +562,7 @@
         openerBtn.appendChild(wrapper);
         dropdown.appendChild(openerBtn);
         navItem.appendChild(dropdown);
+        navItem._dtuSettingsOpener = openerBtn;
 
         function blockD2LDropdown(event) {
             try { event.stopPropagation(); } catch (e1) { }

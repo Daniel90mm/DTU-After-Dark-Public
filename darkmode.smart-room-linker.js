@@ -111,6 +111,7 @@
             var room0 = String((match[2] || '').replace(/\s+/g, ''));
             if (/^\s*(?:KB|MB|GB|TB)\b/i.test(tail)) return null;
             if (match[0].indexOf('.') !== -1 && /^[0-9]+$/.test(room0) && room0.length <= 2) return null;
+            if (/\s-\s/.test(match[0]) && /^[0-9]{1,2}$/.test(room0)) return null;
             return {
                 building: normalizeMazemapBuilding(match[1]),
                 room: normalizeMazemapRoom(room0)
@@ -129,7 +130,7 @@
         if (match) {
             var building = normalizeMazemapBuilding(match[1]);
             var rest = text.slice((match.index || 0) + match[0].length);
-            var roomMatch = rest.match(/\b(?:Room|Lokale|Lok\.?|Rum|R|Auditorium|Aud\.?|AUD|SA)\s*([A-Za-z]?\s*[0-9]{1,4}\s*[A-Za-z]?)\b/i);
+            var roomMatch = rest.match(/\b(?:Room|Lokale|Lok\.?|Rum|R|Auditorium|Aud\.?|AUD|SA)\s*(R?[0-9]{1,2}(?:\.[0-9A-Za-z]{1,3}){1,3}|[A-Za-z]?\s*[0-9]{1,4}\s*[A-Za-z]?)\b/i);
             return {
                 building: building,
                 room: roomMatch ? normalizeMazemapRoom((roomMatch[1] || '').replace(/\s+/g, '')) : ''
@@ -257,8 +258,36 @@
         (document.head || document.documentElement).appendChild(styleEl);
     }
 
-    function getMazemapPinGlyph() {
-        return '📍';
+    // A drawn map pin in the link colour; the emoji rendered as a platform
+    // picture that ignored the link colour and theme.
+    function setMazemapPinIcon(iconEl) {
+        if (!iconEl) return;
+        var doc = iconEl.ownerDocument || document;
+        while (iconEl.firstChild) iconEl.removeChild(iconEl.firstChild);
+        var ns = 'http://www.w3.org/2000/svg';
+        var svg = doc.createElementNS(ns, 'svg');
+        svg.setAttribute('viewBox', '0 0 24 24');
+        svg.setAttribute('width', '0.95em');
+        svg.setAttribute('height', '0.95em');
+        svg.setAttribute('aria-hidden', 'true');
+        svg.setAttribute('focusable', 'false');
+        svg.style.cssText = 'display:inline-block;vertical-align:-0.12em;';
+        // darkmode.css forces `svg{color:#e0e0e0}`; keep the link colour.
+        svg.style.setProperty('color', 'inherit', 'important');
+        var pin = doc.createElementNS(ns, 'path');
+        pin.setAttribute('d', 'M12 21s-6.5-6.2-6.5-11A6.5 6.5 0 0 1 18.5 10c0 4.8-6.5 11-6.5 11Z');
+        pin.setAttribute('fill', 'none');
+        pin.setAttribute('stroke', 'currentColor');
+        pin.setAttribute('stroke-width', '2');
+        pin.setAttribute('stroke-linejoin', 'round');
+        var dot = doc.createElementNS(ns, 'circle');
+        dot.setAttribute('cx', '12');
+        dot.setAttribute('cy', '10');
+        dot.setAttribute('r', '2.3');
+        dot.setAttribute('fill', 'currentColor');
+        svg.appendChild(pin);
+        svg.appendChild(dot);
+        iconEl.appendChild(svg);
     }
 
     function removeMazemapTooltip() {
@@ -303,7 +332,8 @@
         else linkEl.removeAttribute('data-dtu-mazemap-loading');
         var icon = linkEl.querySelector('[data-dtu-mazemap-icon]');
         if (!icon) return;
-        icon.textContent = loading ? '...' : getMazemapPinGlyph();
+        if (loading) icon.textContent = '...';
+        else setMazemapPinIcon(icon);
     }
 
     function applyMazemapSmartLinkInlineStyle(anchor) {
@@ -391,7 +421,8 @@
         var icon = document.createElement('span');
         markExt(icon);
         icon.setAttribute('data-dtu-mazemap-icon', '1');
-        icon.textContent = getMazemapPinGlyph();
+        icon.setAttribute('aria-hidden', 'true');
+        setMazemapPinIcon(icon);
         applyMazemapSmartIconInlineStyle(icon);
         anchor.appendChild(icon);
 
@@ -449,7 +480,7 @@
         var matches = [];
         var match;
 
-        var reA = /\b(?:Building|Bygning|B)\s*([0-9]{3}[A-Za-z]?)\s*(?:,|\s)\s*(?:Room|Lokale|Lok\.?|Rum|R|Auditorium|Aud\.?|Seminar(?:\s*Room)?|Group(?:\s*Room)?|Exercise(?:\s*Room)?|AUD|SA)\s*([0-9]{1,4}[A-Za-z]?)\b/gi;
+        var reA = /\b(?:Building|Bygning|B)\s*([0-9]{3}[A-Za-z]?)\s*(?:,|\s)\s*(?:Room|Lokale|Lok\.?|Rum|R|Auditorium|Aud\.?|Seminar(?:\s*Room)?|Group(?:\s*Room)?|Exercise(?:\s*Room)?|AUD|SA)\s*(R?[0-9]{1,2}(?:\.[0-9A-Za-z]{1,3}){1,3}|[0-9]{1,4}[A-Za-z]?)\b/gi;
         while ((match = reA.exec(value)) !== null) {
             matches.push({ start: match.index, end: match.index + match[0].length, building: match[1], room: match[2], text: match[0] });
         }
@@ -501,6 +532,9 @@
             var roomRaw = (match[2] || '').replace(/\s+/g, '');
             var tail = value.slice(match.index + match[0].length, match.index + match[0].length + 12);
             if (/^\s*(?:KB|MB|GB|TB)\b/i.test(tail)) continue;
+            // "800 - 3" is arithmetic (evaluering: "svarprocent 362 / (800 - 3)"),
+            // not a room: DTU rooms are written 306-031 or 116-81.
+            if (/\s-\s/.test(match[0]) && /^[0-9]{1,2}$/.test(roomRaw)) continue;
             if (match[0].indexOf('.') !== -1) {
                 var digits = roomRaw.replace(/[^0-9]/g, '');
                 if (digits.length > 0 && digits.length <= 2) continue;
@@ -598,15 +632,18 @@
         anchor.setAttribute('title', normalizedRoom ? 'Open in MazeMap (click to resolve exact location)' : 'Open building in MazeMap');
         anchor.setAttribute('style', getMazemapInlineLinkStyleString() + 'padding:0 !important;display:inline;line-height:inherit;');
 
+        // Inline colour first: darkmode.css repaints unmarked spans with the
+        // body text colour, which made the link indistinguishable from prose.
         var txt = doc.createElement('span');
+        txt.setAttribute('style', 'color:inherit !important;');
         txt.textContent = String(labelText || query);
         anchor.appendChild(txt);
 
         var icon = doc.createElement('span');
         icon.setAttribute('data-dtu-mazemap-icon', '1');
         icon.setAttribute('aria-hidden', 'true');
-        icon.textContent = getMazemapPinGlyph();
-        icon.setAttribute('style', 'display:inline;margin-left:4px;font-size:0.95em;opacity:0.9;text-decoration:none;');
+        setMazemapPinIcon(icon);
+        icon.setAttribute('style', 'color:inherit !important;display:inline;margin-left:4px;font-size:0.95em;opacity:0.9;text-decoration:none;');
         anchor.appendChild(icon);
 
         return anchor;

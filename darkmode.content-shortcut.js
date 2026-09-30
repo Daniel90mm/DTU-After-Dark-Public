@@ -692,6 +692,10 @@
             opacity: 1 !important;
             pointer-events: auto !important;
         }
+        a.dtu-dark-content-btn:focus-visible {
+            outline: 2px solid currentColor !important;
+            outline-offset: 2px !important;
+        }
         a.dtu-dark-content-btn:hover {
             background-color: rgba(0, 0, 0, 0.85) !important;
         }

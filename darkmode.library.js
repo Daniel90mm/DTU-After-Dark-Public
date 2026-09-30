@@ -254,7 +254,7 @@
             + '.dtu-library-content{padding:18px 22px 20px!important;overflow:auto!important;}'
             + '.dtu-library-layout{display:flex!important;flex-direction:column!important;gap:14px!important;}'
             + '.dtu-library-section{padding:12px!important;background:#2d2d2d!important;border:1px solid #404040!important;border-radius:10px!important;}'
-            + '.dtu-library-section-title{font-size:12px!important;font-weight:700!important;text-transform:uppercase!important;color:#a3acb8!important;}'
+            + '.dtu-library-section-title{font-size:14px!important;font-weight:700!important;text-transform:none!important;color:#e8e8e8!important;}'
             + '.dtu-library-link-grid{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:8px 20px!important;}'
             + '.dtu-library-link-item{display:grid!important;grid-template-columns:18px minmax(0,1fr) 14px!important;align-items:center!important;gap:12px!important;min-height:58px!important;padding:10px 4px!important;color:#e8e8e8!important;text-decoration:none!important;}'
             + '.dtu-library-link-icon svg,.dtu-library-link-arrow svg{width:18px!important;height:18px!important;stroke:currentColor!important;fill:none!important;}'
@@ -280,6 +280,22 @@
         hideLibraryPanel();
     }
 
+    function markLibrarySubtree(root) {
+        if (!root || !root.querySelectorAll) return;
+        markExt(root);
+        root.querySelectorAll('div, span, p, em, strong, label, h1, h2, h3, h4, h5, h6, a, button').forEach(function (el) {
+            if (!el.hasAttribute('data-dtu-ext')) markExt(el);
+        });
+    }
+
+    function getLibraryPanelFocusables(panel) {
+        if (!panel) return [];
+        return Array.prototype.filter.call(
+            panel.querySelectorAll('a[href], button:not([disabled]), [tabindex]:not([tabindex="-1"])'),
+            function (el) { return el.offsetParent !== null || el === document.activeElement; }
+        );
+    }
+
     function hideLibraryPanel() {
         var overlay = document.querySelector('.dtu-library-modal-overlay');
         if (overlay) overlay.remove();
@@ -290,12 +306,18 @@
 
         var state = readState();
         if (state.escHandler) {
-            try { document.removeEventListener('keydown', state.escHandler); } catch (eEsc) { }
+            try { document.removeEventListener('keydown', state.escHandler, true); } catch (eEsc) { }
         }
         if (state.occupancyAutoTimer) {
             clearInterval(state.occupancyAutoTimer);
         }
-        writeState({ escHandler: null, occupancyAutoTimer: null });
+        if (state.scrollLock) {
+            try {
+                document.documentElement.style.overflow = state.scrollLock.html;
+                document.body.style.overflow = state.scrollLock.body;
+            } catch (eScroll) { }
+        }
+        writeState({ escHandler: null, occupancyAutoTimer: null, scrollLock: null });
 
         deepQueryAll('.dtu-library-nav-item .d2l-dropdown-opener[aria-expanded="true"]', document).forEach(function (btn) {
             btn.setAttribute('aria-expanded', 'false');
@@ -321,6 +343,15 @@
         }
         if (!navItem) {
             navItem = document.createElement('div');
+        }
+
+        // Already wired: only re-place it. Rebuilding would replace the opener
+        // on every feature pass and drop keyboard focus from it.
+        var wiredOpener = navItem._dtuLibraryOpener;
+        if (wiredOpener && wiredOpener.isConnected && navItem.contains(wiredOpener)) {
+            placeLibraryNavItem(mainWrapper, navItem);
+            applyLibraryNavItemVisibility(navItem);
+            return;
         }
 
         navItem.className = 'd2l-navigation-s-item dtu-library-nav-item';
@@ -354,6 +385,7 @@
         navItem.appendChild(dropdown);
 
         placeLibraryNavItem(mainWrapper, navItem);
+        navItem._dtuLibraryOpener = openerBtn;
 
         function blockD2LDropdown(event) {
             try { event.stopPropagation(); } catch (e3) { }
@@ -420,19 +452,19 @@
     function getLibraryQuickLinkIconSvg(iconName) {
         switch (String(iconName || '')) {
             case 'room':
-                return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V7.5A1.5 1.5 0 0 1 5.5 6h13A1.5 1.5 0 0 1 20 7.5V20"/><path d="M7.5 20v-5.5h9V20"/><path d="M8 10h.01"/><path d="M16 10h.01"/></svg>';
+                return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V7.5A1.5 1.5 0 0 1 5.5 6h13A1.5 1.5 0 0 1 20 7.5V20"/><path d="M7.5 20v-5.5h9V20"/><path d="M8 10h.01"/><path d="M16 10h.01"/></svg>';
             case 'bookings':
-                return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 6h13"/><path d="M7 12h13"/><path d="M7 18h13"/><path d="M3.5 6h.01"/><path d="M3.5 12h.01"/><path d="M3.5 18h.01"/></svg>';
+                return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 6h13"/><path d="M7 12h13"/><path d="M7 18h13"/><path d="M3.5 6h.01"/><path d="M3.5 12h.01"/><path d="M3.5 18h.01"/></svg>';
             case 'search':
-                return '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>';
+                return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>';
             case 'print':
-                return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 8V4h10v4"/><path d="M7 17H5.5A1.5 1.5 0 0 1 4 15.5v-4A1.5 1.5 0 0 1 5.5 10h13a1.5 1.5 0 0 1 1.5 1.5v4a1.5 1.5 0 0 1-1.5 1.5H17"/><path d="M7 14h10v6H7z"/></svg>';
+                return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 8V4h10v4"/><path d="M7 17H5.5A1.5 1.5 0 0 1 4 15.5v-4A1.5 1.5 0 0 1 5.5 10h13a1.5 1.5 0 0 1 1.5 1.5v4a1.5 1.5 0 0 1-1.5 1.5H17"/><path d="M7 14h10v6H7z"/></svg>';
             case 'events':
-                return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v3"/><path d="M17 4v3"/><path d="M4 9h16"/><path d="M5.5 6.5h13A1.5 1.5 0 0 1 20 8v10.5A1.5 1.5 0 0 1 18.5 20h-13A1.5 1.5 0 0 1 4 18.5V8a1.5 1.5 0 0 1 1.5-1.5Z"/><path d="M9 13h2"/><path d="M13 13h2"/><path d="M9 16h6"/></svg>';
+                return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4v3"/><path d="M17 4v3"/><path d="M4 9h16"/><path d="M5.5 6.5h13A1.5 1.5 0 0 1 20 8v10.5A1.5 1.5 0 0 1 18.5 20h-13A1.5 1.5 0 0 1 4 18.5V8a1.5 1.5 0 0 1 1.5-1.5Z"/><path d="M9 13h2"/><path d="M13 13h2"/><path d="M9 16h6"/></svg>';
             case 'news':
-                return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5.5h9.5A1.5 1.5 0 0 1 17 7v10.5A1.5 1.5 0 0 1 15.5 19h-9A1.5 1.5 0 0 1 5 17.5V6.5A1 1 0 0 1 6 5.5Z"/><path d="M17 8.5h1.5A1.5 1.5 0 0 1 20 10v7.5a1.5 1.5 0 0 1-1.5 1.5H17"/><path d="M8 9h6"/><path d="M8 12h6"/><path d="M8 15h4"/></svg>';
+                return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5.5h9.5A1.5 1.5 0 0 1 17 7v10.5A1.5 1.5 0 0 1 15.5 19h-9A1.5 1.5 0 0 1 5 17.5V6.5A1 1 0 0 1 6 5.5Z"/><path d="M17 8.5h1.5A1.5 1.5 0 0 1 20 10v7.5a1.5 1.5 0 0 1-1.5 1.5H17"/><path d="M8 9h6"/><path d="M8 12h6"/><path d="M8 15h4"/></svg>';
             default:
-                return '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m13 5 7 7-7 7"/></svg>';
+                return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="m13 5 7 7-7 7"/></svg>';
         }
     }
 
@@ -460,23 +492,62 @@
         markExt(overlay);
         overlay.style.cssText = 'background:transparent !important;background-color:transparent !important;'
             + 'backdrop-filter:blur(4px) !important;-webkit-backdrop-filter:blur(4px) !important;';
+        // Every user-initiated close returns focus to the Library button.
+        function closeFromUser() {
+            hideLibraryPanel();
+            if (anchorBtn) anchorBtn.setAttribute('aria-expanded', 'false');
+            // The nav pass rebuilds the opener, so focus the live one.
+            var opener = queryFirstDeep('.dtu-library-nav-item button.d2l-dropdown-opener', document) || anchorBtn;
+            if (opener && opener.isConnected) {
+                try { opener.focus({ preventScroll: true }); } catch (eFocus) { }
+            }
+        }
+
         overlay.addEventListener('mousedown', function (e) {
             if (e.target !== overlay) return;
-            hideLibraryPanel();
-            if (anchorBtn) anchorBtn.setAttribute('aria-expanded', 'false');
+            closeFromUser();
         });
-
-        var escHandler = function (e) {
-            if (!e || e.key !== 'Escape') return;
-            hideLibraryPanel();
-            if (anchorBtn) anchorBtn.setAttribute('aria-expanded', 'false');
-        };
-        document.addEventListener('keydown', escHandler);
-        writeState({ escHandler: escHandler });
 
         var panel = document.createElement('div');
         panel.className = 'dtu-library-panel';
+        panel.setAttribute('role', 'dialog');
+        panel.setAttribute('aria-modal', 'true');
+        panel.setAttribute('aria-labelledby', 'dtu-library-title');
+        panel.tabIndex = -1;
         markExt(panel);
+
+        // Escape closes; Tab and Shift+Tab stay inside the dialog.
+        var escHandler = function (e) {
+            if (!e) return;
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                closeFromUser();
+                return;
+            }
+            if (e.key !== 'Tab') return;
+            var focusables = getLibraryPanelFocusables(panel);
+            if (!focusables.length) { e.preventDefault(); panel.focus(); return; }
+            var first = focusables[0];
+            var last = focusables[focusables.length - 1];
+            var active = document.activeElement;
+            if (!panel.contains(active)) {
+                e.preventDefault();
+                (e.shiftKey ? last : first).focus();
+            } else if (e.shiftKey && (active === first || active === panel)) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && active === last) {
+                e.preventDefault();
+                first.focus();
+            }
+        };
+        document.addEventListener('keydown', escHandler, true);
+        writeState({
+            escHandler: escHandler,
+            scrollLock: { html: document.documentElement.style.overflow, body: document.body.style.overflow }
+        });
+        document.documentElement.style.overflow = 'hidden';
+        document.body.style.overflow = 'hidden';
 
         var header = document.createElement('div');
         header.className = 'dtu-library-header';
@@ -486,6 +557,9 @@
 
         var headerTitle = document.createElement('div');
         headerTitle.className = 'dtu-library-title';
+        headerTitle.id = 'dtu-library-title';
+        headerTitle.setAttribute('role', 'heading');
+        headerTitle.setAttribute('aria-level', '2');
         headerTitle.textContent = 'DTU Library';
 
         var headerOccupancy = createLibraryHeaderOccupancy();
@@ -497,10 +571,8 @@
         closeBtn.className = 'dtu-library-close';
         closeBtn.textContent = '×';
         closeBtn.title = 'Close';
-        closeBtn.addEventListener('click', function () {
-            hideLibraryPanel();
-            if (anchorBtn) anchorBtn.setAttribute('aria-expanded', 'false');
-        });
+        closeBtn.setAttribute('aria-label', 'Close library');
+        closeBtn.addEventListener('click', closeFromUser);
 
         headerMain.appendChild(headerTitle);
         headerActions.appendChild(headerOccupancy.updatedEl);
@@ -535,14 +607,11 @@
 
         var linksTitle = document.createElement('div');
         linksTitle.className = 'dtu-library-section-title';
-        linksTitle.textContent = 'Library Menu';
-
-        var linksSubtitle = document.createElement('div');
-        linksSubtitle.className = 'dtu-library-links-subtitle';
-        linksSubtitle.textContent = 'Bookings, search, printing, events, and updates.';
+        linksTitle.textContent = 'Library menu';
+        linksTitle.setAttribute('role', 'heading');
+        linksTitle.setAttribute('aria-level', '3');
 
         linksTitleWrap.appendChild(linksTitle);
-        linksTitleWrap.appendChild(linksSubtitle);
         linksHeader.appendChild(linksTitleWrap);
         linksSection.appendChild(linksHeader);
 
@@ -596,19 +665,21 @@
         linksSection.appendChild(linksGrid);
         layout.appendChild(linksSection);
 
-        var eventsSection = createLibraryFeedSection('Upcoming Events', 'events');
+        var eventsSection = createLibraryFeedSection('Upcoming events', 'events');
         var feedGrid = document.createElement('div');
         feedGrid.className = 'dtu-library-feed-grid';
         feedGrid.appendChild(eventsSection.container);
 
-        var newsSection = createLibraryFeedSection('Library News', 'news');
+        var newsSection = createLibraryFeedSection('Library news', 'news');
         feedGrid.appendChild(newsSection.container);
         layout.appendChild(feedGrid);
         content.appendChild(layout);
 
         panel.appendChild(content);
         overlay.appendChild(panel);
+        markLibrarySubtree(overlay);
         document.body.appendChild(overlay);
+        try { panel.focus({ preventScroll: true }); } catch (eFocusIn) { }
 
         var state = readState();
         var latestCrowdingResp = state.crowdingCache || null;
@@ -616,9 +687,11 @@
 
         function renderLibraryCrowdingViews() {
             renderLibraryHeaderOccupancy(headerOccupancy, latestCrowdingResp);
+            markLibrarySubtree(headerOccupancy.updatedEl);
             if (typeof deps.renderLibraryTrendSection === 'function' && !trendSection.isFallback) {
                 try {
                     deps.renderLibraryTrendSection(trendSection, latestCrowdingResp, null, latestEventsResp);
+                    markLibrarySubtree(trendSection.container);
                 } catch (eRenderTrend) {
                     var fallback = createLibraryFallbackTrendSection('Library occupancy is unavailable right now.');
                     try {
@@ -859,6 +932,11 @@
     }
 
     function renderLibraryFeedItems(section, resp, type) {
+        renderLibraryFeedItemsInto(section, resp, type);
+        if (section) markLibrarySubtree(section.container || section.body);
+    }
+
+    function renderLibraryFeedItemsInto(section, resp, type) {
         var deps = getDeps() || {};
         if (!section || !section.body) return;
 

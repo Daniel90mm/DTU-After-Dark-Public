@@ -200,7 +200,7 @@
             }
         }
 
-        return fetch(absUrl, { credentials: 'same-origin', cache: 'no-store' }).then(function (res) {
+        return fetch(absUrl, { credentials: 'include', cache: 'no-store' }).then(function (res) {
             if (!res || !res.ok) throw new Error('http_' + (res ? res.status : '0'));
             return res.text();
         }).then(function (html) {

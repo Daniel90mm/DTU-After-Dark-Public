@@ -41,8 +41,8 @@ Chrome Web Store: https://chromewebstore.google.com/detail/dtu-after-dark/hemonf
 
 ### kurser.dtu.dk and course info
 
-- Grade statistics panel with pass-rate and grade-distribution data in a flatter dashboard-style course insight panel.
-- Course evaluation summary panel with satisfaction/workload snapshots and a link to the full evaluation, using the same calmer course-insight layout.
+- Grades and student evaluation side by side on kurser.dtu.dk course pages. Grades open on the course's main exam, not a small re-exam sitting; buttons switch between the last four exams, and an info note explains small sittings and exams that mix grades with pass/fail. New courses show a single "nothing yet" line.
+- Student evaluation next to the grades: overall score, response rate, the five satisfaction questions, workload, and a link to the full evaluation.
 - Textbook Links that parse course literature sections and add direct library and book-source links (same module and toggle as the Learn book finder).
 - Smart room linking for recognizable building/room mentions on supported pages.
 

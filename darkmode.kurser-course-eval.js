@@ -41,26 +41,9 @@
         return null;
     }
 
-    function getKurserInsightTheme() {
-        var deps = getDeps();
-        if (deps && typeof deps.getKurserInsightTheme === 'function') return deps.getKurserInsightTheme();
-        return null;
-    }
-
-    function getKurserInsightContainerStyle(theme) {
-        var deps = getDeps();
-        if (deps && typeof deps.getKurserInsightContainerStyle === 'function') {
-            return deps.getKurserInsightContainerStyle(theme);
-        }
-        return '';
-    }
-
-    function getKurserInsightSurfaceStyle(theme, extra) {
-        var deps = getDeps();
-        if (deps && typeof deps.getKurserInsightSurfaceStyle === 'function') {
-            return deps.getKurserInsightSurfaceStyle(theme, extra);
-        }
-        return '';
+    // Shared layout helpers from darkmode.kurser-widgets.js, which loads first.
+    function getLayout() {
+        try { return globalThis.DTUAfterDarkCourseWidgetsLayout || null; } catch (e0) { return null; }
     }
 
     function findKurserCourseTitleElement(courseCode) {
@@ -77,11 +60,6 @@
             return deps.findKurserGradeStatsInsertAnchor(titleEl);
         }
         return null;
-    }
-
-    function isDarkModeEnabled() {
-        var deps = getDeps();
-        return !!(deps && typeof deps.isDarkModeEnabled === 'function' && deps.isDarkModeEnabled());
     }
 
     function getFeatureKurserCourseEvalKey() {
@@ -108,9 +86,11 @@
         var courseCode = getKurserCourseCode();
         if (!courseCode) return;
 
+        var layout = getLayout();
+        if (!layout) return;
+
         var container = null;
         var status = null;
-        var panelTheme = getKurserInsightTheme();
 
         var existingEval = document.querySelector('[data-dtu-course-eval]');
         if (existingEval) {
@@ -130,8 +110,6 @@
             }
         }
 
-        var baseStyle = getKurserInsightContainerStyle(panelTheme);
-
         if (!container) {
             var gradeStats = document.querySelector('[data-dtu-grade-stats]');
             var insertAnchor = gradeStats;
@@ -144,7 +122,7 @@
                 insertAnchor = insertAnchor || (titleEl ? findKurserGradeStatsInsertAnchor(titleEl) : null);
             }
             if (!insertAnchor || !insertAnchor.parentNode) return;
-            if (!widgetsGrid) widgetsGrid = getOrCreateCourseWidgetsGrid(insertAnchor, courseCode);
+            if (!widgetsGrid) widgetsGrid = layout.getOrCreateGrid(insertAnchor, courseCode);
             if (gradeStats && gradeStats.parentNode !== widgetsGrid) {
                 widgetsGrid.insertBefore(gradeStats, widgetsGrid.firstChild || null);
             }
@@ -153,34 +131,10 @@
             container.setAttribute('data-dtu-course-eval', '1');
             container.setAttribute('data-dtu-course-eval-code', courseCode);
             markExt(container);
-            container.style.cssText = baseStyle;
-
-            var title = document.createElement('div');
-            markExt(title);
-            title.textContent = 'Course Evaluation';
-            title.style.cssText = 'font-weight: 800; font-size: 14px; line-height: 1.15; margin-bottom: 4px;';
-            container.appendChild(title);
-
-            status = document.createElement('div');
-            markExt(status);
-            status.setAttribute('data-dtu-course-eval-status', '1');
-            status.textContent = 'Loading evaluation data...';
-            status.style.cssText = 'font-size: 11px; color: ' + panelTheme.mutedText + ';';
-            container.appendChild(status);
-
-            if (gradeStats && gradeStats.parentNode === widgetsGrid) {
-                gradeStats.insertAdjacentElement('afterend', container);
-            } else {
-                widgetsGrid.appendChild(container);
-            }
-        } else {
-            container.style.cssText = baseStyle;
-            if (!status || !status.parentNode) {
-                status = document.createElement('div');
-                container.appendChild(status);
-            }
-            markExt(status);
-            status.setAttribute('data-dtu-course-eval-status', '1');
+            widgetsGrid.appendChild(container);
+            status = renderCourseEvalShell(container, 'Loading evaluation...');
+        } else if (!status || !status.parentNode) {
+            status = renderCourseEvalShell(container, '');
         }
 
         var nextTryAt = parseInt(container.getAttribute('data-dtu-course-eval-nexttry') || '0', 10) || 0;
@@ -210,7 +164,7 @@
 
         function fetchAndRenderEvaluation(latestEvalUrl, latestEvalLabel) {
             if (!latestEvalUrl) {
-                status.textContent = 'No evaluations available';
+                status = renderCourseEvalEmpty(container);
                 scheduleCourseEvalRetry(8000);
                 return;
             }
@@ -227,7 +181,7 @@
                     return;
                 }
                 container.setAttribute('data-dtu-course-eval-loaded', '1');
-                renderCourseEvaluationPanel(container, response.data, latestEvalUrl, latestEvalLabel);
+                renderCourseEvaluationPanel(container, response.data, latestEvalUrl);
             });
         }
 
@@ -392,7 +346,7 @@
                         return;
                     }
 
-                    status.textContent = 'No evaluations available';
+                    status = renderCourseEvalEmpty(container);
                     console.log('[DTU After Dark] Course eval: no eval links found in /info page for', courseCode, '(html length:', htmlLen, ', creds:', infoFetchCreds, ')');
                     if (looksSuspicious) scheduleCourseEvalRetry(8000);
                     return;
@@ -411,568 +365,155 @@
             });
     }
 
-    function getCourseEvalRailTheme() {
-        var isDark = isDarkModeEnabled();
-        var accent = '#1f7ae0';
-        try {
-            var styles = getComputedStyle(document.documentElement);
-            var primaryAccentProperty = isDark ? '--dtu-ad-accent-soft' : '--dtu-ad-accent-deep';
-            accent = (styles.getPropertyValue(primaryAccentProperty) || styles.getPropertyValue('--dtu-ad-accent') || accent).trim() || accent;
-        } catch (e0) { }
-        return {
-            ink: isDark ? '#f0eee8' : '#1a1a1a',
-            muted: isDark ? 'rgba(240,238,232,.62)' : 'rgba(26,26,26,.55)',
-            faint: isDark ? 'rgba(240,238,232,.18)' : 'rgba(26,26,26,.12)',
-            hair: isDark ? 'rgba(240,238,232,.13)' : 'rgba(26,26,26,.08)',
-            track: isDark ? 'rgba(240,238,232,.10)' : 'rgba(26,26,26,.06)',
-            pageBg: isDark ? '#202020' : '#fff',
-            accent: accent
-        };
-    }
-
-    function applyCourseWidgetsGridStyle(grid) {
-        grid.style.cssText = [
-            'display:grid',
-            'grid-template-columns:repeat(2,minmax(0,1fr))',
-            'gap:18px',
-            'align-items:start',
-            'width:100%',
-            'max-width:1160px',
-            'margin:12px 0 18px',
-            'box-sizing:border-box',
-            'background:transparent',
-            'border:0',
-            'box-shadow:none',
-            'overflow:visible'
-        ].join(';') + ';';
-        grid.style.setProperty('background', 'transparent', 'important');
-        grid.style.setProperty('border', '0', 'important');
-        grid.style.setProperty('box-shadow', 'none', 'important');
-    }
-
-    function getOrCreateCourseWidgetsGrid(insertAnchor, courseCode) {
-        var grid = document.querySelector('[data-dtu-course-widgets-grid]');
-        if (grid && String(grid.getAttribute('data-dtu-course-widgets-grid-course') || '').toUpperCase() !== String(courseCode || '').toUpperCase()) {
-            grid.remove();
-            grid = null;
-        }
-        if (!grid) {
-            grid = document.createElement('div');
-            grid.setAttribute('data-dtu-course-widgets-grid', '1');
-            grid.setAttribute('data-dtu-course-widgets-grid-course', courseCode);
-            markExt(grid);
-            insertAnchor.insertAdjacentElement('afterend', grid);
-        }
-        applyCourseWidgetsGridStyle(grid);
-        return grid;
-    }
-
     function pruneCourseWidgetsGrid() {
         var grid = document.querySelector('[data-dtu-course-widgets-grid]');
         if (grid && !grid.querySelector('[data-dtu-grade-stats], [data-dtu-course-eval]')) grid.remove();
+        var layout = getLayout();
+        if (layout) layout.refresh();
     }
 
-    function applyCourseEvalRailContainerStyle(container, rail) {
-        container.style.cssText = [
-            'display:block',
-            'margin:0',
-            'padding:12px 14px 14px',
-            'width:100%',
-            'max-width:none',
-            'box-sizing:border-box',
-            'background:transparent',
-            'border:0',
-            'border-radius:0',
-            'box-shadow:none',
-            'overflow:visible',
-            'color:' + rail.ink,
-            'font-family:Lato,"Lucida Sans Unicode","Lucida Grande",sans-serif',
-            'font-size:13px',
-            'line-height:1.35'
-        ].join(';') + ';';
-        container.style.setProperty('background', 'transparent', 'important');
-        container.style.setProperty('border', '0', 'important');
-        container.style.setProperty('box-shadow', 'none', 'important');
+    // Header plus a status line; returns the status element, which the
+    // loading and retry paths above keep writing to.
+    function renderCourseEvalShell(container, statusText) {
+        var layout = getLayout();
+        layout.prepareColumn(container);
+        container.setAttribute('data-dtu-cw-state', 'loading');
+        container.appendChild(layout.makeColumnHead('Student evaluation'));
+        var status = layout.makeEl('div', 'dtu-cw-status', statusText);
+        status.setAttribute('data-dtu-course-eval-status', '1');
+        container.appendChild(status);
+        layout.refresh();
+        return status;
     }
 
-    function makeCourseEvalRailLabel(text, rail) {
-        var el = document.createElement('div');
-        markExt(el);
-        el.textContent = text;
-        el.style.cssText = 'font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.78px;color:' + rail.muted + ';line-height:1.2;';
-        clearCourseEvalRailBackground(el);
-        return el;
+    function renderCourseEvalEmpty(container) {
+        var layout = getLayout();
+        layout.prepareColumn(container);
+        container.setAttribute('data-dtu-cw-state', 'empty');
+        container.appendChild(layout.makeColumnHead('Student evaluation'));
+        var empty = layout.makeEl('div', 'dtu-cw-empty');
+        empty.appendChild(layout.makeEl('span', 'dtu-cw-empty-lead', 'No evaluation yet'));
+        var status = layout.makeEl('span', 'dtu-cw-status', 'New courses get one after they have been taught once.');
+        status.setAttribute('data-dtu-course-eval-status', '1');
+        empty.appendChild(status);
+        container.appendChild(empty);
+        layout.refresh();
+        return status;
     }
 
-    function clearCourseEvalRailBackground(el) {
-        if (!el || !el.style) return el;
-        el.style.setProperty('background', 'transparent', 'important');
-        el.style.setProperty('background-color', 'transparent', 'important');
-        el.style.setProperty('background-image', 'none', 'important');
-        return el;
+    // "E25" -> "Autumn 2025 teaching (E25)"; three-week courses arrive as
+    // "Jan 26" and read "January 2026 teaching".
+    function formatCourseEvalPeriod(period) {
+        var p = String(period || '').trim();
+        var m = /^([EF])(\d{2})$/i.exec(p);
+        if (m) return (m[1].toUpperCase() === 'E' ? 'Autumn' : 'Spring') + ' 20' + m[2] + ' teaching (' + p.toUpperCase() + ')';
+        var months = { jan: 'January', jun: 'June', jul: 'July', aug: 'August' };
+        m = /^(jan|jun|jul|aug)\w*\s+(\d{2})$/i.exec(p);
+        if (m) return months[m[1].toLowerCase()] + ' 20' + m[2] + ' teaching';
+        return p;
     }
 
-    function formatCourseEvalTerm(term) {
-        return String(term || '').replace(/[-_]+/g, ' ').replace(/\s+/g, ' ').trim().toUpperCase();
+    function describeWorkload(avg) {
+        if (avg <= 1.5) return 'Much less than expected';
+        if (avg <= 2.5) return 'Less than expected';
+        if (avg <= 3.5) return 'As expected';
+        if (avg <= 4.5) return 'More than expected';
+        return 'Much more than expected';
     }
 
-    function renderCourseEvalRail(container, data, evalUrl, satisfactionQuestions) {
-        var rail = getCourseEvalRailTheme();
-        applyCourseEvalRailContainerStyle(container, rail);
-        container.innerHTML = '';
-        markExt(container);
+    var QUESTION_SHORT_LABELS = {
+        '1.1': 'Learned a lot',
+        '1.2': 'Aligns with objectives',
+        '1.3': 'Motivating',
+        '1.4': 'Feedback opportunity',
+        '1.5': 'Clear expectations'
+    };
 
-        var header = document.createElement('div');
-        markExt(header);
-        header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:14px;white-space:nowrap;margin:0 0 16px;min-width:0;';
-        clearCourseEvalRailBackground(header);
-        header.appendChild(makeCourseEvalRailLabel('Course Evaluation', rail));
-        var period = document.createElement('div');
-        markExt(period);
-        period.textContent = formatCourseEvalTerm(data.period || '');
-        period.style.cssText = 'font-size:10px;font-weight:700;letter-spacing:.3px;color:' + rail.muted + ';text-transform:uppercase;overflow:hidden;text-overflow:ellipsis;';
-        clearCourseEvalRailBackground(period);
-        header.appendChild(period);
-        container.appendChild(header);
+    function normalizeEvalQuestionNumber(n) {
+        return String(n || '').trim().replace(/[.:]+$/, '');
+    }
 
-        var workloadAvg = data.workload && data.workload.average ? Number(data.workload.average) : 0;
-        if (workloadAvg > 0) {
-            var workload = document.createElement('div');
-            markExt(workload);
-            workload.style.cssText = 'padding:0 0 20px;border-bottom:1px solid ' + rail.hair + ';';
-            clearCourseEvalRailBackground(workload);
-            workload.appendChild(makeCourseEvalRailLabel('Workload', rail));
+    function renderCourseEvaluationPanel(container, data, evalUrl) {
+        var layout = getLayout();
+        var el = layout.makeEl;
+        layout.prepareColumn(container);
+        container.setAttribute('data-dtu-cw-state', 'ready');
+        container.appendChild(layout.makeColumnHead('Student evaluation', formatCourseEvalPeriod(data.period)));
 
-            var ruler = document.createElement('div');
-            markExt(ruler);
-            ruler.style.cssText = 'position:relative;height:22px;margin-top:11px;';
-            clearCourseEvalRailBackground(ruler);
-            var line = document.createElement('div');
-            markExt(line);
-            line.style.cssText = 'position:absolute;left:2px;right:2px;top:11px;height:1px;background:' + rail.track + ';';
-            ruler.appendChild(line);
-            [0, 25, 50, 75, 100].forEach(function (x) {
-                var tick = document.createElement('span');
-                markExt(tick);
-                tick.style.cssText = 'position:absolute;left:' + x + '%;top:7px;width:1px;height:9px;background:' + rail.faint + ';transform:translateX(-.5px);';
-                ruler.appendChild(tick);
-            });
-            var pos = Math.max(0, Math.min(100, ((workloadAvg - 1) / 4) * 100));
-            var marker = document.createElement('span');
-            markExt(marker);
-            marker.style.cssText = 'position:absolute;left:' + pos.toFixed(1) + '%;top:4px;width:14px;height:14px;border-radius:50%;border:2px solid ' + rail.pageBg + ';box-sizing:border-box;transform:translateX(-50%);';
-            marker.style.setProperty('background', rail.accent, 'important');
-            marker.style.setProperty('background-color', rail.accent, 'important');
-            ruler.appendChild(marker);
-            workload.appendChild(ruler);
-
-            var scale = document.createElement('div');
-            markExt(scale);
-            scale.style.cssText = 'display:flex;justify-content:space-between;gap:10px;margin-top:4px;font-size:10px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;color:' + rail.muted + ';';
-            clearCourseEvalRailBackground(scale);
-            ['Much less', 'As expected', 'Much more'].forEach(function (txt, idx) {
-                var sp = document.createElement('span');
-                markExt(sp);
-                sp.textContent = txt;
-                sp.style.cssText = 'min-width:0;' + (idx === 1 ? 'text-align:center;' : idx === 2 ? 'text-align:right;' : '');
-                scale.appendChild(sp);
-            });
-            workload.appendChild(scale);
-
-            var wlLabel = workloadAvg <= 1.5 ? 'Much less' : workloadAvg <= 2.5 ? 'Less' : workloadAvg <= 3.5 ? 'As expected' : workloadAvg <= 4.5 ? 'More' : 'Much more';
-            var numeric = document.createElement('div');
-            markExt(numeric);
-            numeric.innerHTML = '<b></b> · <span></span>';
-            numeric.querySelector('b').textContent = wlLabel;
-            numeric.querySelector('span').textContent = workloadAvg.toFixed(2) + ' / 5';
-            numeric.style.cssText = 'margin-top:9px;font-size:12px;color:' + rail.muted + ';font-variant-numeric:tabular-nums;';
-            clearCourseEvalRailBackground(numeric);
-            numeric.querySelector('b').style.color = rail.ink;
-            workload.appendChild(numeric);
-            container.appendChild(workload);
-        }
-
-        var overallQuestions = satisfactionQuestions.length ? satisfactionQuestions : (data.questions || []);
-        var overallSum = 0;
-        var overallCount = 0;
-        overallQuestions.forEach(function (q) {
-            if (q && q.average > 0) {
-                overallSum += q.average;
-                overallCount++;
-            }
+        // The five satisfaction questions, in order; anything else is extra.
+        var byKey = {};
+        (data.questions || []).forEach(function (q) {
+            if (q) byKey[normalizeEvalQuestionNumber(q.number)] = q;
         });
-        var overallAvg = overallCount ? overallSum / overallCount : 0;
+        var questions = Object.keys(QUESTION_SHORT_LABELS).filter(function (k) { return byKey[k]; }).map(function (k) { return byKey[k]; });
+        if (!questions.length) questions = data.questions || [];
 
-        var middle = document.createElement('div');
-        markExt(middle);
-        middle.style.cssText = 'display:flex;gap:24px;align-items:flex-end;padding:18px 0;border-bottom:1px solid ' + rail.hair + ';flex-wrap:wrap;';
-        clearCourseEvalRailBackground(middle);
-        container.appendChild(middle);
+        var answered = questions.filter(function (q) { return Number(q.average) > 0; });
+        var overall = answered.length
+            ? answered.reduce(function (sum, q) { return sum + Number(q.average); }, 0) / answered.length
+            : 0;
 
-        if (overallAvg > 0) {
-            var overall = document.createElement('div');
-            markExt(overall);
-            overall.style.cssText = 'display:flex;flex-direction:column;gap:5px;min-width:120px;';
-            clearCourseEvalRailBackground(overall);
-            overall.appendChild(makeCourseEvalRailLabel('Overall', rail));
-            var ov = document.createElement('div');
-            markExt(ov);
-            ov.innerHTML = '<span></span><small> / 5</small>';
-            ov.querySelector('span').textContent = overallAvg.toFixed(2);
-            ov.style.cssText = 'font-size:28px;font-weight:500;letter-spacing:0;line-height:1;color:' + rail.accent + ';font-variant-numeric:tabular-nums;';
-            clearCourseEvalRailBackground(ov);
-            ov.style.setProperty('color', rail.accent, 'important');
-            ov.querySelector('span').style.setProperty('color', rail.accent, 'important');
-            ov.querySelector('small').style.cssText = 'font-size:14px;color:' + rail.muted + ';font-weight:500;letter-spacing:0;';
-            overall.appendChild(ov);
-            middle.appendChild(overall);
+        var hero = el('div', 'dtu-cw-hero');
+        if (overall > 0) {
+            hero.appendChild(el('span', 'dtu-cw-big', overall.toFixed(2)));
+            hero.appendChild(el('span', 'dtu-cw-unit', 'of 5 overall'));
         }
+        var side = el('span', 'dtu-cw-side');
+        side.appendChild(el('b', '', Math.round(Number(data.responseRate) || 0) + '%'));
+        side.appendChild(document.createTextNode(' answered (' + (Number(data.respondents) || 0) + ' of ' + (Number(data.eligible) || 0) + ')'));
+        hero.appendChild(side);
+        container.appendChild(hero);
 
-        var rr = document.createElement('div');
-        markExt(rr);
-        rr.style.cssText = 'display:flex;flex-direction:column;gap:5px;min-width:150px;';
-        clearCourseEvalRailBackground(rr);
-        rr.appendChild(makeCourseEvalRailLabel('Response rate', rail));
-        var rrVal = document.createElement('div');
-        markExt(rrVal);
-        rrVal.innerHTML = '<span></span><small></small>';
-        rrVal.querySelector('span').textContent = (Number(data.responseRate) || 0).toFixed(1) + '%';
-        rrVal.querySelector('small').textContent = ' · ' + (Number(data.respondents) || 0) + '/' + (Number(data.eligible) || 0);
-        rrVal.style.cssText = 'font-size:16px;font-weight:500;color:' + rail.ink + ';font-variant-numeric:tabular-nums;';
-        clearCourseEvalRailBackground(rrVal);
-        rrVal.querySelector('small').style.cssText = 'font-size:12px;color:' + rail.muted + ';font-weight:500;';
-        rr.appendChild(rrVal);
-        middle.appendChild(rr);
-
-        var QUESTION_SHORT_LABELS = {
-            '1.1': 'Learned a lot',
-            '1.2': 'Aligns with objectives',
-            '1.3': 'Motivating',
-            '1.4': 'Feedback opportunity',
-            '1.5': 'Clear expectations'
-        };
-        var questionsForUi = satisfactionQuestions.length ? satisfactionQuestions : (data.questions || []);
-        if (questionsForUi && questionsForUi.length) {
-            var sat = document.createElement('div');
-            markExt(sat);
-            sat.style.cssText = 'margin-top:18px;';
-            clearCourseEvalRailBackground(sat);
-            sat.appendChild(makeCourseEvalRailLabel('Student Satisfaction', rail));
-
-            questionsForUi.forEach(function (q, idx) {
-                var row = document.createElement('div');
-                markExt(row);
-                row.style.cssText = 'display:grid;grid-template-columns:minmax(120px,160px) minmax(90px,1fr) 36px;gap:12px;align-items:center;padding:9px 1px 9px 0;'
-                    + (idx > 0 ? 'border-top:1px solid ' + rail.hair + ';' : '');
-                clearCourseEvalRailBackground(row);
-                var qNum = String(q.number || '').trim().replace(/[.:]+$/, '');
-                var label = document.createElement('div');
-                markExt(label);
-                label.textContent = QUESTION_SHORT_LABELS[qNum] || qNum;
-                label.title = q.text || '';
-                label.style.cssText = 'font-size:13px;font-weight:500;color:' + rail.ink + ';min-width:0;';
-                clearCourseEvalRailBackground(label);
+        if (questions.length) {
+            var rows = el('div', 'dtu-cw-rows');
+            questions.forEach(function (q) {
+                var avg = Number(q.average) || 0;
+                var row = el('div', 'dtu-cw-row');
+                var label = el('span', 'dtu-cw-row-label', QUESTION_SHORT_LABELS[normalizeEvalQuestionNumber(q.number)] || normalizeEvalQuestionNumber(q.number));
+                if (q.text) label.title = q.text;
                 row.appendChild(label);
-
-                var railEl = document.createElement('div');
-                markExt(railEl);
-                railEl.style.cssText = 'position:relative;height:14px;';
-                clearCourseEvalRailBackground(railEl);
-                var base = document.createElement('span');
-                markExt(base);
-                base.style.cssText = 'position:absolute;left:0;right:0;top:6.5px;height:1px;background:' + rail.track + ';';
-                railEl.appendChild(base);
-                [0, 25, 50, 75, 100].forEach(function (x) {
-                    var tick = document.createElement('span');
-                    markExt(tick);
-                    tick.style.cssText = 'position:absolute;left:' + x + '%;top:4.5px;width:1px;height:5px;background:' + rail.faint + ';';
-                    railEl.appendChild(tick);
-                });
-                var scorePos = Math.max(0, Math.min(100, (((Number(q.average) || 0) - 1) / 4) * 100));
-                var dot = document.createElement('span');
-                markExt(dot);
-                dot.style.cssText = 'position:absolute;left:' + scorePos.toFixed(1) + '%;top:3px;width:8px;height:8px;border-radius:50%;transform:translateX(-50%);';
-                dot.style.setProperty('background', rail.accent, 'important');
-                dot.style.setProperty('background-color', rail.accent, 'important');
-                railEl.appendChild(dot);
-                row.appendChild(railEl);
-
-                var score = document.createElement('div');
-                markExt(score);
-                score.textContent = (Number(q.average) || 0).toFixed(2);
-                score.style.cssText = 'font-size:12px;font-weight:600;text-align:right;color:' + rail.ink + ';font-variant-numeric:tabular-nums;';
-                clearCourseEvalRailBackground(score);
-                row.appendChild(score);
-                sat.appendChild(row);
+                var track = el('div', 'dtu-cw-track');
+                track.setAttribute('role', 'img');
+                track.setAttribute('aria-label', avg.toFixed(2) + ' of 5');
+                var fill = el('div', 'dtu-cw-fill');
+                fill.style.width = Math.max(0, Math.min(100, (avg - 1) / 4 * 100)).toFixed(1) + '%';
+                track.appendChild(fill);
+                track.appendChild(el('span', 'dtu-cw-mid'));
+                row.appendChild(track);
+                row.appendChild(el('span', 'dtu-cw-val', avg.toFixed(2)));
+                rows.appendChild(row);
             });
-            container.appendChild(sat);
+            var axis = el('div', 'dtu-cw-axis');
+            axis.setAttribute('aria-hidden', 'true');
+            axis.appendChild(el('span'));
+            var scale = el('span', 'dtu-cw-axis-scale');
+            scale.appendChild(el('span', '', '1 disagree'));
+            scale.appendChild(el('span', '', '3'));
+            scale.appendChild(el('span', '', '5 agree'));
+            axis.appendChild(scale);
+            axis.appendChild(el('span'));
+            rows.appendChild(axis);
+            container.appendChild(rows);
         }
 
-        var footer = document.createElement('div');
-        markExt(footer);
-        footer.style.cssText = 'display:flex;justify-content:space-between;align-items:center;gap:12px;padding-top:12px;margin-top:10px;border-top:1px solid ' + rail.hair + ';font-size:11px;color:' + rail.muted + ';font-variant-numeric:tabular-nums;';
-        clearCourseEvalRailBackground(footer);
-        var sourceLink = document.createElement('a');
-        markExt(sourceLink);
-        sourceLink.href = evalUrl;
-        sourceLink.target = '_blank';
-        sourceLink.rel = 'noopener noreferrer';
-        sourceLink.textContent = 'View full evaluation';
-        sourceLink.style.cssText = 'color:' + rail.accent + ';text-decoration:none;font-weight:700;';
-        sourceLink.style.setProperty('color', rail.accent, 'important');
-        footer.appendChild(sourceLink);
-        var responses = document.createElement('span');
-        markExt(responses);
-        responses.textContent = (Number(data.respondents) || 0) + ' responses';
-        footer.appendChild(responses);
-        container.appendChild(footer);
-    }
-
-    function renderCourseEvaluationPanel(container, data, evalUrl, evalLabel) {
-        container.innerHTML = '';
-        markExt(container);
-
-        var panelTheme = getKurserInsightTheme();
-        var mutedText = panelTheme.mutedText;
-        var subtleText = panelTheme.subtleText;
-        var divider = panelTheme.divider;
-        var quietTrack = panelTheme.quietTrack;
-        var accentColor = panelTheme.accentText;
-        container.style.cssText = getKurserInsightContainerStyle(panelTheme);
-
-        function normalizeEvalQuestionNumber(n) {
-            return String(n || '').trim().replace(/[.:]+$/, '');
+        var foot = el('div', 'dtu-cw-foot');
+        var workloadAvg = data.workload && Number(data.workload.average) > 0 ? Number(data.workload.average) : 0;
+        var footMain = el('span', 'dtu-cw-foot-main');
+        if (workloadAvg) {
+            var wl = el('span');
+            wl.appendChild(document.createTextNode('Workload '));
+            wl.appendChild(el('b', '', describeWorkload(workloadAvg)));
+            wl.appendChild(document.createTextNode(' (' + workloadAvg.toFixed(2) + ' of 5)'));
+            footMain.appendChild(wl);
         }
-
-        var EVAL_SATISFACTION_KEYS = ['1.1', '1.2', '1.3', '1.4', '1.5'];
-        var satisfactionQuestions = [];
-        if (data && Array.isArray(data.questions) && data.questions.length) {
-            var byKey = {};
-            data.questions.forEach(function (q) {
-                if (!q) return;
-                var key = normalizeEvalQuestionNumber(q.number);
-                if (EVAL_SATISFACTION_KEYS.indexOf(key) === -1) return;
-                byKey[key] = {
-                    number: key,
-                    text: q.text || '',
-                    options: q.options || [],
-                    totalResponses: q.totalResponses || 0,
-                    average: Number(q.average) || 0
-                };
-            });
-            EVAL_SATISFACTION_KEYS.forEach(function (key) {
-                if (byKey[key]) satisfactionQuestions.push(byKey[key]);
-            });
-        }
-
-        renderCourseEvalRail(container, data, evalUrl, satisfactionQuestions);
-        return;
-
-        var headerRow = document.createElement('div');
-        markExt(headerRow);
-        headerRow.style.cssText = 'display: flex; justify-content: space-between; align-items: flex-start; gap: 6px; margin-bottom: 5px;';
-
-        var titleEl = document.createElement('div');
-        markExt(titleEl);
-        titleEl.textContent = 'Course Evaluation';
-        titleEl.style.cssText = 'font-weight: 800; font-size: 14px; line-height: 1.15; color: ' + panelTheme.text + ';';
-        headerRow.appendChild(titleEl);
-
-        var periodChip = document.createElement('span');
-        markExt(periodChip);
-        periodChip.textContent = data.period || '';
-        periodChip.style.cssText = 'font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: ' + accentColor + ';';
-        headerRow.appendChild(periodChip);
-
-        container.appendChild(headerRow);
-
-        var summaryCard = document.createElement('div');
-        markExt(summaryCard);
-        summaryCard.style.cssText = 'display: grid; grid-template-columns: repeat(auto-fit, minmax(78px, 1fr)); gap: 6px; margin-bottom: 8px; ' + getKurserInsightSurfaceStyle(panelTheme);
-
-        var rrWrap = document.createElement('div');
-        markExt(rrWrap);
-        var rrLabel = document.createElement('div');
-        markExt(rrLabel);
-        rrLabel.textContent = 'Response Rate';
-        rrLabel.style.cssText = 'font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: ' + mutedText + ';';
-        rrWrap.appendChild(rrLabel);
-        var rrValue = document.createElement('div');
-        markExt(rrValue);
-        rrValue.textContent = data.responseRate.toFixed(1) + '%';
-        rrValue.style.cssText = 'margin-top: 3px; font-size: 21px; line-height: 0.95; font-weight: 800;';
-        var rrColor = data.responseRate > 50 ? '#4caf50' : (data.responseRate > 30 ? '#ffb300' : '#ef5350');
-        rrValue.style.setProperty('color', rrColor, 'important');
-        rrWrap.appendChild(rrValue);
-        summaryCard.appendChild(rrWrap);
-
-        var respWrap = document.createElement('div');
-        markExt(respWrap);
-        var respLabel = document.createElement('div');
-        markExt(respLabel);
-        respLabel.textContent = 'Respondents';
-        respLabel.style.cssText = 'font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: ' + mutedText + ';';
-        respWrap.appendChild(respLabel);
-        var respValue = document.createElement('div');
-        markExt(respValue);
-        respValue.textContent = data.respondents + ' / ' + data.eligible;
-        respValue.style.cssText = 'margin-top: 3px; font-size: 15px; line-height: 1; font-weight: 760; color: ' + subtleText + ';';
-        respWrap.appendChild(respValue);
-        summaryCard.appendChild(respWrap);
-
-        var overallQuestions = satisfactionQuestions.length ? satisfactionQuestions : (data.questions || []);
-        if (overallQuestions && overallQuestions.length) {
-            var overallSum = 0;
-            var overallCount = 0;
-            overallQuestions.forEach(function (q) {
-                if (q.average > 0) {
-                    overallSum += q.average;
-                    overallCount++;
-                }
-            });
-            if (overallCount > 0) {
-                var overallAvg = overallSum / overallCount;
-                var avgWrap = document.createElement('div');
-                markExt(avgWrap);
-                var avgLabel = document.createElement('div');
-                markExt(avgLabel);
-                avgLabel.textContent = 'Overall';
-                avgLabel.style.cssText = 'font-size: 9.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: ' + mutedText + ';';
-                avgWrap.appendChild(avgLabel);
-                var avgValue = document.createElement('div');
-                markExt(avgValue);
-                avgValue.textContent = overallAvg.toFixed(2) + ' / 5';
-                avgValue.style.cssText = 'margin-top: 3px; font-size: 20px; line-height: 0.95; font-weight: 800;';
-                var avgColor = overallAvg >= 4 ? '#4caf50' : (overallAvg >= 3 ? '#ffb300' : '#ef5350');
-                avgValue.style.setProperty('color', avgColor, 'important');
-                avgWrap.appendChild(avgValue);
-                summaryCard.appendChild(avgWrap);
-            }
-        }
-
-        container.appendChild(summaryCard);
-
-        var QUESTION_SHORT_LABELS = {
-            '1.1': 'Learned a lot',
-            '1.2': 'Aligns with objectives',
-            '1.3': 'Motivating',
-            '1.4': 'Feedback opportunity',
-            '1.5': 'Clear expectations'
-        };
-
-        var questionsForUi = satisfactionQuestions.length ? satisfactionQuestions : (data.questions || []);
-        if (questionsForUi && questionsForUi.length) {
-            var questionsCard = document.createElement('div');
-            markExt(questionsCard);
-            questionsCard.style.cssText = getKurserInsightSurfaceStyle(panelTheme, 'margin-bottom: 8px;');
-
-            var qTitle = document.createElement('div');
-            markExt(qTitle);
-            qTitle.textContent = 'Student Satisfaction';
-            qTitle.style.cssText = 'font-size: 11px; font-weight: 750; color: ' + panelTheme.text + '; margin-bottom: 2px;';
-            questionsCard.appendChild(qTitle);
-
-            questionsForUi.forEach(function (q, idx) {
-                var row = document.createElement('div');
-                markExt(row);
-                row.style.cssText = 'display: grid; grid-template-columns: minmax(135px, 0.8fr) 1.15fr auto; gap: 6px; align-items: center; padding: 5px 0;'
-                    + (idx > 0 ? (' border-top: 1px solid ' + divider + ';') : '');
-
-                var label = document.createElement('div');
-                markExt(label);
-                var qNum = normalizeEvalQuestionNumber(q.number);
-                label.textContent = QUESTION_SHORT_LABELS[qNum] || qNum;
-                label.style.cssText = 'font-size: 10.5px; font-weight: 600; color: ' + subtleText + ';';
-                label.title = q.text;
-                row.appendChild(label);
-
-                var barWrap = document.createElement('div');
-                markExt(barWrap);
-                barWrap.style.cssText = 'height: 5px; border-radius: 999px; overflow: hidden; background: ' + quietTrack + ';';
-                var bar = document.createElement('div');
-                markExt(bar);
-                var pct = q.average > 0 ? ((q.average / 5) * 100) : 0;
-                var barColor = q.average >= 4 ? '#4caf50' : (q.average >= 3 ? '#ffb300' : '#ef5350');
-                bar.style.cssText = 'height: 100%; border-radius: 999px; width: ' + pct.toFixed(1) + '%;';
-                bar.style.setProperty('background', barColor, 'important');
-                barWrap.appendChild(bar);
-                row.appendChild(barWrap);
-
-                var score = document.createElement('div');
-                markExt(score);
-                score.textContent = q.average.toFixed(2);
-                score.style.cssText = 'font-size: 10.5px; font-weight: 780; min-width: 32px; text-align: right;';
-                score.style.setProperty('color', barColor, 'important');
-                row.appendChild(score);
-
-                questionsCard.appendChild(row);
-            });
-
-            container.appendChild(questionsCard);
-        }
-
-        if (data.workload && data.workload.options && data.workload.options.length) {
-            var workloadCard = document.createElement('div');
-            markExt(workloadCard);
-            workloadCard.style.cssText = getKurserInsightSurfaceStyle(panelTheme, 'margin-bottom: 5px;');
-
-            var wTitle = document.createElement('div');
-            markExt(wTitle);
-            wTitle.textContent = 'Workload';
-            wTitle.style.cssText = 'font-size: 11px; font-weight: 750; color: ' + panelTheme.text + '; margin-bottom: 4px;';
-            workloadCard.appendChild(wTitle);
-
-            var wAvg = data.workload.average || 3;
-            var gaugePos = ((wAvg - 1) / 4) * 100;
-            var gaugeLabel = wAvg <= 1.5 ? 'Much less' : wAvg <= 2.5 ? 'Less' : wAvg <= 3.5 ? 'As expected' : wAvg <= 4.5 ? 'More' : 'Much more';
-            var gaugeColor = wAvg <= 2.5 ? '#66bb6a' : wAvg <= 3.5 ? '#90a4ae' : wAvg <= 4.25 ? '#ffb74d' : '#ef5350';
-
-            var scaleLabels = document.createElement('div');
-            markExt(scaleLabels);
-            scaleLabels.style.cssText = 'display: flex; justify-content: space-between; font-size: 9px; color: ' + mutedText + '; margin-bottom: 4px;';
-            ['Much less', 'Less', 'As expected', 'More', 'Much more'].forEach(function (lbl) {
-                var sp = document.createElement('span');
-                sp.textContent = lbl;
-                scaleLabels.appendChild(sp);
-            });
-            workloadCard.appendChild(scaleLabels);
-
-            var track = document.createElement('div');
-            markExt(track);
-            track.style.cssText = 'position: relative; height: 6px; border-radius: 999px; overflow: visible; background: linear-gradient(to right, #66bb6a, #a5d6a7 25%, #90a4ae 50%, #ffb74d 75%, #ef5350);';
-
-            var marker = document.createElement('div');
-            markExt(marker);
-            marker.style.cssText = 'position: absolute; top: -3px; width: 12px; height: 12px; border-radius: 50%; border: 2px solid ' + (isDarkModeEnabled() ? '#e0e0e0' : '#333') + '; transform: translateX(-50%); box-shadow: 0 1px 3px rgba(0,0,0,0.3);';
-            marker.style.left = gaugePos.toFixed(1) + '%';
-            marker.style.setProperty('background', gaugeColor, 'important');
-            track.appendChild(marker);
-            workloadCard.appendChild(track);
-
-            var valLabel = document.createElement('div');
-            markExt(valLabel);
-            valLabel.style.cssText = 'text-align: center; margin-top: 6px; font-size: 10.5px; font-weight: 750;';
-            valLabel.style.setProperty('color', gaugeColor, 'important');
-            valLabel.textContent = gaugeLabel + ' (' + wAvg.toFixed(2) + ' / 5)';
-            workloadCard.appendChild(valLabel);
-
-            container.appendChild(workloadCard);
-        }
-
-        var footer = document.createElement('div');
-        markExt(footer);
-        footer.style.cssText = 'font-size: 10.5px; color: ' + mutedText + '; display: flex; justify-content: space-between; align-items: center; gap: 6px; padding-top: 8px; border-top: 1px solid ' + divider + ';';
-        var sourceLink = document.createElement('a');
-        sourceLink.href = evalUrl;
-        sourceLink.target = '_blank';
-        sourceLink.rel = 'noopener noreferrer';
-        sourceLink.textContent = 'View full evaluation';
-        sourceLink.style.cssText = 'color: ' + panelTheme.linkColor + '; text-decoration: none; font-weight: 700;';
-        footer.appendChild(sourceLink);
-        var respNote = document.createElement('span');
-        respNote.textContent = data.respondents + ' responses';
-        footer.appendChild(respNote);
-        container.appendChild(footer);
+        foot.appendChild(footMain);
+        var link = el('a', 'dtu-cw-link', 'Full evaluation');
+        link.href = evalUrl;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        foot.appendChild(link);
+        container.appendChild(foot);
+        layout.refresh();
     }
 
     try {

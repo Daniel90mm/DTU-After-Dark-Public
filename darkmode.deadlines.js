@@ -5,7 +5,10 @@
     // DTU publishes these dates years ahead and edits them rarely, so elapsed time is a
     // poor refetch trigger. The real signal is the data horizon; this is only a safety
     // net for amendments to already-published dates.
-    var DEADLINES_CACHE_TTL_MS = 1000 * 60 * 60 * 24 * 30;
+    // Checked once a day: two small pages, so a date DTU amends shows up by the next day.
+    var DEADLINES_CACHE_TTL_MS = 1000 * 60 * 60 * 24;
+    // A failing source must not be retried on every render.
+    var DEADLINES_AUTO_RETRY_MS = 1000 * 60 * 10;
     var DEADLINES_HORIZON_REFRESH_MS = 1000 * 60 * 60 * 24 * 120;
     var DEADLINES_EXPANDED_KEY = 'dtuDarkModeDeadlinesExpanded';
     var DEADLINES_TIMELINE_STYLE_ID = 'dtu-after-dark-deadlines-timeline-style';
@@ -18,6 +21,7 @@
     var _deadlinesFetchInProgress = false;
     var _deadlinesLastResponse = null;
     var _deadlinesLastRequestAt = 0;
+    var _deadlinesLastAutoRequestAt = 0;
     var _deadlinesLastRefreshFailed = false;
     var _courseSearchVisibilityTimer = null;
     var _courseSearchVisibilityAttempts = 0;
@@ -157,8 +161,9 @@
         if (deps && typeof deps.startOfTodayUtcTs === 'function') {
             return deps.startOfTodayUtcTs();
         }
+        // The local calendar date, as darkmode.js uses: DTU deadlines are Danish dates.
         var now = new Date();
-        return Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+        return Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
     }
 
     function diffDaysUtc(fromTs, toTs) {
@@ -719,7 +724,10 @@
                 // The track's left edge can fall inside a range (a window opened in the
                 // previous teaching period). The bar then clamps to 0% and would read as
                 // though it started at the edge, so flag it for a fade-out left cap.
-                continuesBefore: isRange && itemStartTs < startTs
+                continuesBefore: isRange && itemStartTs < startTs,
+                // Same at the right edge: a window that closes after the next teaching
+                // period would otherwise look as if it ended where the track does.
+                continuesAfter: isRange && itemEndTs >= endTs
             };
         });
 
@@ -997,6 +1005,10 @@
             '.dtu-deadline-timeline-bar.is-active{background:var(--deadline-active);}',
             '.dtu-deadline-timeline-bar.is-clipped-start{background:linear-gradient(90deg,transparent 0,var(--deadline-mark) 9px);}',
             '.dtu-deadline-timeline-bar.is-active.is-clipped-start{background:linear-gradient(90deg,transparent 0,var(--deadline-active) 9px);}',
+            '.dtu-deadline-timeline-bar.is-clipped-end{background:linear-gradient(270deg,transparent 0,var(--deadline-mark) 9px);}',
+            '.dtu-deadline-timeline-bar.is-active.is-clipped-end{background:linear-gradient(270deg,transparent 0,var(--deadline-active) 9px);}',
+            '.dtu-deadline-timeline-bar.is-clipped-start.is-clipped-end{background:linear-gradient(90deg,transparent 0,var(--deadline-mark) 9px,var(--deadline-mark) calc(100% - 9px),transparent 100%);}',
+            '.dtu-deadline-timeline-bar.is-active.is-clipped-start.is-clipped-end{background:linear-gradient(90deg,transparent 0,var(--deadline-active) 9px,var(--deadline-active) calc(100% - 9px),transparent 100%);}',
             '.dtu-deadline-timeline-date-mark{position:absolute;width:4px;height:15px;border-radius:1px;box-shadow:0 0 0 1px var(--deadline-surface);background:var(--deadline-mark);cursor:help;transform:translate(-50%,-50%);}',
             '.dtu-deadline-timeline-aggregate{position:absolute;min-width:18px;height:15px;padding:0 4px;transform:translate(-50%,-50%);border:1px solid var(--deadline-mark);border-radius:1px;background:var(--deadline-surface);color:var(--deadline-status);font-size:9px;font-weight:700;line-height:13px;text-align:center;cursor:help;box-sizing:border-box;}',
             '.dtu-deadline-timeline-bar::after,.dtu-deadline-timeline-date-mark::after,.dtu-deadline-timeline-aggregate::after{content:"";position:absolute;background:transparent;}',
@@ -1031,7 +1043,8 @@
             '.dtu-deadline-mobile-status{text-align:right;white-space:nowrap;}',
             '.dtu-deadline-a11y-list{display:block;position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0;}',
             '@container(max-width:800px){.dtu-deadline-timeline-desktop{display:none;}.dtu-deadline-mobile-window{display:block;padding:4px 0 0;}.dtu-deadline-mobile-legend{display:flex;padding:2px 0 6px;justify-content:flex-start;}.dtu-deadline-mobile-list{display:block;}}',
-            '@media(max-width:820px){.dtu-deadline-timeline-desktop{display:none;}.dtu-deadline-mobile-window{display:block;padding:4px 0 0;}.dtu-deadline-mobile-legend{display:flex;padding:2px 0 6px;justify-content:flex-start;}.dtu-deadline-mobile-list{display:block;}}'
+            '@media(max-width:820px){.dtu-deadline-timeline-desktop{display:none;}.dtu-deadline-mobile-window{display:block;padding:4px 0 0;}.dtu-deadline-mobile-legend{display:flex;padding:2px 0 6px;justify-content:flex-start;}.dtu-deadline-mobile-list{display:block;}}',
+            '.dtu-deadlines-home-widget [data-dtu-ext] a:focus-visible,.dtu-deadlines-home-widget button[data-dtu-ext]:focus-visible,.dtu-deadlines-home-widget a[data-dtu-ext]:focus-visible{outline:2px solid currentColor !important;outline-offset:2px !important;}'
         ].join('\n');
         document.head.appendChild(style);
     }
@@ -1335,8 +1348,9 @@
                     mark = createTimelinePositionedElement('dtu-deadline-timeline-bar', item.startPercent);
                     mark.style.width = Math.max(0.7, item.endPercent - item.startPercent) + '%';
                     if (row.state === 'active') mark.className += ' is-active';
-                    if (item.continuesBefore) {
-                        mark.className += ' is-clipped-start';
+                    if (item.continuesBefore) mark.className += ' is-clipped-start';
+                    if (item.continuesAfter) mark.className += ' is-clipped-end';
+                    if (item.continuesBefore || item.continuesAfter) {
                         mark.style.webkitMaskImage = 'none';
                         mark.style.maskImage = 'none';
                     }
@@ -1426,6 +1440,21 @@
         if (chevronBtn) chevronBtn.style.height = '';
     }
 
+    // Fetches DTU's pages again when the held copy is a day old, or when the dates it
+    // holds are about to run out. At most one automatic request per 10 minutes, so a
+    // source that keeps failing is not retried on every render.
+    function scheduleDailyDeadlinesCheck(widget, resp, todayTs) {
+        var now = Date.now();
+        var fetchedAt = (resp && typeof resp.fetchedAt === 'number') ? resp.fetchedAt : 0;
+        var horizonTs = getDeadlineDataHorizonTs(resp);
+        var runningOut = horizonTs == null || (horizonTs - todayTs) < DEADLINES_HORIZON_REFRESH_MS;
+        var stale = !fetchedAt || (now - fetchedAt) > DEADLINES_CACHE_TTL_MS;
+        if (!(runningOut || stale) || _deadlinesFetchInProgress) return;
+        if (_deadlinesLastAutoRequestAt && (now - _deadlinesLastAutoRequestAt) < DEADLINES_AUTO_RETRY_MS) return;
+        _deadlinesLastAutoRequestAt = now;
+        requestStudentDeadlines(false, function () { renderDeadlinesHomepageWidget(widget); });
+    }
+
     function renderDeadlinesHomepageWidget(widget) {
         if (!widget) return;
         ensureDeadlinesTimelineStyles();
@@ -1436,7 +1465,6 @@
         var footer = widget.querySelector('[data-dtu-deadlines-footer]');
         var meta = widget.querySelector('[data-dtu-deadlines-meta]');
         var chevronBtn = widget.querySelector('[data-dtu-deadlines-chevron]');
-        var refreshBtn = widget.querySelector('[data-dtu-deadlines-refresh]');
         var sources = widget.querySelector('[data-dtu-deadlines-sources]');
         var content = widget.querySelector('[data-dtu-deadlines-content]');
 
@@ -1485,10 +1513,6 @@
                 requestStudentDeadlines(false, function () { renderDeadlinesHomepageWidget(widget); });
             }
 
-            if (refreshBtn) {
-                refreshBtn.disabled = true;
-                refreshBtn.style.opacity = '0.7';
-            }
             return;
         }
 
@@ -1501,14 +1525,11 @@
             var horizonTs = getDeadlineDataHorizonTs(resp);
             var exhausted = horizonTs != null && todayTs > horizonTs;
             empty.textContent = exhausted
-                ? ('Cached deadlines stop at ' + formatDeadlineTsShort(horizonTs) + '. Refresh to load newer dates.')
+                ? ('Published deadlines stop at ' + formatDeadlineTsShort(horizonTs) + '. Newer dates load automatically once DTU publishes them.')
                 : ('No deadlines found for ' + phaseWindow.phases.map(function (phase) { return phase.label; }).join(' or ') + '.');
             empty.style.cssText = 'font-size: 13px; color: ' + (isDarkMode() ? '#b0b0b0' : '#6b7280') + '; font-style: italic;';
             if (next) next.appendChild(empty);
-            if (refreshBtn) {
-                refreshBtn.disabled = false;
-                refreshBtn.style.opacity = '1';
-            }
+            scheduleDailyDeadlinesCheck(widget, resp, todayTs);
             return;
         }
 
@@ -1572,21 +1593,7 @@
             });
         }
 
-        var now = Date.now();
-        var fetchedAt = (resp && typeof resp.fetchedAt === 'number') ? resp.fetchedAt : 0;
-        var horizonTs = getDeadlineDataHorizonTs(resp);
-        // Running out of published dates is the reason that actually matters; age is the
-        // long-stop for a date DTU has since amended.
-        var runningOut = horizonTs == null || (horizonTs - todayTs) < DEADLINES_HORIZON_REFRESH_MS;
-        var stale = !fetchedAt || (now - fetchedAt) > DEADLINES_CACHE_TTL_MS;
-        if ((runningOut || stale) && !_deadlinesFetchInProgress) {
-            requestStudentDeadlines(false, function () { renderDeadlinesHomepageWidget(widget); });
-        }
-
-        if (refreshBtn) {
-            refreshBtn.disabled = false;
-            refreshBtn.style.opacity = '1';
-        }
+        scheduleDailyDeadlinesCheck(widget, resp, todayTs);
     }
 
     function ensureDTULearnHomepageCol3Wide(enabled) {
@@ -1648,8 +1655,8 @@
         link.target = '_blank';
         link.rel = 'noopener noreferrer';
         link.setAttribute('data-kind', kind);
-        var resting = isDarkMode() ? '#888' : '#9ca3af';
-        var raised = isDarkMode() ? '#c8c8c8' : '#4b5563';
+        var resting = isDarkMode() ? '#a3a3a3' : '#6b7280';
+        var raised = isDarkMode() ? '#e0e0e0' : '#374151';
         link.style.cssText = 'color: ' + resting + ' !important; text-decoration: underline !important;'
             + ' text-underline-offset: 2px; text-decoration-thickness: 1px;';
         function setColor(value) { link.style.setProperty('color', value, 'important'); }
@@ -1774,44 +1781,26 @@
             var footer = document.createElement('div');
             markExt(footer);
             footer.setAttribute('data-dtu-deadlines-footer', '1');
-            footer.style.cssText = 'display: none; align-items: center; justify-content: space-between; gap: 6px; margin-top: 8px; padding-top: 8px; '
+            footer.style.cssText = 'display: none; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 16px; margin-top: 8px; padding-top: 8px; '
                 + 'border-top: 1px solid ' + (isDarkMode() ? '#333' : '#e5e7eb') + ';';
 
             var footerLeft = document.createElement('div');
             markExt(footerLeft);
-            footerLeft.style.cssText = 'display: flex; align-items: center; gap: 6px;';
+            footerLeft.style.cssText = 'display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; min-width: 0;';
 
             var meta = document.createElement('div');
             markExt(meta);
             meta.setAttribute('data-dtu-deadlines-meta', '1');
-            meta.style.cssText = 'font-size: 10px; color: ' + (isDarkMode() ? '#666' : '#9ca3af') + ';';
+            meta.style.cssText = 'font-size: 10px; color: ' + (isDarkMode() ? '#a3a3a3' : '#6b7280') + ';';
 
-            var refreshBtn = document.createElement('button');
-            refreshBtn.type = 'button';
-            markExt(refreshBtn);
-            refreshBtn.setAttribute('data-dtu-deadlines-refresh', '1');
-            refreshBtn.setAttribute('aria-label', 'Refresh deadlines');
-            refreshBtn.setAttribute('title', 'Refresh deadlines');
-            refreshBtn.textContent = '\u21bb';
-            refreshBtn.style.cssText = 'border: none; background: transparent; cursor: pointer; font-size: 14px; line-height: 1; padding: 2px; border-radius: 4px; color: '
-                + (isDarkMode() ? '#888' : '#9ca3af') + ';';
-            refreshBtn.style.setProperty('background', 'transparent', 'important');
-            refreshBtn.style.setProperty('color', isDarkMode() ? '#888' : '#9ca3af', 'important');
-            refreshBtn.style.setProperty('border', 'none', 'important');
-            refreshBtn.addEventListener('mouseenter', function () {
-                refreshBtn.style.setProperty('color', isDarkMode() ? '#ccc' : '#555', 'important');
-            });
-            refreshBtn.addEventListener('mouseleave', function () {
-                refreshBtn.style.setProperty('color', isDarkMode() ? '#888' : '#9ca3af', 'important');
-            });
-            refreshBtn.addEventListener('click', function () {
-                refreshBtn.disabled = true;
-                refreshBtn.style.opacity = '0.5';
-                requestStudentDeadlines(true, function () { renderDeadlinesHomepageWidget(widget); });
-            });
+            var disclaimer = document.createElement('div');
+            markExt(disclaimer);
+            disclaimer.textContent = 'Please double-check dates on the official DTU student pages.';
+            disclaimer.style.cssText = 'font-size: 10px; font-style: italic; line-height: 14px; color: '
+                + (isDarkMode() ? '#a3a3a3' : '#6b7280') + ';';
 
+            footerLeft.appendChild(disclaimer);
             footerLeft.appendChild(meta);
-            footerLeft.appendChild(refreshBtn);
 
             var sources = document.createElement('div');
             markExt(sources);
@@ -1821,14 +1810,14 @@
             var sourcesLabel = document.createElement('span');
             markExt(sourcesLabel);
             sourcesLabel.textContent = 'Sources:';
-            sourcesLabel.style.cssText = 'color: ' + (isDarkMode() ? '#666' : '#9ca3af') + ';';
+            sourcesLabel.style.cssText = 'color: ' + (isDarkMode() ? '#a3a3a3' : '#6b7280') + ';';
 
             var courseA = createDeadlineSourceLink('Course', 'course');
 
             var sep = document.createElement('span');
             markExt(sep);
             sep.textContent = '/';
-            sep.style.cssText = 'color: ' + (isDarkMode() ? '#555' : '#d1d5db') + ';';
+            sep.style.cssText = 'color: ' + (isDarkMode() ? '#a3a3a3' : '#6b7280') + ';';
 
             var examA = createDeadlineSourceLink('Exam', 'exam');
 
@@ -1840,16 +1829,9 @@
             footer.appendChild(footerLeft);
             footer.appendChild(sources);
 
-            var disclaimer = document.createElement('div');
-            markExt(disclaimer);
-            disclaimer.textContent = 'Please double-check dates on the official DTU student pages.';
-            disclaimer.style.cssText = 'font-size: 10px; font-style: italic; line-height: 14px; color: '
-                + (isDarkMode() ? '#555' : '#b0b0b0') + '; margin-top: 6px;';
-
             padding.appendChild(next);
             padding.appendChild(more);
             padding.appendChild(footer);
-            padding.appendChild(disclaimer);
             content.appendChild(padding);
 
             widget.appendChild(header);

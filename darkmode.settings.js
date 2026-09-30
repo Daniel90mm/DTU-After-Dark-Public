@@ -327,9 +327,24 @@
         }
     }
 
+    // Keyboard handler and scroll state of the open modal, released on close.
+    var _settingsModalKeyHandler = null;
+    var _settingsModalScrollLock = null;
+
     function hideSettingsModal() {
         var overlay = document.querySelector('.dtu-settings-modal-overlay');
         if (overlay) overlay.remove();
+        if (_settingsModalKeyHandler) {
+            try { document.removeEventListener('keydown', _settingsModalKeyHandler, true); } catch (eKey) { }
+            _settingsModalKeyHandler = null;
+        }
+        if (_settingsModalScrollLock) {
+            try {
+                document.documentElement.style.overflow = _settingsModalScrollLock.html;
+                document.body.style.overflow = _settingsModalScrollLock.body;
+            } catch (eScroll) { }
+            _settingsModalScrollLock = null;
+        }
         try {
             var settingsBtn = document.querySelector('.dtu-settings-nav-item button');
             if (settingsBtn) settingsBtn.setAttribute('aria-expanded', 'false');
@@ -411,7 +426,6 @@
                 btn.style.setProperty('background-image', 'none', 'important');
                 btn.style.setProperty('border', '0', 'important');
                 btn.style.setProperty('box-shadow', 'none', 'important');
-                btn.style.setProperty('outline', 'none', 'important');
                 btn.style.setProperty('border-radius', '0', 'important');
             } catch (e1) { }
             btn.addEventListener('mouseenter', function () {
@@ -731,7 +745,6 @@
                 btn.style.setProperty('background-image', 'none', 'important');
                 btn.style.setProperty('border', '0', 'important');
                 btn.style.setProperty('box-shadow', 'none', 'important');
-                btn.style.setProperty('outline', 'none', 'important');
             } catch (e00) { }
             btn.addEventListener('mouseenter', function () {
                 try {
@@ -872,7 +885,6 @@
             { id: 'feature-learn-nav-resource-links-toggle', key: featureKeys.learnNavResourceLinks },
             { id: 'library-dropdown-toggle', key: featureKeys.libraryDropdown },
             { id: 'feature-lessons-bulk-download-toggle', key: featureKeys.learnLessonsBulkDownload },
-            { id: 'feature-lessons-bulk-single-zip-toggle', key: featureKeys.learnLessonsBulkSingleZip },
             { id: 'feature-campusnet-gpa-tools-toggle', key: featureKeys.campusnetGpaTools },
             { id: 'feature-participant-intel-toggle', key: featureKeys.participantIntel },
             { id: 'feature-participant-intel-demographics-toggle', key: featureKeys.participantIntelDemographics },
@@ -922,8 +934,7 @@
                     { tid: 'bus-departures-toggle', title: 'Bus Departures', desc: 'Show live bus departure times around campus' },
                     { tid: 'deadlines-toggle', title: 'Deadlines Widget', desc: 'Timeline of upcoming assignments' },
                     { tid: 'search-widget-toggle', title: 'Course Search', desc: 'Native course search on the dashboard' },
-                    { tid: 'feature-lessons-bulk-download-toggle', title: 'Course Content Download', desc: 'Enable course content download tools in DTU Learn Lessons pages' },
-                    { tid: 'feature-lessons-bulk-single-zip-toggle', title: 'Bulk Download', desc: 'Download selected section files as one ZIP bundle', subToggleOf: 'feature-lessons-bulk-download-toggle' }
+                    { tid: 'feature-lessons-bulk-download-toggle', title: 'Course Content Download', desc: 'Download selected Lessons sections as a ZIP file' }
                 ]
             },
             {
@@ -959,7 +970,7 @@
             + '.dtu-am-root{display:flex;width:100%;max-width:100%;height:600px;max-height:calc(100vh - 140px);'
             + 'overflow:hidden;border-radius:8px;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;'
             + 'background:var(--dtu-am-content-bg) !important;color:var(--dtu-am-text) !important}'
-            + '.dtu-am-sidebar{width:170px;min-width:170px;overflow-x:hidden;overflow-y:auto;'
+            + '.dtu-am-sidebar{width:200px;min-width:200px;overflow-x:hidden;overflow-y:auto;'
             + 'padding:14px 0;display:flex;flex-direction:column;gap:1px;'
             + 'background:var(--dtu-am-sidebar-bg) !important;border-right:1px solid var(--dtu-am-border) !important}'
             + '.dtu-am-content{flex:1;min-width:0;min-height:0;height:100%;display:flex;flex-direction:column;'
@@ -969,14 +980,14 @@
             + '.dtu-am-content,.dtu-am-sidebar{-ms-overflow-style:none;scrollbar-width:none}'
             + '.dtu-am-sidebar-hd{padding:0 14px 10px;border-bottom:1px solid var(--dtu-am-border) !important;margin-bottom:6px}'
             + '.dtu-am-brand{font-size:14px;font-weight:700;color:var(--dtu-am-text) !important}'
-            + '.dtu-am-sub{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;'
+            + '.dtu-am-sub{font-size:11px;font-weight:600;letter-spacing:0;'
             + 'color:var(--dtu-am-muted) !important;margin-top:2px}'
             + '.dtu-am-panel{display:none !important}'
             + '.dtu-am-panel.dtu-active{display:block !important}'
             + '.dtu-am-panel-title{font-size:18px;font-weight:600;color:var(--dtu-am-text) !important;margin:0 0 2px}'
             + '.dtu-am-panel-desc{font-size:12px;color:var(--dtu-am-muted) !important;margin-bottom:16px}'
             + '.dtu-nav-i{padding:8px 14px;cursor:pointer;border-radius:6px;margin:2px 6px;transition:background .15s;user-select:none;-webkit-user-select:none;'
-            + 'font-size:13px;color:var(--dtu-am-text) !important;border-left:3px solid transparent}'
+            + 'font-size:13px;color:var(--dtu-am-text) !important;border-left:3px solid transparent;white-space:nowrap}'
             + '.dtu-nav-i:hover{background:var(--dtu-am-hover) !important}'
             + '.dtu-nav-i.dtu-active{background:var(--dtu-am-active-bg) !important;border-left-color:var(--dtu-am-accent) !important;'
             + 'color:var(--dtu-am-active-text) !important;font-weight:600}'
@@ -995,9 +1006,12 @@
             + '.dtu-am-accent-warning{font-size:11px;line-height:1.35;margin-top:5px;max-width:420px;'
             + 'color:var(--dtu-ad-status-warning-strong) !important}'
             + '.dtu-am-accent-warning[hidden]{display:none !important}'
-            + '.dtu-am-link{font-size:11px;line-height:1.25;color:var(--dtu-am-action) !important;'
+            + '.dtu-am-root a.dtu-am-link{font-size:11px;line-height:1.25;color:var(--dtu-am-action) !important;'
             + 'text-decoration:none !important;margin-top:1px}'
-            + '.dtu-am-link:hover{text-decoration:underline !important;color:var(--dtu-am-accent) !important}'
+            + '.dtu-am-root a.dtu-am-link:hover{text-decoration:underline !important;color:var(--dtu-am-action) !important}'
+            + '.dtu-am-root a:focus-visible,.dtu-am-root button:focus-visible,.dtu-am-root select:focus-visible,.dtu-nav-i:focus-visible{outline:2px solid var(--dtu-am-text) !important;outline-offset:2px !important}'
+            + '.dtu-tog input:focus-visible+.dtu-tog-sl{outline:2px solid var(--dtu-am-text) !important;outline-offset:2px !important}'
+            + '[role="dialog"]:focus{outline:none !important}'
             + '.dtu-am-actions{display:flex;align-items:center;gap:10px;flex-shrink:0}'
             + '.dtu-am-edit{background:transparent;border:1px solid var(--dtu-am-border) !important;'
             + 'color:var(--dtu-am-action) !important;padding:6px 10px;border-radius:8px;cursor:pointer;'
@@ -1035,20 +1049,58 @@
             + 'background:transparent !important;background-color:transparent !important;'
             + 'backdrop-filter:blur(4px) !important;-webkit-backdrop-filter:blur(4px) !important;';
 
-        overlay.addEventListener('mousedown', function (e) {
-            if (e.target === overlay) hideSettingsModal();
-        });
-
-        function onEsc(e) {
-            if (e.key === 'Escape') {
-                hideSettingsModal();
-                document.removeEventListener('keydown', onEsc);
+        // Every user-initiated close returns focus to the Settings button.
+        function closeFromUser() {
+            hideSettingsModal();
+            var opener = document.querySelector('.dtu-settings-nav-item button');
+            if (opener) {
+                try { opener.focus({ preventScroll: true }); } catch (eFocus) { }
             }
         }
-        document.addEventListener('keydown', onEsc);
+
+        overlay.addEventListener('mousedown', function (e) {
+            if (e.target === overlay) closeFromUser();
+        });
 
         var modal = document.createElement('div');
         markExt(modal);
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-labelledby', 'dtu-am-dialog-title');
+        modal.tabIndex = -1;
+
+        // Escape closes; Tab and Shift+Tab stay inside the dialog.
+        _settingsModalKeyHandler = function (e) {
+            if (!e) return;
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                closeFromUser();
+                return;
+            }
+            if (e.key !== 'Tab') return;
+            var focusables = Array.prototype.filter.call(
+                modal.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'),
+                function (el) { return el.getClientRects().length > 0 || el === document.activeElement; }
+            );
+            if (!focusables.length) { e.preventDefault(); modal.focus(); return; }
+            var first = focusables[0];
+            var last = focusables[focusables.length - 1];
+            var active = document.activeElement;
+            if (!modal.contains(active)) {
+                e.preventDefault();
+                (e.shiftKey ? last : first).focus();
+            } else if (e.shiftKey && (active === first || active === modal)) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && active === last) {
+                e.preventDefault();
+                first.focus();
+            }
+        };
+        document.addEventListener('keydown', _settingsModalKeyHandler, true);
+        _settingsModalScrollLock = { html: document.documentElement.style.overflow, body: document.body.style.overflow };
+        document.documentElement.style.overflow = 'hidden';
+        document.body.style.overflow = 'hidden';
         var modalW = Math.min(900, Math.floor(window.innerWidth - 40));
         modal.style.cssText = 'width:' + modalW + 'px;max-height:calc(100vh - 80px);border-radius:14px;overflow:hidden;'
             + 'box-shadow:0 20px 60px rgba(0,0,0,' + (isDark ? '0.7' : '0.25') + ');'
@@ -1069,6 +1121,9 @@
         var sidebarBrand = document.createElement('div');
         markExt(sidebarBrand);
         sidebarBrand.className = 'dtu-am-brand';
+        sidebarBrand.id = 'dtu-am-dialog-title';
+        sidebarBrand.setAttribute('role', 'heading');
+        sidebarBrand.setAttribute('aria-level', '2');
         sidebarBrand.textContent = 'DTU After Dark';
         var sidebarSub = document.createElement('div');
         markExt(sidebarSub);
@@ -1094,6 +1149,9 @@
             markExt(navItem);
             navItem.className = 'dtu-nav-i' + (cat.id === firstCat ? ' dtu-active' : '');
             navItem.textContent = cat.label;
+            navItem.setAttribute('role', 'button');
+            navItem.tabIndex = 0;
+            if (cat.id === firstCat) navItem.setAttribute('aria-current', 'true');
             navItem.setAttribute('data-cat', cat.id);
             sidebar.appendChild(navItem);
             navItems.push(navItem);
@@ -1312,9 +1370,11 @@
 
         function showCat(catId) {
             if (!catId) return;
-            navItems.forEach(function (n) { n.classList.remove('dtu-active'); });
             navItems.forEach(function (n) {
-                if (n.getAttribute('data-cat') === catId) n.classList.add('dtu-active');
+                var on = n.getAttribute('data-cat') === catId;
+                n.classList.toggle('dtu-active', on);
+                if (on) n.setAttribute('aria-current', 'true');
+                else n.removeAttribute('aria-current');
             });
             Object.keys(panels).forEach(function (id) {
                 var p = panels[id];
@@ -1334,6 +1394,9 @@
             navItem.addEventListener('pointerdown', activate);
             navItem.addEventListener('mousedown', activate);
             navItem.addEventListener('click', activate);
+            navItem.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter' || e.key === ' ') activate(e);
+            });
         });
 
         contentArea.appendChild(createAfterDarkDisclaimerFooter());
@@ -1342,6 +1405,7 @@
         modal.appendChild(container);
         overlay.appendChild(modal);
         document.body.appendChild(overlay);
+        try { modal.focus({ preventScroll: true }); } catch (eFocusIn) { }
     }
 
     try {

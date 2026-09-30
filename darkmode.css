@@ -712,6 +712,16 @@ span[style*="background"]:not(.typebox):not([data-dtu-ext]) {
   background: transparent !important;
 }
 
+/* Nav bar icons (waffle, mail, discussions, bell, gear). d2l-icon draws in
+   var(--d2l-theme-icon-color-standard); the dark engine's shadow-root styles
+   override it only once injected, and in Firefox on course pages they can miss,
+   leaving D2L's dark grey. Custom properties inherit into shadow roots, so set
+   it from the light DOM. Hover still turns icons blue (D2L sets the fill). */
+d2l-labs-navigation {
+  --d2l-theme-icon-color-standard: #e0e0e0;
+  --d2l-color-ferrite: #e0e0e0;
+}
+
 /* CRITICAL: Fix the top navigation bar (Calendar, Student Resources, etc.) */
 /* Using #2d2d2d (dark 2) for main header */
 .d2l-labs-navigation-centerer,
@@ -2340,6 +2350,57 @@ table:has(> tbody > tr > td > img[src*="UserPicture.ashx"]) td {
   border-color: #505050 !important;
 }
 
+/* Public course results (evaluering.dtu.dk/kursus/...). The intro text and the
+   wrappers sit on the dark-1 page; only the results card, the course picker and
+   each question block are dark-2 surfaces. The page paints its headings and
+   picker with a light gradient JPEG and its question rows with #ebebeb. */
+#TitleBlock,
+#SearchFormularPanel,
+#content > .grid_6.clearright {
+  background-color: transparent !important;
+}
+
+#CourseResultsPublicContainer h2,
+#CourseSelectorContainer {
+  background-image: none !important;
+}
+
+#CourseResultsPublicContainer h2 {
+  border-bottom: 1px solid #404040 !important;
+}
+
+#Results .CourseSchemaResultHeader,
+#Results .CourseSchemaResultFooter {
+  background: #2d2d2d !important;
+  color: #e0e0e0 !important;
+}
+
+#Results .CourseSchemaResultHeader > div,
+#Results .FinalEvaluation_Result_AnswerPercentageColumn {
+  background: transparent !important;
+}
+
+#Results .FinalEvaluation_Result_QuestionPositionColumn,
+#Results .CourseSchemaResultFooter {
+  color: #a0a0a0 !important;
+}
+
+/* Section headings ("Jeg synes, at...") carry .noprint, which the results
+   card rule above paints dark 2; they stretch behind the floated questions. */
+#Results h5.noprint {
+  background-color: transparent !important;
+}
+
+/* The results card's catch-all rule outranks the plain red-bar rule. */
+#CourseResultsPublicContainer .ResultsMeasurableBarRed {
+  background-color: #990000 !important;
+}
+
+/* The breadcrumb separator is a white JPEG; invert it into the page. */
+.breadcrumb img.screenSeparator {
+  filter: invert(0.9) !important;
+}
+
 #PeriodDropDownList option {
   background-color: #2d2d2d !important;
   color: #e0e0e0 !important;
@@ -3503,6 +3564,22 @@ input.inputsubmit:hover {
   background: #4d4d4d !important;
 }
 
+/* DTU web header search button (evaluering and other www.dtu.dk-shell pages).
+   DTU draws a red magnifier PNG as its background; the search-button rule above
+   replaces the whole background, so draw a light magnifier instead. */
+[id*="SearchBox"] input.inputsubmit[id*="SearchBox_searchbutton"],
+[id*="SearchBox"] input.inputsubmit[id*="SearchBox_searchbutton"]:hover {
+  background-color: #3d3d3d !important;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' fill='none' stroke='%23e0e0e0' stroke-width='1.75' stroke-linecap='round'%3E%3Ccircle cx='6.75' cy='6.75' r='4.75'/%3E%3Cpath d='M10.25 10.25 14 14'/%3E%3C/svg%3E") !important;
+  background-repeat: no-repeat !important;
+  background-position: center !important;
+  background-size: 14px 14px !important;
+}
+
+[id*="SearchBox"] input.inputsubmit[id*="SearchBox_searchbutton"]:hover {
+  background-color: #4d4d4d !important;
+}
+
 /* ==================== Page Footer - dark 2 ==================== */
 .pagefooterlogo,
 .pagefootercolumn,
@@ -3770,10 +3847,9 @@ table.gradesList tr.context_alternating td:first-child {
   background-color: transparent !important;
   background-image: none !important;
   box-shadow: none !important;
-  outline: 0 !important;
   appearance: none !important;
   -webkit-appearance: none !important;
-  color: rgba(var(--dtu-ad-accent-rgb), 0.74) !important;
+  color: var(--dtu-ad-accent-soft) !important;
   cursor: pointer !important;
   font-size: 11px !important;
   font-weight: 600 !important;
@@ -5026,46 +5102,8 @@ main.main.arc-row>section.main__content {
   background-color: #1a1a1a !important;
 }
 
-/* Kurser course insight widgets: keep the redesign paired, flat, and responsive. */
-[data-dtu-course-widgets-grid] {
-  display: grid !important;
-  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
-  gap: 18px !important;
-  align-items: start !important;
-  background: transparent !important;
-  background-color: transparent !important;
-  border: 0 !important;
-  box-shadow: none !important;
-}
-
-[data-dtu-course-widgets-grid] > [data-dtu-grade-stats],
-[data-dtu-course-widgets-grid] > [data-dtu-course-eval] {
-  width: 100% !important;
-  max-width: none !important;
-  min-width: 0 !important;
-  margin: 0 !important;
-  background: transparent !important;
-  background-color: transparent !important;
-  border: 0 !important;
-  box-shadow: none !important;
-}
-
-[data-dtu-course-widgets-grid] [data-dtu-ext] span {
-  color: inherit !important;
-}
-
-[data-dtu-course-widgets-grid] [data-dtu-ext] div,
-[data-dtu-course-widgets-grid] [data-dtu-ext] span:not([style*="background"]),
-[data-dtu-course-widgets-grid] [data-dtu-ext] small {
-  background-color: transparent !important;
-  background-image: none !important;
-}
-
-@media (max-width: 980px) {
-  [data-dtu-course-widgets-grid] {
-    grid-template-columns: minmax(0, 1fr) !important;
-  }
-}
+/* Kurser course insight widgets: styled by the stylesheet darkmode.kurser-widgets.js
+   injects (#dtu-course-widgets-style), which also covers light mode. */
 
 /* Lessons (smart-curriculum) redesign: panel overlay + new-content toast */
 .panel-overlay.collapsable {

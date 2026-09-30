@@ -360,6 +360,13 @@
                 background-color: white !important;
                 transition: none !important;
             }
+            /* Focus rings the host page and our reset styles removed (both modes). */
+            table.gradesList a:focus-visible,
+            .gpa-sim-add-btn:focus-visible,
+            .gpa-actual-toggle-btn:focus-visible {
+                outline: 2px solid currentColor !important;
+                outline-offset: 2px !important;
+            }
         `;
         (document.head || document.documentElement).appendChild(style);
     }
@@ -453,7 +460,6 @@
     const FEATURE_PARTICIPANT_INTEL_RETENTION_KEY = 'dtuAfterDarkFeatureParticipantIntelRetention';
     const FEATURE_LIBRARY_DROPDOWN_KEY = 'dtuAfterDarkFeatureLibraryDropdown';
     const FEATURE_LEARN_LESSONS_BULK_DOWNLOAD_KEY = 'dtuAfterDarkFeatureLearnLessonsBulkDownload';
-    const FEATURE_LEARN_LESSONS_BULK_SINGLE_ZIP_KEY = 'dtuAfterDarkFeatureLearnLessonsBulkSingleZip';
     const PARTICIPANT_INTEL_STORAGE_KEY = 'dtuParticipantIntel';
     const PARTICIPANT_INTEL_MAX_STUDENTS = 5000;
     const PARTICIPANT_INTEL_MAX_RETENTION = 20;
@@ -472,8 +478,7 @@
         [FEATURE_PARTICIPANT_INTEL_SHARED_HISTORY_KEY]: false,
         [FEATURE_PARTICIPANT_INTEL_RETENTION_KEY]: false,
         [FEATURE_LIBRARY_DROPDOWN_KEY]: true,
-        [FEATURE_LEARN_LESSONS_BULK_DOWNLOAD_KEY]: true,
-        [FEATURE_LEARN_LESSONS_BULK_SINGLE_ZIP_KEY]: true
+        [FEATURE_LEARN_LESSONS_BULK_DOWNLOAD_KEY]: true
     };
 
     let _featureFlags = Object.assign({}, FEATURE_FLAG_DEFAULTS);
@@ -852,7 +857,7 @@
         rootEl.style.setProperty('--dtu-am-sidebar-bg', isDark ? '#2d2d2d' : '#f3f4f6');
         rootEl.style.setProperty('--dtu-am-content-bg', isDark ? '#2d2d2d' : '#ffffff');
         rootEl.style.setProperty('--dtu-am-text', isDark ? '#e0e0e0' : '#1f2937');
-        rootEl.style.setProperty('--dtu-am-muted', isDark ? '#888' : '#6b7280');
+        rootEl.style.setProperty('--dtu-am-muted', isDark ? '#a3a3a3' : '#5f6673');
         rootEl.style.setProperty('--dtu-am-border', isDark ? '#333' : '#e5e7eb');
         rootEl.style.setProperty('--dtu-am-hover', isDark ? '#333' : '#e5e7eb');
         rootEl.style.setProperty('--dtu-am-action', isDark ? '#93c5fd' : '#1565c0');
@@ -1481,7 +1486,6 @@
                     participantIntel: FEATURE_PARTICIPANT_INTEL_KEY,
                     libraryDropdown: FEATURE_LIBRARY_DROPDOWN_KEY,
                     learnLessonsBulkDownload: FEATURE_LEARN_LESSONS_BULK_DOWNLOAD_KEY,
-                    learnLessonsBulkSingleZip: FEATURE_LEARN_LESSONS_BULK_SINGLE_ZIP_KEY,
                     participantIntelDemographics: FEATURE_PARTICIPANT_INTEL_DEMOGRAPHICS_KEY,
                     participantIntelSharedHistory: FEATURE_PARTICIPANT_INTEL_SHARED_HISTORY_KEY,
                     participantIntelRetention: FEATURE_PARTICIPANT_INTEL_RETENTION_KEY
@@ -1920,6 +1924,7 @@
         normalizeIntelCourseSemester: normalizeIntelCourseSemester,
         isCampusnetLikelyAcademicCourse: isCampusnetLikelyAcademicCourse,
         getCampusnetUsersParticipantElements: getCampusnetUsersParticipantElements,
+        getCampusnetUsersCountFromPage: getCampusnetUsersCountFromPage,
         getCampusnetParticipantSNumber: getCampusnetParticipantSNumber,
         getCampusnetCourseCodeFromPage: getCampusnetCourseCodeFromPage,
         getCampusnetSemesterFromPage: getCampusnetSemesterFromPage,
@@ -1929,8 +1934,7 @@
         storageLocalGet: storageLocalGet,
         storageLocalSet: storageLocalSet,
         participantIntelStorageKey: PARTICIPANT_INTEL_STORAGE_KEY,
-        participantIntelMaxStudents: PARTICIPANT_INTEL_MAX_STUDENTS,
-        insertParticipantIntelligence: function () { insertParticipantIntelligence(); }
+        participantIntelMaxStudents: PARTICIPANT_INTEL_MAX_STUDENTS
     };
 
     function dedupeIntelCourseList(courses) {
@@ -2052,10 +2056,10 @@
         return api.getCampusnetUsersCategoryMeta();
     }
 
-    function getCampusnetUsersCountFromPage() {
+    function getCampusnetUsersCountFromPage(rootDoc) {
         var api = getParticipantIntelHostApi();
         if (!api || typeof api.getCampusnetUsersCountFromPage !== 'function') return null;
-        return api.getCampusnetUsersCountFromPage();
+        return api.getCampusnetUsersCountFromPage(rootDoc);
     }
 
     function getCampusnetUsersAnchorElement() {
@@ -2070,10 +2074,10 @@
         return api.getCampusnetParticipantsListRoot();
     }
 
-    function getCampusnetUsersParticipantElements() {
+    function getCampusnetUsersParticipantElements(rootDoc) {
         var api = getParticipantIntelHostApi();
         if (!api || typeof api.getCampusnetUsersParticipantElements !== 'function') return [];
-        return api.getCampusnetUsersParticipantElements();
+        return api.getCampusnetUsersParticipantElements(rootDoc);
     }
 
     function getCampusnetParticipantSNumber(item) {
@@ -2082,18 +2086,21 @@
         return api.getCampusnetParticipantSNumber(item);
     }
 
-    function ensureCampusnetParticipantsPageSizeMax() {
-        var api = getParticipantIntelCoreApi();
-        if (!api || typeof api.ensureCampusnetParticipantsPageSizeMax !== 'function') return false;
-        return api.ensureCampusnetParticipantsPageSizeMax();
-    }
-
     // -- Participant list parser --
 
     function parseParticipantList() {
         var api = getParticipantIntelCoreApi();
         if (!api || typeof api.parseParticipantList !== 'function') return [];
         return api.parseParticipantList();
+    }
+
+    function getFullParticipantList(cb) {
+        var api = getParticipantIntelCoreApi();
+        if (!api || typeof api.getFullParticipantList !== 'function') {
+            cb(parseParticipantList(), { complete: false, total: 0 });
+            return;
+        }
+        return api.getFullParticipantList(cb);
     }
 
     // -- Data collection & self-detection --
@@ -2128,6 +2135,7 @@
         isDarkMode: function () { return !!darkModeEnabled; },
         markExt: markExt,
         parseParticipantList: parseParticipantList,
+        getFullParticipantList: getFullParticipantList,
         getCampusnetUsersCountFromPage: getCampusnetUsersCountFromPage,
         loadParticipantIntel: loadParticipantIntel,
         normalizeProgramLabel: normalizeProgramLabel,
@@ -2286,46 +2294,6 @@
             if (!retentionEnabled) {
                 var oldRet = document.querySelector('[data-dtu-retention-indicator]');
                 if (oldRet) oldRet.remove();
-            }
-
-            // Prefer showing all users on one page (max page size is typically 1500).
-            // This makes composition + history badges accurate without requiring manual pagination.
-            if (demographicsEnabled || sharedHistoryEnabled) {
-                if (ensureCampusnetParticipantsPageSizeMax()) {
-                    // Retention uses the header "Users (N)" count, so it can still run immediately.
-                    if (retentionEnabled) recordRetentionSnapshot();
-                    return;
-                }
-            }
-
-            // If we just requested a larger page size, give CampusNet a moment to refresh the list
-            // before we scrape (avoids storing/visualizing an incomplete first page).
-            var pageSizeAdjustTs = 0;
-            try {
-                var coreApi = getParticipantIntelCoreApi();
-                if (coreApi && typeof coreApi.getParticipantIntelPageSizeAdjustTs === 'function') {
-                    pageSizeAdjustTs = Number(coreApi.getParticipantIntelPageSizeAdjustTs()) || 0;
-                }
-            } catch (ePageTs) { pageSizeAdjustTs = 0; }
-            if ((demographicsEnabled || sharedHistoryEnabled)
-                && pageSizeAdjustTs && (Date.now() - pageSizeAdjustTs) < 5500) {
-                var totalUsers = getCampusnetUsersCountFromPage();
-                var loadedUsers = getCampusnetUsersParticipantElements().length;
-                var likelyComplete = false;
-                if (totalUsers && loadedUsers) {
-                    if (loadedUsers >= totalUsers) likelyComplete = true;
-                    else if (totalUsers > 1500 && loadedUsers >= 1500) likelyComplete = true;
-                }
-                if (!likelyComplete) {
-                    if (retentionEnabled) recordRetentionSnapshot();
-                    return;
-                }
-                try {
-                    var coreApi2 = getParticipantIntelCoreApi();
-                    if (coreApi2 && typeof coreApi2.resetParticipantIntelPageSizeAdjustTs === 'function') {
-                        coreApi2.resetParticipantIntelPageSizeAdjustTs();
-                    }
-                } catch (ePageReset) { }
             }
 
             if (sharedHistoryEnabled) collectParticipantData();

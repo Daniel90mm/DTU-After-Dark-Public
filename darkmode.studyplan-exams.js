@@ -101,7 +101,7 @@
                 btn.type = 'button';
                 var choiceKey = option.choiceKey || deps.buildStudyplanExamChoiceOptionKey(option);
                 var selected = choice.selectedChoiceKey && choice.selectedChoiceKey === choiceKey;
-                btn.textContent = deps.formatExamClusterShortDate(option.entry.dateTs) + ' · ' + (option.entry.text || option.entry.dateLabel || '');
+                btn.textContent = deps.formatExamClusterShortDate(option.entry.dateTs) + ': ' + (option.entry.text || option.entry.dateLabel || '');
                 btn.style.cssText = 'padding:0 0 2px 0;border-radius:0;font-size:10px;font-weight:700;cursor:pointer;'
                     + 'max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
                 btn.style.setProperty('border', '0', 'important');
@@ -485,7 +485,7 @@
             meta.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px;';
             var metaLabel = document.createElement('div');
             deps.markExt(metaLabel);
-            metaLabel.textContent = (editorItem.code || item.code || 'Course') + ' · ' + deps.formatExamClusterShortDate(effectiveTs);
+            metaLabel.textContent = (editorItem.code || item.code || 'Course') + ', ' + deps.formatExamClusterShortDate(effectiveTs);
             metaLabel.style.cssText = 'font-size:13px;font-weight:800;letter-spacing:-0.01em;';
             meta.appendChild(metaLabel);
             var metaState = document.createElement('span');
@@ -572,7 +572,7 @@
             meta.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px;';
             var label = document.createElement('div');
             deps.markExt(label);
-            label.textContent = effectiveTs ? 'Custom · ' + deps.formatExamClusterShortDate(effectiveTs) : 'Add custom entry';
+            label.textContent = effectiveTs ? 'Custom: ' + deps.formatExamClusterShortDate(effectiveTs) : 'Add custom entry';
             label.style.cssText = 'font-size:13px;font-weight:800;letter-spacing:-0.01em;';
             meta.appendChild(label);
             var state = document.createElement('span');
@@ -904,7 +904,7 @@
             var riskText = document.createElement('div');
             deps.markExt(riskText);
             riskText.style.cssText = 'font-size:11px; color:' + (isDark ? '#d9d9d9' : '#374151') + ';';
-            riskText.textContent = details.join(' · ');
+            riskText.textContent = details.join(', ');
             riskBox.appendChild(riskText);
 
             body.appendChild(riskBox);

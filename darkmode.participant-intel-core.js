@@ -3,8 +3,9 @@
 
     var participantIntelLastCollectSig = null;
     var participantIntelLastCollectTs = 0;
-    var participantIntelPageSizeAdjustTs = 0;
-    var participantIntelPageSizeAdjustTimer = null;
+    var fullParticipantListCache = null;
+    var fullParticipantListInFlight = null;
+    var fullParticipantListFailure = null;
 
     function getDeps() {
         return globalThis.DTUAfterDarkParticipantIntelCoreDeps || null;
@@ -207,80 +208,12 @@
         });
     })();
 
-    function ensureCampusnetParticipantsPageSizeMax() {
-        var deps = getDeps();
-        if (!deps || !deps.isCampusnetParticipantPage()) return false;
-        var ss = null;
-        try { ss = sessionStorage; } catch (e) { ss = null; }
-        if (!ss) return false;
-
-        var key = 'dtuAfterDarkParticipantsPageSizeMaxAttempt:' + window.location.pathname;
-        var now = Date.now();
-        var lastAttempt = parseInt(ss.getItem(key) || '0', 10);
-        if (lastAttempt && (now - lastAttempt) < 8000) return false;
-
-        var selects = document.querySelectorAll('select');
-        for (var i = 0; i < selects.length; i++) {
-            var sel = selects[i];
-            if (!sel || !sel.options || sel.options.length < 4) continue;
-
-            var nums = [];
-            for (var o = 0; o < sel.options.length; o++) {
-                var raw = sel.options[o].value || sel.options[o].textContent;
-                var n = parseInt(raw, 10);
-                if (!isNaN(n)) nums.push(n);
-            }
-            if (!nums.length) continue;
-
-            var max = Math.max.apply(Math, nums);
-            if (max < 500) continue;
-            if (nums.indexOf(1500) === -1) continue;
-
-            var curRaw = sel.value || (sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].textContent : '');
-            var cur = parseInt(curRaw, 10);
-            if (!isNaN(cur) && cur >= max) return false;
-
-            try { ss.setItem(key, String(now)); } catch (e4) { }
-            participantIntelPageSizeAdjustTs = now;
-
-            for (var oo = 0; oo < sel.options.length; oo++) {
-                var opt = sel.options[oo];
-                var optNum = parseInt(opt.value || opt.textContent, 10);
-                if (optNum === max) {
-                    sel.value = opt.value;
-                    opt.selected = true;
-                    break;
-                }
-            }
-
-            try {
-                sel.dispatchEvent(new Event('change', { bubbles: true }));
-            } catch (e) {
-                try {
-                    var evt = document.createEvent('HTMLEvents');
-                    evt.initEvent('change', true, false);
-                    sel.dispatchEvent(evt);
-                } catch (e2) { }
-            }
-
-            if (!participantIntelPageSizeAdjustTimer) {
-                participantIntelPageSizeAdjustTimer = setTimeout(function () {
-                    participantIntelPageSizeAdjustTimer = null;
-                    try { deps.insertParticipantIntelligence(); } catch (e3) { }
-                }, 1600);
-            }
-
-            return true;
-        }
-
-        return false;
-    }
-
-    function parseParticipantList() {
+    function parseParticipantList(rootDoc) {
         var deps = getDeps();
         var participants = [];
         if (!deps) return participants;
-        var items = deps.getCampusnetUsersParticipantElements();
+        var doc = rootDoc || document;
+        var items = deps.getCampusnetUsersParticipantElements(doc);
         for (var i = 0; i < items.length; i++) {
             var item = items[i];
             var entry = {};
@@ -309,7 +242,7 @@
             }
             if (idx === null || isNaN(idx)) idx = i;
 
-            var infoBox = document.getElementById('participantinformation' + idx);
+            var infoBox = doc.getElementById('participantinformation' + idx);
             if (!infoBox) infoBox = item.nextElementSibling;
             if (!infoBox) {
                 var sib = item.nextElementSibling;
@@ -345,6 +278,107 @@
             if (entry.sNumber) participants.push(entry);
         }
         return participants;
+    }
+
+    // The "Users" list as CampusNet would show it with every participant on one
+    // page. When the visible page already holds them all, that is the page
+    // itself. Otherwise the full list is fetched once in the background and
+    // parsed as an inert document, so CampusNet's page size is left alone and
+    // no profile pictures are requested (CampusNet serves each one slowly).
+    // Falls back to the visible page when the fetch fails.
+    var FULL_PARTICIPANT_LIST_TTL_MS = 10 * 60 * 1000;
+
+    var BLANK_PICTURE = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
+
+    // CampusNet can take 20 seconds or more per profile picture, and the browser
+    // opens at most 6 connections to it, so a page of unfinished pictures makes
+    // every other CampusNet request wait. Swapping the unfinished ones for a
+    // blank image cancels those loads; the returned function puts them back.
+    function pauseUnfinishedParticipantPictures() {
+        var paused = [];
+        document.querySelectorAll('.ui-participant img[src*="/userpicture/"]').forEach(function (img) {
+            if (img.complete) return;
+            paused.push({ img: img, src: img.getAttribute('src') });
+            img.setAttribute('src', BLANK_PICTURE);
+        });
+        var restored = false;
+        return function restore() {
+            if (restored) return;
+            restored = true;
+            paused.forEach(function (p) {
+                if (p.img.getAttribute('src') === BLANK_PICTURE) p.img.setAttribute('src', p.src);
+            });
+        };
+    }
+
+    function fetchFullParticipantsHtml(path) {
+        var url = window.location.origin + path
+            + '?groupType=Rights&query=&sortField=LastName&page=0&showClosed=True&displayType=list&itemsPerPage=1500';
+        var restorePictures = pauseUnfinishedParticipantPictures();
+        var safety = setTimeout(restorePictures, 15000);
+        // Firefox runs content-script fetches with the extension's origin, so
+        // 'same-origin' would drop the CampusNet login cookie; 'include' sends it.
+        return fetch(url, { credentials: 'include' }).then(function (res) {
+            if (!res.ok) throw new Error('http_' + res.status);
+            return res.text();
+        }).then(function (html) {
+            clearTimeout(safety);
+            restorePictures();
+            return html;
+        }, function (err) {
+            clearTimeout(safety);
+            restorePictures();
+            throw err;
+        });
+    }
+
+    function getFullParticipantList(cb) {
+        var deps = getDeps();
+        if (!deps) { cb([], { complete: false, total: 0 }); return; }
+        var visible = parseParticipantList();
+        var total = deps.getCampusnetUsersCountFromPage() || 0;
+        var visibleUsers = deps.getCampusnetUsersParticipantElements().length;
+        if (!total || visibleUsers >= total) {
+            cb(visible, { complete: true, total: total || visibleUsers });
+            return;
+        }
+
+        var key = window.location.pathname;
+        var now = Date.now();
+        if (fullParticipantListCache && fullParticipantListCache.key === key
+            && (now - fullParticipantListCache.ts) < FULL_PARTICIPANT_LIST_TTL_MS) {
+            cb(fullParticipantListCache.participants, { complete: true, total: fullParticipantListCache.total });
+            return;
+        }
+
+        if (fullParticipantListFailure && fullParticipantListFailure.key === key
+            && (now - fullParticipantListFailure.ts) < 60000) {
+            cb(visible, { complete: false, total: total });
+            return;
+        }
+
+        if (!fullParticipantListInFlight || fullParticipantListInFlight.key !== key) {
+            var promise = fetchFullParticipantsHtml(key).then(function (html) {
+                var doc = new DOMParser().parseFromString(html, 'text/html');
+                var participants = parseParticipantList(doc);
+                var fullTotal = deps.getCampusnetUsersCountFromPage(doc) || participants.length;
+                if (!participants.length) throw new Error('parse_empty');
+                fullParticipantListCache = { key: key, ts: Date.now(), participants: participants, total: fullTotal };
+                return fullParticipantListCache;
+            });
+            fullParticipantListInFlight = { key: key, promise: promise };
+            promise.then(function () {}, function () {
+                fullParticipantListFailure = { key: key, ts: Date.now() };
+            }).then(function () {
+                if (fullParticipantListInFlight && fullParticipantListInFlight.promise === promise) fullParticipantListInFlight = null;
+            });
+        }
+
+        fullParticipantListInFlight.promise.then(function (entry) {
+            cb(entry.participants, { complete: true, total: entry.total });
+        }, function () {
+            cb(visible, { complete: false, total: total });
+        });
     }
 
     function detectAndStoreSelf(intel, participants, courseCode, semester) {
@@ -508,8 +542,14 @@
         try { pageTitle = document.title || ''; } catch (e0) { pageTitle = ''; }
         if (!deps.isCampusnetLikelyAcademicCourse(courseCode, courseName, { title: pageTitle })) return;
 
-        var participants = parseParticipantList();
-        if (!participants.length) return;
+        getFullParticipantList(function (participants) {
+            storeParticipantData(participants, courseCode, semester, courseName);
+        });
+    }
+
+    function storeParticipantData(participants, courseCode, semester, courseName) {
+        var deps = getDeps();
+        if (!deps || !participants.length) return;
 
         var now = Date.now();
         var sig = (courseCode || 'unknown') + '|' + semester + '|' + participants.length
@@ -558,24 +598,14 @@
         });
     }
 
-    function getParticipantIntelPageSizeAdjustTs() {
-        return participantIntelPageSizeAdjustTs;
-    }
-
-    function resetParticipantIntelPageSizeAdjustTs() {
-        participantIntelPageSizeAdjustTs = 0;
-    }
-
     globalThis.DTUAfterDarkParticipantIntelCore = {
         dedupeIntelCourseList: dedupeIntelCourseList,
         collapseCourseEntriesByCode: collapseCourseEntriesByCode,
         loadParticipantIntel: loadParticipantIntel,
         saveParticipantIntel: saveParticipantIntel,
-        ensureCampusnetParticipantsPageSizeMax: ensureCampusnetParticipantsPageSizeMax,
         parseParticipantList: parseParticipantList,
+        getFullParticipantList: getFullParticipantList,
         collectParticipantData: collectParticipantData,
-        detectAndStoreSelf: detectAndStoreSelf,
-        getParticipantIntelPageSizeAdjustTs: getParticipantIntelPageSizeAdjustTs,
-        resetParticipantIntelPageSizeAdjustTs: resetParticipantIntelPageSizeAdjustTs
+        detectAndStoreSelf: detectAndStoreSelf
     };
 })();

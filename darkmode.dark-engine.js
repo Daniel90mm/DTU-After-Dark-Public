@@ -335,6 +335,14 @@
             color: ${DARK_TEXT} !important;
             border-color: ${DARK_BORDER} !important;
         }
+        /* darkmode.css paints these wrappers dark 2, and which of the two style
+           elements lands later in the Lessons frame varies per load. Out-rank
+           it so the TOC panel is dark 1 every time. */
+        html body .navigation-container,
+        html body .navigation-menu,
+        html body .navigation-search {
+            background-color: #1a1a1a !important;
+        }
         d2l-list,
         d2l-list-item,
         d2l-list-item-nav {
@@ -665,6 +673,26 @@
         }
     `;
 
+    // Nested topics in the Lessons TOC sit in an expand-collapse region. Filled,
+    // it drew a square dark-2 block around the rows; the rows' own rounded pills
+    // carry all the state, so the region stays see-through.
+    const lessonsTocExpandCollapseStyles = `
+        :host,
+        .d2l-expand-collapse-content-container,
+        .d2l-expand-collapse-content-inner {
+            background-color: transparent !important;
+        }
+    `;
+
+    function isInsideLessonsTocItem(element) {
+        try {
+            const root = element.getRootNode && element.getRootNode();
+            return !!(root && root.host && root.host.tagName === 'D2L-LIST-ITEM-NAV');
+        } catch (e) {
+            return false;
+        }
+    }
+
     const htmlEditorShadowStyles = `
         :host {
             color: ${DARK_TEXT} !important;
@@ -852,9 +880,11 @@
             background-image: none !important;
             color: ${DARK_TEXT} !important;
         }
+        /* No fill of its own: a filled glyph box showed as a square on rows
+           whose rounded pill is unfilled. */
         d2l-icon[icon="tier2:file-document"] {
-            background-color: ${DARK_BG} !important;
-            background: ${DARK_BG} !important;
+            background-color: transparent !important;
+            background: transparent !important;
             background-image: none !important;
             color: ${DARK_TEXT} !important;
         }
@@ -867,7 +897,6 @@
            shared raised hover while leaving D2L's semantic selection borders. */
         [slot="outside-control-container"],
         ::slotted([slot="outside-control-container"]),
-        :host([current]),
         :host([current]) [slot="outside-control-container"] {
             background-color: ${DARK_BG} !important;
             background: ${DARK_BG} !important;
@@ -875,11 +904,41 @@
         }
         [slot="outside-control-container"]:hover,
         ::slotted([slot="outside-control-container"]):hover,
-        :host([current]):hover,
         :host([current]) [slot="outside-control-container"]:hover {
             background-color: #3d3d3d !important;
             background: #3d3d3d !important;
             background-image: none !important;
+        }
+        /* Lessons TOC rows: D2L paints only the rounded outside-control-container
+           pill; the host and the list stay transparent. Keep that shape on the
+           dark-1 panel -- resting pills unfilled, hovered/focused and current
+           pills raised to dark 2. Hover arrives as host attributes: the pill
+           itself sits under the action layer and never matches :hover. */
+        :host(d2l-list-item-nav) [slot="outside-control-container"] {
+            background-color: transparent !important;
+            background: transparent !important;
+        }
+        /* Row separators are border-top: var(--d2l-color-mica) pseudo-elements
+           (near-white on dark). Recolour the token, not the borders, so D2L's
+           own rules that hide them on hover/focus/current keep working. */
+        :host(d2l-list-item-nav) {
+            --d2l-color-mica: ${DARK_BORDER} !important;
+        }
+        :host(d2l-list-item-nav[_hovering-primary-action]) [slot="outside-control-container"],
+        :host(d2l-list-item-nav[_hovering-control]) [slot="outside-control-container"],
+        :host(d2l-list-item-nav[_hovering-selection]) [slot="outside-control-container"],
+        :host(d2l-list-item-nav[_focusing-primary-action]) [slot="outside-control-container"],
+        :host(d2l-list-item-nav[current]) [slot="outside-control-container"] {
+            background-color: ${DARK_BG} !important;
+            background: ${DARK_BG} !important;
+            background-image: none !important;
+        }
+        :host(d2l-list-item-nav:not([current])[_hovering-primary-action]) [slot="outside-control-container"],
+        :host(d2l-list-item-nav:not([current])[_hovering-control]) [slot="outside-control-container"],
+        :host(d2l-list-item-nav:not([current])[_hovering-selection]) [slot="outside-control-container"],
+        :host(d2l-list-item-nav:not([current])[_focusing-primary-action]) [slot="outside-control-container"] {
+            border-color: ${DARK_BORDER} !important;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.35) !important;
         }
         [slot="supporting-info"],
         [slot="content"],
@@ -957,7 +1016,7 @@
         :host {
             color: #e0e0e0 !important;
         }
-        *:not(a):not([style^="color"]):not([style*="; color"]):not([style*=";color"]),
+        *:not(a):not(a *):not([style^="color"]):not([style*="; color"]):not([style*=";color"]),
         *::before, *::after {
             color: #e0e0e0 !important;
         }
@@ -970,9 +1029,9 @@
             color: #e0e0e0 !important;
         }
         div.d2l-html-block-rendered,
-        div.d2l-html-block-rendered *:not(a):not([style^="color"]):not([style*="; color"]):not([style*=";color"]),
+        div.d2l-html-block-rendered *:not(a):not(a *):not([style^="color"]):not([style*="; color"]):not([style*=";color"]),
         .d2l-html-block-rendered,
-        .d2l-html-block-rendered *:not(a):not([style^="color"]):not([style*="; color"]):not([style*=";color"]) {
+        .d2l-html-block-rendered *:not(a):not(a *):not([style^="color"]):not([style*="; color"]):not([style*=";color"]) {
             color: #e0e0e0 !important;
         }
         span, p, div, strong, em, b, i {
@@ -981,6 +1040,21 @@
         }
         a {
             color: #66b3ff !important;
+        }
+        /* Text pasted from Word wraps link text in styled spans; let it take
+           the link colour instead of the body text or its authored colour. */
+        .d2l-html-block-rendered a * {
+            color: inherit !important;
+        }
+        /* Underline links in course text so they read as links without relying
+           on colour. MazeMap links keep their own dotted underline and pin. */
+        .d2l-html-block-rendered a[href]:not([data-dtu-mazemap-link]) {
+            text-decoration: underline !important;
+            text-decoration-color: rgba(102, 179, 255, 0.5) !important;
+            text-underline-offset: 2px !important;
+        }
+        .d2l-html-block-rendered a[href]:not([data-dtu-mazemap-link]):hover {
+            text-decoration-color: currentColor !important;
         }
         a:hover, a:hover * {
             color: #99ccff !important;
@@ -1086,6 +1160,9 @@
                 || tagName === 'd2l-breadcrumb-current-page') {
                 styleId = 'dark-mode-shadow-styles-breadcrumb';
                 styleText = breadcrumbShadowStyles;
+            } else if (tagName === 'd2l-expand-collapse-content' && isInsideLessonsTocItem(element)) {
+                styleId = 'dark-mode-shadow-styles-expand-collapse-toc';
+                styleText = lessonsTocExpandCollapseStyles;
             } else if (tagName === 'd2l-expand-collapse-content' || tagName === 'd2l-lti-launch') {
                 styleId = 'dark-mode-shadow-styles-expand-collapse';
                 styleText = expandCollapseStyles;
@@ -1984,6 +2061,9 @@
         }
         if (el.hasAttribute && el.hasAttribute('data-dtu-ext')) return;
         if (el.closest && el.closest('[data-dtu-ext]')) return;
+        // The DTU web header's search button draws its magnifier as a
+        // background image; darkmode.css restyles it, so leave it alone here.
+        if (el.matches && el.matches('input.inputsubmit[id*="SearchBox_searchbutton"]')) return;
         if (window.location.hostname === 'evaluering.dtu.dk' && el.matches) {
             if (el.matches('.question__content, .question__content > div[style*="font-size:0"]')) return;
         }
@@ -2142,10 +2222,15 @@
         var tagName = ((el.tagName || '') + '').toLowerCase();
         var iconName = (el.getAttribute && el.getAttribute('icon')) || '';
         if (tagName === 'd2l-icon' && iconName === 'tier2:file-document') {
-            if (inlineStyleHasDarkFill(el, '#2d2d2d', 'rgb(45,45,45)')
+            // Transparent so the glyph sits on whatever its row shows (resting,
+            // hovered or current pill) instead of drawing its own square.
+            // Guarded: rewriting unchanged inline styles loops the observer.
+            var iconFill = normalizeInlineStyleValue(el.style.getPropertyValue('background-color'));
+            if ((iconFill === 'transparent' || iconFill === 'rgba(0,0,0,0)')
+                && el.style.getPropertyPriority('background-color') === 'important'
                 && inlineStyleHasTextColor(el, '#e0e0e0', 'rgb(224,224,224)')) return;
-            el.style.setProperty('background', '#2d2d2d', 'important');
-            el.style.setProperty('background-color', '#2d2d2d', 'important');
+            el.style.setProperty('background', 'transparent', 'important');
+            el.style.setProperty('background-color', 'transparent', 'important');
             el.style.setProperty('background-image', 'none', 'important');
             el.style.setProperty('color', '#e0e0e0', 'important');
             return;

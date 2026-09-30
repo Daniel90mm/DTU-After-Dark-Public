@@ -790,7 +790,7 @@
             var campusLines = getCampusLineDefinitions(config.campuses);
             var availableLines = campusLines.filter(function (bus) { return configuredLineNames.indexOf(bus.line) === -1; });
             availableCount.textContent = availableLines.length + ' available lines';
-            campusSummary.textContent = selectedCampusLabels.length ? 'Campuses: ' + selectedCampusLabels.join(' · ') : 'Campus scope follows your current bus setup.';
+            campusSummary.textContent = selectedCampusLabels.length ? 'Campuses: ' + selectedCampusLabels.join(', ') : 'Campus scope follows your current bus setup.';
             contextMeta.appendChild(availableCount);
             contextMeta.appendChild(campusSummary);
             modal.appendChild(contextMeta);
@@ -836,7 +836,7 @@
                 var campusTags = getLineCampusLabels(bus.line, config.campuses);
                 var campusMetaText = document.createElement('span');
                 campusMetaText.style.cssText = 'font-size:13px;line-height:1.45;color:' + modalTheme.subtle + ';';
-                campusMetaText.textContent = campusTags.length ? campusTags.join(' · ') : 'Available for your selected campuses';
+                campusMetaText.textContent = campusTags.length ? campusTags.join(', ') : 'Available for your selected campuses';
 
                 var actionHint = document.createElement('span');
                 actionHint.style.cssText = 'font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:'
@@ -1727,6 +1727,12 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
     var _libraryOccupancyAutoTimer = null;
     var LIBRARY_CROWD_HEATMAP_EXPANDED_KEY = 'dtuAfterDarkLibraryCrowdHeatmapExpanded';
 
+    // Dark mode draws the typical line and historical band in a light neutral:
+    // the accent (DTU red by default) at low opacity is invisible on the dark
+    // panel, and keeping red for "Current" alone makes the three series distinct.
+    var LIBRARY_CHART_DARK_TYPICAL_STROKE = 'rgba(224,224,224,0.62)';
+    var LIBRARY_CHART_DARK_BAND_FILL = 'rgba(224,224,224,0.10)';
+
     function ensureLibraryRuntimeStyles() {
         if (!isTopWindow()) return;
         var host = document.head || document.documentElement;
@@ -1768,6 +1774,9 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
         var crowdGood = '#2e7d32';
         var crowdWarn = '#d97706'; // Fixed amber — keeps traffic-light semantics independent of accent colour
         var crowdBad = '#c62828';
+        // Text-sized accents follow the extension's convention: the soft accent
+        // on dark surfaces (the base accent is too dark to read there).
+        var accentText = isDarkModeEnabled() ? 'var(--dtu-ad-accent-soft)' : 'var(--dtu-ad-accent)';
 
         var css = [
             '.dtu-library-modal-overlay{position:fixed !important;inset:0 !important;z-index:1000000 !important;display:flex !important;align-items:center !important;justify-content:center !important;padding:20px !important;background:transparent !important;background-color:transparent !important;backdrop-filter:blur(4px) !important;-webkit-backdrop-filter:blur(4px) !important;}',
@@ -1799,25 +1808,27 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
             '.dtu-library-trend-section .dtu-library-crowd-chart{background:transparent !important;border-radius:0 !important;}',
             '.dtu-library-trend-section .dtu-library-crowd-events,.dtu-library-trend-section .dtu-library-crowd-confidence{padding:0 !important;}',
             '.dtu-library-section-header{display:flex !important;align-items:center !important;justify-content:space-between !important;gap:8px !important;margin:0 0 8px !important;padding:0 !important;background:transparent !important;}',
-            '.dtu-library-section-title{margin:0 !important;font-size:12px !important;font-weight:700 !important;letter-spacing:0.7px !important;text-transform:uppercase !important;color:' + sectionTitle + ' !important;background:transparent !important;}',
+            '.dtu-library-section-title{margin:0 !important;font-size:14px !important;font-weight:700 !important;letter-spacing:0 !important;text-transform:none !important;color:' + panelText + ' !important;background:transparent !important;}',
             '.dtu-library-actions{display:flex !important;align-items:center !important;gap:8px !important;background:transparent !important;}',
             'button.dtu-library-action-btn{appearance:none !important;border:1px solid ' + actionBorder + ' !important;background:' + actionBg + ' !important;color:' + panelText + ' !important;border-radius:7px !important;cursor:pointer !important;padding:4px 10px !important;font-size:11px !important;font-weight:650 !important;line-height:1.2 !important;white-space:nowrap !important;min-height:26px !important;}',
             'button.dtu-library-action-btn:hover{background:' + actionBgHover + ' !important;border-color:var(--dtu-ad-accent) !important;color:var(--dtu-ad-accent-soft) !important;}',
             '.dtu-library-links-section{padding:2px 0 0 !important;background:transparent !important;border:0 !important;}',
-            '.dtu-library-links-header{margin:0 0 12px !important;padding:0 4px !important;}',
+            '.dtu-library-links-header{margin:0 0 6px !important;padding:0 4px !important;}',
             '.dtu-library-links-title-wrap{display:flex !important;flex-direction:column !important;gap:3px !important;min-width:0 !important;background:transparent !important;}',
             '.dtu-library-links-subtitle{margin:0 !important;font-size:11px !important;font-weight:520 !important;line-height:1.35 !important;color:' + muted + ' !important;background:transparent !important;}',
             '.dtu-library-link-grid{display:grid !important;grid-template-columns:repeat(3,minmax(0,1fr)) !important;gap:8px 20px !important;background:transparent !important;}',
-            'a.dtu-library-link-item{display:grid !important;grid-template-columns:18px minmax(0,1fr) 14px !important;align-items:center !important;gap:12px !important;min-height:58px !important;padding:10px 4px 10px 2px !important;border-radius:0 !important;background:transparent !important;border:0 !important;box-shadow:inset 0 -1px 0 ' + linkDivider + ' !important;color:' + panelText + ' !important;text-decoration:none !important;text-align:left !important;white-space:normal !important;overflow-wrap:anywhere !important;transition:all 0.2s ease-in-out !important;}',
+            'a.dtu-library-link-item{display:grid !important;grid-template-columns:18px minmax(0,1fr) 14px !important;align-items:center !important;gap:12px !important;min-height:48px !important;padding:7px 4px 7px 2px !important;border-radius:0 !important;background:transparent !important;border:0 !important;box-shadow:inset 0 -1px 0 ' + linkDivider + ' !important;color:' + panelText + ' !important;text-decoration:none !important;text-align:left !important;white-space:normal !important;overflow-wrap:anywhere !important;transition:background-color 0.2s ease-in-out,transform 0.2s ease-in-out !important;}',
             'a.dtu-library-link-item:hover{background:' + linkBgHover + ' !important;border-radius:12px !important;box-shadow:inset 0 -1px 0 transparent !important;color:' + panelText + ' !important;transform:translateY(-2px) !important;}',
-            '.dtu-library-link-icon{display:inline-flex !important;align-items:center !important;justify-content:center !important;align-self:start !important;flex-shrink:0 !important;width:18px !important;min-width:18px !important;height:18px !important;color:var(--dtu-ad-accent) !important;}',
-            '.dtu-library-link-icon svg{display:block !important;width:18px !important;height:18px !important;stroke:currentColor !important;fill:none !important;stroke-width:1.9 !important;stroke-linecap:round !important;stroke-linejoin:round !important;}',
+            '.dtu-library-link-icon{display:inline-flex !important;align-items:center !important;justify-content:center !important;align-self:start !important;flex-shrink:0 !important;width:18px !important;min-width:18px !important;height:18px !important;color:' + accentText + ' !important;}',
+            '.dtu-library-link-icon svg{display:block !important;color:inherit !important;width:18px !important;height:18px !important;stroke:currentColor !important;fill:none !important;stroke-width:1.9 !important;stroke-linecap:round !important;stroke-linejoin:round !important;}',
             '.dtu-library-link-content{display:flex !important;flex-direction:column !important;gap:2px !important;min-width:0 !important;}',
             '.dtu-library-link-label{display:block !important;min-width:0 !important;overflow-wrap:anywhere !important;font-size:13px !important;font-weight:700 !important;line-height:1.2 !important;color:' + panelText + ' !important;}',
             '.dtu-library-link-meta{display:block !important;min-width:0 !important;overflow-wrap:anywhere !important;font-size:10.5px !important;font-weight:540 !important;line-height:1.3 !important;color:' + muted + ' !important;}',
             '.dtu-library-link-arrow{display:inline-flex !important;align-items:center !important;justify-content:flex-end !important;align-self:center !important;width:14px !important;height:14px !important;color:' + sectionTitle + ' !important;transition:transform 0.2s ease-in-out,color 0.2s ease-in-out !important;}',
-            '.dtu-library-link-arrow svg{display:block !important;width:14px !important;height:14px !important;stroke:currentColor !important;fill:none !important;stroke-width:1.9 !important;stroke-linecap:round !important;stroke-linejoin:round !important;}',
-            'a.dtu-library-link-item:hover .dtu-library-link-icon,a.dtu-library-link-item:hover .dtu-library-link-arrow{color:var(--dtu-ad-accent) !important;}',
+            '.dtu-library-link-arrow svg{display:block !important;color:inherit !important;width:14px !important;height:14px !important;stroke:currentColor !important;fill:none !important;stroke-width:1.9 !important;stroke-linecap:round !important;stroke-linejoin:round !important;}',
+            'a.dtu-library-link-item:hover .dtu-library-link-icon,a.dtu-library-link-item:hover .dtu-library-link-arrow{color:' + accentText + ' !important;}',
+            '.dtu-library-panel a:focus-visible,.dtu-library-panel button:focus-visible{outline:2px solid ' + panelText + ' !important;outline-offset:2px !important;}',
+            '.dtu-library-panel:focus{outline:none !important;}',
             'a.dtu-library-link-item:hover .dtu-library-link-arrow{transform:translateX(2px) !important;}',
             '.dtu-library-crowd{display:flex !important;flex-direction:column !important;gap:12px !important;padding:2px 2px 0 !important;color:' + crowdText + ' !important;}',
             '.dtu-library-crowd-card{background:transparent !important;border:0 !important;border-radius:0 !important;padding:0 !important;box-shadow:none !important;}',
@@ -1833,13 +1844,15 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
             '.dtu-library-crowd-free-wrap{display:flex !important;align-items:flex-end !important;gap:6px !important;}',
             '.dtu-library-crowd-free{margin:0 !important;font-size:30px !important;font-weight:800 !important;line-height:0.98 !important;letter-spacing:-0.35px !important;color:' + crowdText + ' !important;}',
             '.dtu-library-crowd-free-unit{margin:0 0 3px !important;font-size:10px !important;font-weight:620 !important;line-height:1 !important;color:' + crowdMuted + ' !important;}',
+            '.dtu-library-crowd-hero.is-after-hours .dtu-library-crowd-hero-stats,.dtu-library-crowd-hero.is-after-hours .dtu-library-crowd-progress,.dtu-library-crowd-hero.is-after-hours .dtu-library-crowd-free-unit{display:none !important;}',
+            '.dtu-library-crowd-hero.is-after-hours .dtu-library-crowd-free{font-size:20px !important;letter-spacing:0 !important;}',
             '.dtu-library-crowd-status{margin:0 0 3px !important;font-size:12px !important;font-weight:700 !important;line-height:1.1 !important;color:' + crowdMuted + ' !important;}',
             '.dtu-library-crowd-progress{position:relative !important;width:100% !important;height:12px !important;margin-top:2px !important;border-radius:999px !important;background:' + crowdTrack + ' !important;border:1px solid ' + crowdBorder + ' !important;overflow:hidden !important;}',
             '.dtu-library-crowd-progress-fill{position:absolute !important;left:0 !important;top:0 !important;bottom:0 !important;width:0 !important;border-radius:999px !important;background:' + crowdGood + ' !important;transition:width 0.25s ease !important;}',
             '.dtu-library-crowd-progress[aria-valuetext*=\"Moderate\"] .dtu-library-crowd-progress-fill{background:' + crowdWarn + ' !important;}',
             '.dtu-library-crowd-progress[aria-valuetext*=\"Busy\"] .dtu-library-crowd-progress-fill{background:' + crowdBad + ' !important;}',
             '.dtu-library-crowd-chart-wrap{background:transparent !important;border:0 !important;border-radius:0 !important;padding:2px 0 0 !important;box-shadow:none !important;}',
-            '.dtu-library-crowd-chart{display:block !important;width:100% !important;height:172px !important;border-radius:0 !important;background:transparent !important;}',
+            '.dtu-library-crowd-chart{display:block !important;width:100% !important;height:136px !important;border-radius:0 !important;background:transparent !important;}',
             '.dtu-library-crowd-chart-note{margin:10px 0 0 !important;font-size:10px !important;line-height:1.35 !important;color:' + crowdMuted + ' !important;}',
             '.dtu-library-crowd-events{display:flex !important;flex-direction:column !important;gap:4px !important;margin-top:8px !important;}',
             '.dtu-library-crowd-event{display:flex !important;align-items:flex-start !important;gap:6px !important;font-size:10px !important;line-height:1.3 !important;color:' + crowdMuted + ' !important;}',
@@ -1860,19 +1873,19 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
             '.dtu-library-feed-section{padding:4px 0 0 !important;background:transparent !important;border:0 !important;}',
             '.dtu-library-feed-header{margin:0 0 10px !important;padding:0 4px !important;}',
             '.dtu-library-feed-list{display:flex !important;flex-direction:column !important;gap:0 !important;background:transparent !important;}',
-            'a.dtu-library-feed-item{display:flex !important;align-items:flex-start !important;gap:16px !important;padding:14px 4px 14px 0 !important;border-radius:0 !important;background:transparent !important;border:0 !important;box-shadow:inset 0 -1px 0 ' + feedDivider + ' !important;text-decoration:none !important;color:' + panelText + ' !important;transition:all 0.2s ease-in-out !important;}',
+            'a.dtu-library-feed-item{display:flex !important;align-items:flex-start !important;gap:16px !important;padding:14px 4px 14px 0 !important;border-radius:0 !important;background:transparent !important;border:0 !important;box-shadow:inset 0 -1px 0 ' + feedDivider + ' !important;text-decoration:none !important;color:' + panelText + ' !important;transition:background-color 0.2s ease-in-out,transform 0.2s ease-in-out !important;}',
             'a.dtu-library-feed-item:hover{background:' + rowBgHover + ' !important;border-radius:14px !important;box-shadow:inset 0 -1px 0 transparent !important;transform:translateY(-2px) !important;}',
             '.dtu-library-date-badge{position:relative !important;display:flex !important;flex-direction:column !important;align-items:flex-start !important;justify-content:center !important;flex-shrink:0 !important;min-width:64px !important;height:auto !important;padding:2px 0 2px 14px !important;border-radius:0 !important;overflow:visible !important;background:transparent !important;border:0 !important;}',
-            '.dtu-library-date-badge::before{content:\"\" !important;position:absolute !important;top:6px !important;bottom:6px !important;left:0 !important;width:3px !important;border-radius:999px !important;background:var(--dtu-ad-accent) !important;}',
+            '.dtu-library-date-badge::before{content:\"\" !important;position:absolute !important;top:6px !important;bottom:6px !important;left:0 !important;width:3px !important;border-radius:999px !important;background:' + accentText + ' !important;}',
             '.dtu-library-date-day{margin:0 !important;font-size:24px !important;font-weight:790 !important;line-height:0.95 !important;color:' + panelText + ' !important;}',
-            '.dtu-library-date-month{margin:2px 0 0 !important;font-size:10px !important;font-weight:760 !important;line-height:1 !important;letter-spacing:0.7px !important;text-transform:uppercase !important;color:var(--dtu-ad-accent) !important;}',
+            '.dtu-library-date-month{margin:2px 0 0 !important;font-size:10px !important;font-weight:760 !important;line-height:1 !important;letter-spacing:0.7px !important;text-transform:uppercase !important;color:' + accentText + ' !important;}',
             '.dtu-library-item-content{display:flex !important;flex-direction:column !important;gap:4px !important;min-width:0 !important;flex:1 1 auto !important;background:transparent !important;padding-top:1px !important;}',
-            '.dtu-library-news-badge{position:relative !important;display:inline-flex !important;align-items:center !important;padding:0 0 0 14px !important;margin:0 0 2px !important;border-radius:0 !important;background:transparent !important;border:0 !important;color:var(--dtu-ad-accent) !important;font-size:10px !important;font-weight:760 !important;line-height:1.25 !important;letter-spacing:0.8px !important;text-transform:uppercase !important;}',
+            '.dtu-library-news-badge{position:relative !important;display:inline-flex !important;align-items:center !important;padding:0 0 0 14px !important;margin:0 0 2px !important;border-radius:0 !important;background:transparent !important;border:0 !important;color:' + accentText + ' !important;font-size:10px !important;font-weight:760 !important;line-height:1.25 !important;letter-spacing:0.8px !important;text-transform:uppercase !important;}',
             '.dtu-library-news-badge::before{content:\"\" !important;position:absolute !important;left:0 !important;top:50% !important;width:8px !important;height:1.5px !important;transform:translateY(-50%) !important;background:currentColor !important;border-radius:999px !important;}',
             '.dtu-library-item-title{margin:0 !important;font-size:14px !important;font-weight:720 !important;line-height:1.35 !important;color:' + panelText + ' !important;display:-webkit-box !important;-webkit-line-clamp:2 !important;line-clamp:2 !important;-webkit-box-orient:vertical !important;overflow:hidden !important;}',
             '.dtu-library-item-meta{margin:0 !important;font-size:11px !important;line-height:1.45 !important;color:' + muted + ' !important;white-space:normal !important;overflow-wrap:anywhere !important;}',
             '.dtu-library-state-msg{margin:0 !important;padding:16px 12px !important;border-radius:9px !important;border:1px dashed ' + panelBorder + ' !important;background:' + stateBg + ' !important;text-align:center !important;color:' + muted + ' !important;font-size:12px !important;font-style:italic !important;}',
-            '@media (max-width: 900px){.dtu-library-feed-grid{grid-template-columns:1fr !important;}.dtu-library-link-grid{grid-template-columns:repeat(2,minmax(0,1fr)) !important;}.dtu-library-header{align-items:flex-start !important;}.dtu-library-header-main{flex-wrap:wrap !important;align-items:flex-start !important;gap:10px !important;}.dtu-library-header-occupancy{width:100% !important;gap:10px !important;}.dtu-library-header-actions{width:100% !important;justify-content:flex-start !important;}}',
+            '@media (max-width: 900px){.dtu-library-header{flex-wrap:wrap !important;}.dtu-library-feed-grid{grid-template-columns:1fr !important;}.dtu-library-link-grid{grid-template-columns:repeat(2,minmax(0,1fr)) !important;}.dtu-library-header{align-items:flex-start !important;}.dtu-library-header-main{flex-wrap:wrap !important;align-items:flex-start !important;gap:10px !important;}.dtu-library-header-occupancy{width:100% !important;gap:10px !important;}.dtu-library-header-actions{width:100% !important;justify-content:flex-start !important;}}',
             '@media (max-width: 520px){.dtu-library-modal-overlay{padding:8px !important;}.dtu-library-panel{width:calc(100vw - 16px) !important;max-height:calc(100vh - 16px) !important;border-radius:12px !important;}.dtu-library-header{padding:12px 14px 10px !important;}.dtu-library-content{padding:12px 14px 14px !important;}.dtu-library-link-grid{grid-template-columns:1fr !important;}.dtu-library-header-occupancy{gap:8px !important;}.dtu-library-header-occ-value{font-size:19px !important;}.dtu-library-header-updated{display:none !important;}}'
         ].join('');
 
@@ -2407,7 +2420,7 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
         if (!canvas || !model) return;
         var dpr = Math.max(1, window.devicePixelRatio || 1);
         var cssW = Math.max(320, Math.round(canvas.clientWidth || 640));
-        var cssH = Math.max(150, Math.round(canvas.clientHeight || 186));
+        var cssH = Math.max(120, Math.round(canvas.clientHeight || 136));
         var targetW = Math.round(cssW * dpr);
         var targetH = Math.round(cssH * dpr);
         if (canvas.width !== targetW) canvas.width = targetW;
@@ -2426,8 +2439,8 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
         var textColor = isDarkModeEnabled() ? '#9aa0aa' : '#667084';
         // Helper: apply opacity to the dynamic accent color safely
         function accentWithOpacity(opacity) { return 'rgba(' + accentRgb + ',' + opacity + ')'; }
-        var bandFill = accentWithOpacity(isDarkModeEnabled() ? 0.045 : 0.07);
-        var bandStroke = accentWithOpacity(isDarkModeEnabled() ? 0.42 : 0.48);
+        var bandFill = isDarkModeEnabled() ? LIBRARY_CHART_DARK_BAND_FILL : accentWithOpacity(0.07);
+        var bandStroke = isDarkModeEnabled() ? LIBRARY_CHART_DARK_TYPICAL_STROKE : accentWithOpacity(0.48);
         var markerColor = isDarkModeEnabled() ? '#f5f5f5' : '#1a1a1a';
 
         // Hide the min-max band if there are fewer than 3 weekday observations
@@ -2547,6 +2560,12 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
             }
         }
 
+        // Reset the pen: the capacity line above leaves a bright, thicker stroke
+        // and fill that the hour grid would otherwise inherit.
+        ctx.strokeStyle = gridColor;
+        ctx.lineWidth = 1;
+        ctx.fillStyle = textColor;
+        ctx.font = '10px sans-serif';
         for (var hour = model.startHour; hour <= model.endHour; hour += 2) {
             var xPos = xForMinute(hour * 60);
             ctx.beginPath();
@@ -2654,9 +2673,8 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
             return 'Library data unavailable right now.';
         }
 
-        if (!model.isWithinDisplayHours) {
-            return 'Live occupancy is hidden outside the ' + formatLibraryMinuteRange(model.startHour * 60, model.endHour * 60) + ' library graph window.';
-        }
+        // After hours the hero already says when live numbers return.
+        if (!model.isWithinDisplayHours) return '';
 
         var current = model.snapshot.visitors;
         var typicalNow = model.typicalNow;
@@ -2911,6 +2929,7 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
         var freeValue = document.createElement('div');
         freeValue.className = 'dtu-library-crowd-free';
         freeValue.textContent = '--%';
+        markExt(freeValue);
         var freeUnit = document.createElement('div');
         freeUnit.className = 'dtu-library-crowd-free-unit';
         freeUnit.textContent = 'filled';
@@ -2923,6 +2942,7 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
         var status = document.createElement('div');
         status.className = 'dtu-library-crowd-status';
         status.textContent = 'Waiting for data...';
+        markExt(status);
         var heroTop = document.createElement('div');
         heroTop.className = 'dtu-library-crowd-hero-top';
         markExt(heroTop);
@@ -3047,6 +3067,7 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
             container: container,
             titleEl: h3,
             retryBtn: retryBtn,
+            hero: hero,
             freeValue: freeValue,
             status: status,
             nowStatValue: nowStatValue,
@@ -3095,9 +3116,13 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
         if (section.titleEl) section.titleEl.textContent = '';
         // isFinite(null) === true in JS — must check for null explicitly
         var pct = (showLiveOccupancy && model.occupancyRatio != null && isFinite(model.occupancyRatio) ? Math.round(model.occupancyRatio * 100) : null);
-        if (section.freeValue) section.freeValue.textContent = (pct == null ? '--%' : (pct + '%'));
+        // After hours the live numbers are hidden, so say that once instead of
+        // showing an empty percentage and three empty stats.
+        if (section.hero) section.hero.classList.toggle('is-after-hours', !showLiveOccupancy);
+        if (section.freeValue) section.freeValue.textContent = !showLiveOccupancy ? 'After hours' : (pct == null ? '--%' : (pct + '%'));
         if (section.status) {
-            section.status.textContent = statusLabel;
+            section.status.textContent = showLiveOccupancy ? statusLabel
+                : 'Live numbers return at ' + (model.startHour < 10 ? '0' : '') + model.startHour + ':00';
             section.status.style.setProperty('color', statusColor, 'important');
         }
         if (section.nowStatValue) section.nowStatValue.textContent = formatLibraryOccupancyCount(shownVisitors);
@@ -3117,6 +3142,7 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
         var chartFlags = drawLibraryCrowdingChart(section.chartCanvas, model, eventIntervals) || {};
         if (section.chartNote) {
             section.chartNote.textContent = insightLine;
+            section.chartNote.style.setProperty('display', insightLine ? '' : 'none', 'important');
         }
 
         // Update the HTML legend below the canvas
@@ -3139,8 +3165,8 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
                     rect.setAttribute('y', '1');
                     rect.setAttribute('width', '18');
                     rect.setAttribute('height', '6');
-                    rect.setAttribute('fill', 'rgba(' + accentRgbForLeg + ',0.07)');
-                    rect.setAttribute('stroke', 'rgba(' + accentRgbForLeg + ',0.28)');
+                    rect.setAttribute('fill', isDarkModeEnabled() ? LIBRARY_CHART_DARK_BAND_FILL : 'rgba(' + accentRgbForLeg + ',0.07)');
+                    rect.setAttribute('stroke', isDarkModeEnabled() ? 'rgba(224,224,224,0.28)' : 'rgba(' + accentRgbForLeg + ',0.28)');
                     rect.setAttribute('stroke-width', '0.8');
                     rect.setAttribute('rx', '1');
                     svg.appendChild(rect);
@@ -3154,7 +3180,7 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
                 line.setAttribute('y2', '4');
                 line.setAttribute('stroke-linecap', 'round');
                 if (kind === 'typical') {
-                    line.setAttribute('stroke', 'rgba(' + accentRgbForLeg + ',0.60)');
+                    line.setAttribute('stroke', isDarkModeEnabled() ? LIBRARY_CHART_DARK_TYPICAL_STROKE : 'rgba(' + accentRgbForLeg + ',0.60)');
                     line.setAttribute('stroke-width', '1.4');
                     line.setAttribute('stroke-dasharray', '4 3');
                 } else {
@@ -3285,7 +3311,7 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
                     markExt(dot);
                     var txt = document.createElement('span');
                     txt.className = 'dtu-library-crowd-event-text';
-                    txt.textContent = formatLibraryMinuteRange(itv.startMinute, itv.endMinute) + ' \u00b7 ' + (itv.title || 'DTU Library event');
+                    txt.textContent = formatLibraryMinuteRange(itv.startMinute, itv.endMinute) + ': ' + (itv.title || 'DTU Library event');
                     markExt(txt);
                     row.appendChild(dot);
                     row.appendChild(txt);
@@ -3351,8 +3377,7 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
             { id: 'feature-participant-intel-retention-toggle', key: FEATURE_PARTICIPANT_INTEL_RETENTION_KEY },
             { id: 'feature-studyplan-exam-cluster-toggle', key: FEATURE_STUDYPLAN_EXAM_CLUSTER_KEY },
             { id: 'library-dropdown-toggle', key: getLibraryDropdownFeatureKey() },
-            { id: 'feature-lessons-bulk-download-toggle', key: FEATURE_LEARN_LESSONS_BULK_DOWNLOAD_KEY },
-            { id: 'feature-lessons-bulk-single-zip-toggle', key: FEATURE_LEARN_LESSONS_BULK_SINGLE_ZIP_KEY }
+            { id: 'feature-lessons-bulk-download-toggle', key: FEATURE_LEARN_LESSONS_BULK_DOWNLOAD_KEY }
         ];
         mapping.forEach(function (m) {
             const el = document.querySelector('#' + m.id);
@@ -3394,7 +3419,6 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
                         participantIntel: FEATURE_PARTICIPANT_INTEL_KEY,
                         libraryDropdown: getLibraryDropdownFeatureKey(),
                         learnLessonsBulkDownload: FEATURE_LEARN_LESSONS_BULK_DOWNLOAD_KEY,
-                        learnLessonsBulkSingleZip: FEATURE_LEARN_LESSONS_BULK_SINGLE_ZIP_KEY,
                         participantIntelDemographics: FEATURE_PARTICIPANT_INTEL_DEMOGRAPHICS_KEY,
                         participantIntelSharedHistory: FEATURE_PARTICIPANT_INTEL_SHARED_HISTORY_KEY,
                         participantIntelRetention: FEATURE_PARTICIPANT_INTEL_RETENTION_KEY

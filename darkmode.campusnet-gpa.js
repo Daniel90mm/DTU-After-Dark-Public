@@ -230,9 +230,12 @@
         btn.title = excluded
             ? 'Include this course again in GPA and ECTS calculations'
             : 'Ignore this course in GPA and ECTS calculations';
+        btn.setAttribute('aria-label', excluded ? 'Include this course in GPA again' : 'Exclude this course from GPA');
+        // The base accent at reduced opacity was ~1.3:1 on the dark rows;
+        // the soft accent is the dark-surface text accent used elsewhere.
         var fg = isDarkMode()
-            ? (excluded ? 'rgba(var(--dtu-ad-accent-rgb), 0.56)' : 'rgba(var(--dtu-ad-accent-rgb), 0.74)')
-            : (excluded ? 'rgba(var(--dtu-ad-accent-deep-rgb), 0.68)' : 'rgba(var(--dtu-ad-accent-deep-rgb), 0.92)');
+            ? (excluded ? '#c9ced6' : 'var(--dtu-ad-accent-soft)')
+            : (excluded ? 'rgba(var(--dtu-ad-accent-deep-rgb), 0.78)' : 'rgba(var(--dtu-ad-accent-deep-rgb), 0.92)');
         btn.style.setProperty('background', 'transparent', 'important');
         btn.style.setProperty('background-color', 'transparent', 'important');
         btn.style.setProperty('background-image', 'none', 'important');
@@ -240,10 +243,11 @@
         btn.style.setProperty('border', '0', 'important');
         btn.style.setProperty('border-radius', '0', 'important');
         btn.style.setProperty('box-shadow', 'none', 'important');
-        btn.style.setProperty('outline', '0', 'important');
         btn.style.setProperty('appearance', 'none', 'important');
         btn.style.setProperty('-webkit-appearance', 'none', 'important');
-        btn.style.setProperty('padding', '0', 'important');
+        // Padding lifts the click target from 24x13 to at least 24px tall.
+        btn.style.setProperty('padding', '5px 6px', 'important');
+        btn.style.setProperty('min-height', '24px', 'important');
         btn.style.setProperty('display', 'inline-flex', 'important');
         btn.style.setProperty('align-items', 'center', 'important');
         btn.style.setProperty('justify-content', 'center', 'important');
@@ -251,7 +255,7 @@
         btn.style.setProperty('clear', 'none', 'important');
         btn.style.setProperty('margin-top', '0', 'important');
         btn.style.setProperty('margin-left', '0', 'important');
-        btn.style.setProperty('margin-right', '12px', 'important');
+        btn.style.setProperty('margin-right', '6px', 'important');
         btn.style.setProperty('line-height', '1.2', 'important');
         btn.style.setProperty('white-space', 'nowrap', 'important');
         btn.style.setProperty('vertical-align', 'middle', 'important');

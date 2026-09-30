@@ -38,7 +38,10 @@ function loadBackground({ fetchImpl } = {}) {
         'pickBestRoomResult',
         'zeroPadRoom',
         'sanitizeLibraryTrendApiUrl',
-        'parseIntLoose'
+        'parseIntLoose',
+        'parseGradePeriodLinks',
+        'pickMainGradeIteration',
+        'fetchLatestIterations'
     ], { chrome, fetch });
     return { api, listeners, fetchCalls, storage };
 }
@@ -84,7 +87,7 @@ test('grade distribution: pass/fail courses, Danish labels, no-shows excluded fr
         ['Bestået', 30], ['Ikke bestået', 10], ['Ej mødt', 5]
     ])));
     assert.equal(result.mode, 'pass_fail');
-    assert.equal(result.total, 45);
+    assert.equal(result.total, 40, 'total counts students who sat the exam, not no-shows');
     assert.equal(result.passRate, 75);
     assert.deepEqual(result.passFailCounts, { passed: 30, failed: 10, noShow: 5 });
 });
@@ -100,6 +103,123 @@ test('grade distribution: "no data" pages return null', () => {
     assert.equal(api.parseGradeDistribution(''), null);
     assert.equal(api.parseGradeDistribution('<p>No data</p>'), null);
     assert.equal(api.parseGradeDistribution('<p>Fordelingen vises ikke</p>' + gradeTable([['12', 50]])), null);
+});
+
+test('grade distribution: entity-encoded Danish labels parse without a DOMParser', () => {
+    // Real karakterer pages write "Bestået" and "Ej mødt" as numeric entities.
+    const result = plain(api.parseGradeDistribution(gradeTable([
+        ['Best&#229;et', 346], ['Ikke best&#229;et', 8], ['Ej m&#248;dt', 21]
+    ])));
+    assert.equal(result.mode, 'pass_fail');
+    assert.deepEqual(result.passFailCounts, { passed: 346, failed: 8, noShow: 21 });
+});
+
+test('grade distribution: summary rows like "Antal bestået" are not result rows', () => {
+    const result = plain(api.parseGradeDistribution(gradeTable([
+        ['Antal tilmeldte', 44], ['Antal best&#229;et', 22],
+        ['12', 0], ['10', 2], ['7', 9], ['4', 7], ['02', 4], ['00', 20], ['-3', 1]
+    ])));
+    assert.equal(result.mode, 'graded');
+    assert.equal(result.registered, 44);
+    assert.equal(result.total, 43);
+    assert.deepEqual(result.passFailCounts, { passed: 0, failed: 0, noShow: 0 });
+});
+
+test('grade distribution: "Ikke bestået" rows in a graded exam count as fails', () => {
+    // 01001 Winter 2023: 853 graded, none below 02, plus 124 listed as not passed.
+    const result = plain(api.parseGradeDistribution(gradeTable([
+        ['12', 162], ['10', 231], ['7', 308], ['4', 125], ['02', 27], ['00', 0], ['-3', 0],
+        ['Best&#229;et', 0], ['Ikke best&#229;et', 124]
+    ])));
+    assert.equal(result.mode, 'graded');
+    assert.equal(result.total, 977);
+    assert.equal(result.failedTotal, 124);
+    assert.ok(Math.abs(result.passRate - 853 / 977 * 100) < 1e-9);
+    assert.equal(result.average, (12 * 162 + 10 * 231 + 7 * 308 + 4 * 125 + 2 * 27) / 853, 'average over graded students only');
+});
+
+test('grade distribution: a pass/fail exam with a few graded students stays pass/fail', () => {
+    // 02476 Winter 2024: 346 passed, 8 failed, one student graded 12.
+    const result = plain(api.parseGradeDistribution(gradeTable([
+        ['12', 1], ['10', 0], ['7', 0], ['4', 0], ['02', 0], ['00', 0], ['-3', 0],
+        ['Best&#229;et', 346], ['Ikke best&#229;et', 8], ['Ej m&#248;dt', 21]
+    ])));
+    assert.equal(result.mode, 'pass_fail');
+    assert.equal(result.average, null);
+    assert.equal(result.total, 355);
+    assert.equal(result.passedTotal, 347);
+    assert.equal(result.failedTotal, 8);
+});
+
+test('grade period links: only this course, deduplicated, normalised', () => {
+    const html = '<a href="http://karakterer.dtu.dk/Histogram/1/34034/Summer-2026">s26</a>'
+        + '<a href="http://karakterer.dtu.dk/Histogram/1/34034/winter-2025">v25</a>'
+        + '<a href="https://sites.dtu.dkhttp://karakterer.dtu.dk:80/Histogram/1/34034/Summer-2026">x</a>'
+        + '<a href="http://karakterer.dtu.dk/Histogram/1/02402/Winter-2024">other course</a>';
+    assert.deepEqual(plain(api.parseGradePeriodLinks(html, '34034')), ['Summer-2026', 'Winter-2025']);
+});
+
+test('main exam: a small newer sitting does not replace the big exam', () => {
+    const its = [
+        { semester: 'Summer-2026', data: { registered: 105, total: 97 } },
+        { semester: 'Winter-2025', data: { registered: 1080, total: 1030 } },
+        { semester: 'Summer-2025', data: { registered: 93, total: 83 } }
+    ];
+    assert.equal(api.pickMainGradeIteration(its), 1);
+    assert.deepEqual(its.map((it) => it.small), [true, false, true]);
+    // Courses taught in both semesters keep the newest exam.
+    const both = [
+        { semester: 'Summer-2026', data: { registered: 690 } },
+        { semester: 'Winter-2025', data: { registered: 573 } }
+    ];
+    assert.equal(api.pickMainGradeIteration(both), 0);
+});
+
+function gradePage(semester, periods, rows) {
+    const links = periods.map((p) => `<a href="http://karakterer.dtu.dk/Histogram/1/01001/${p}">${p}</a>`).join('');
+    return `<h2>01001 ${semester}</h2>${links}` + gradeTable(rows);
+}
+
+test('grade history: discovers periods from the page links and picks the main exam', async () => {
+    const all = ['Summer-2026', 'Winter-2025', 'Summer-2025', 'Winter-2024'];
+    const pages = {
+        'Summer-2026': [['Antal tilmeldte', 105], ['12', 10], ['7', 50], ['00', 37]],
+        'Winter-2025': [['Antal tilmeldte', 1080], ['12', 500], ['7', 400], ['00', 130]],
+        'Summer-2025': [['Antal tilmeldte', 3]],
+        'Winter-2024': [['Antal tilmeldte', 1102], ['12', 400], ['7', 500], ['00', 133]]
+    };
+    const bg = loadBackground({
+        fetchImpl: async (url) => {
+            const sem = url.split('/').pop();
+            if (!url.includes('/01001/') || !pages[sem]) return { ok: false, status: 404, text: async () => '' };
+            const rows = sem === 'Summer-2025' ? [] : pages[sem];
+            const body = sem === 'Summer-2025' ? '<p>Fordelingen vises ikke</p>' : '';
+            return { ok: true, status: 200, text: async () => body + gradePage(sem, all.filter((p) => p !== sem), rows) };
+        }
+    });
+    const result = plain(await bg.api.fetchLatestIterations('01001', ['Winter-2026', 'Summer-2026', 'Winter-2025', 'Summer-2025', 'Winter-2024'], 4));
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.iterations.map((it) => it.semester), ['Summer-2026', 'Winter-2025', 'Winter-2024']);
+    assert.equal(result.mainIndex, 1);
+    assert.equal(result.semester, 'Winter-2025');
+    assert.equal(result.data.registered, 1080);
+    // One 404 for Winter-2026, then the newest page, then one parallel batch.
+    assert.equal(bg.fetchCalls.length, 5);
+});
+
+test('grade history: a course with no exams yet reports no_data', async () => {
+    const bg = loadBackground();
+    const result = plain(await bg.api.fetchLatestIterations('99999', ['Winter-2025', 'Summer-2025'], 4));
+    assert.deepEqual(result, { ok: false, error: 'no_data' });
+});
+
+test('evaluation period: three-week courses titled with a month', () => {
+    const html = '<h2>Resultater : 02476 Machine Learning Operations Jan 26</h2>'
+        + '<div class="ResultCourseModelWrapper"><div class="QuestionPositionColumn">1.1</div>'
+        + '<div class="FinalEvaluation_QuestionText">q</div>'
+        + '<div class="RowWrapper"><div class="FinalEvaluation_Result_OptionColumn">Enig</div><div class="Answer_Result_Background"><span>5</span></div></div>'
+        + '</div>' + ' '.repeat(200);
+    assert.equal(api.parseEvaluationHtml(html).period, 'Jan 26');
 });
 
 test('FindIt fetches are locked to the https catalog page', () => {
@@ -283,4 +403,20 @@ test('message router fetches grades without cookies for allowed senders', async 
     assert.equal(reply.data.total, 10);
     assert.equal(bg.fetchCalls[0].url, 'https://karakterer.dtu.dk/Histogram/1/02450/Winter-2025');
     assert.equal(bg.fetchCalls[0].opts.credentials, 'omit');
+});
+
+test('message router caches "no exams yet" so new courses are not refetched', async () => {
+    const bg = loadBackground();
+    const [listener] = bg.listeners;
+    const ask = () => new Promise((resolve) => listener(
+        { type: 'dtu-grade-stats', courseCode: '99999', semesters: ['Winter-2025', 'Summer-2025'] },
+        { url: 'https://kurser.dtu.dk/course/99999' },
+        resolve
+    ));
+    assert.deepEqual(plain(await ask()), { ok: false, error: 'no_data' });
+    const fetchesAfterFirst = bg.fetchCalls.length;
+    assert.ok(fetchesAfterFirst > 0);
+    const second = plain(await ask());
+    assert.equal(second.error, 'no_data');
+    assert.equal(bg.fetchCalls.length, fetchesAfterFirst, 'second visit is served from the cache');
 });
