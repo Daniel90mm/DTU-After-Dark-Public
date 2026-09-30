@@ -100,10 +100,11 @@
         var value = normalizeWhitespace(String(raw || ''));
         if (!value) return '';
 
-        if (/^\/\//.test(value)) return null;
-        if (/^\/.+/.test(value)) return value;
-        if (/^[^/].*/.test(value) && /^d2l\//i.test(value)) return '/' + value;
+        if (/^[\\/]{2}/.test(value)) return null;
+        if (/^d2l\//i.test(value)) value = '/' + value;
 
+        // Every value, relative ones included, must resolve to this origin:
+        // "/\evil.com" looks relative but browsers treat it as "//evil.com".
         try {
             var parsed = new URL(value, location.origin);
             if (parsed.origin !== location.origin) return null;
@@ -223,7 +224,12 @@
         return !!(e && (e.ctrlKey || e.metaKey) && e.shiftKey);
     }
 
-    function applyContentShortcutTargetToButton(btn, courseId, defaultHref) {
+    // Runs on every observer tick for every course card, so only write what changed.
+    function setAttrIfChanged(el, name, value) {
+        if (el.getAttribute(name) !== value) el.setAttribute(name, value);
+    }
+
+    function applyContentShortcutTargetToButton(btn, courseId, defaultHref, courseName) {
         if (!btn) return false;
         var courseKey = normalizeContentShortcutCourseId(courseId);
         var fallback = normalizeContentShortcutTarget(defaultHref) || '';
@@ -232,17 +238,37 @@
         var custom = courseKey ? getContentShortcutOverride(courseKey) : '';
         var finalHref = custom || fallback;
 
-        btn.href = finalHref;
-        btn.setAttribute('data-dtu-course-id', courseKey || '');
-        btn.setAttribute('data-dtu-default-href', fallback);
-        btn.setAttribute('data-dtu-current-href', finalHref);
-        btn.setAttribute('data-dtu-custom-href', custom || '');
+        setAttrIfChanged(btn, 'href', finalHref);
+        setAttrIfChanged(btn, 'data-dtu-course-id', courseKey || '');
+        setAttrIfChanged(btn, 'data-dtu-default-href', fallback);
+        setAttrIfChanged(btn, 'data-dtu-current-href', finalHref);
+        setAttrIfChanged(btn, 'data-dtu-custom-href', custom || '');
 
-        var title = custom ? 'Go to Content (custom link)' : 'Go to Content';
-        title += ' | Ctrl/Cmd+Shift+Click to edit';
-        btn.title = title;
-        btn.setAttribute('aria-label', title);
+        // Twenty cards share this button, so the course name tells them apart.
+        var label = 'Go to Content' + (courseName ? ': ' + courseName : '') + (custom ? ' (custom link)' : '');
+        setAttrIfChanged(btn, 'aria-label', label);
+        setAttrIfChanged(btn, 'title', label + '. Ctrl/Cmd+Shift+Click to edit.');
         return true;
+    }
+
+    // The card's own label reads "CODE Name, Term, DTU_xxx, Ends ..."; keep "CODE Name".
+    function getCourseNameFromCard(ecShadow, card) {
+        var nameEl = ecShadow && ecShadow.querySelector ? ecShadow.querySelector('d2l-organization-name') : null;
+        var text = normalizeWhitespace(nameEl ? nameEl.textContent : '');
+        if (!text && card && card.getAttribute) text = normalizeWhitespace(String(card.getAttribute('text') || '').split(', ')[0]);
+        return text.replace(/[,\s]+$/, '');
+    }
+
+    function getCourseNamesOnPage() {
+        var names = {};
+        deepQueryAll('d2l-enrollment-card, d2l-my-courses-enrollment-card', document.body || document).forEach(function (ec) {
+            var shadow = ec.shadowRoot;
+            var card = shadow ? shadow.querySelector('d2l-card') : null;
+            var id = card ? parseCourseIdFromString(card.getAttribute('href') || '') : null;
+            var name = getCourseNameFromCard(shadow, card);
+            if (id && name) names[id] = name;
+        });
+        return names;
     }
 
     function promptEditContentShortcutFromButton(btn) {
@@ -319,8 +345,27 @@
             + 'box-shadow:0 18px 52px rgba(0,0,0,0.45);font-family:sans-serif;';
 
         function closeModal() {
+            document.removeEventListener('keydown', onModalKeydown, true);
             overlay.style.opacity = '0';
             setTimeout(function () { try { overlay.remove(); } catch (e) { } }, 150);
+        }
+
+        // Listen on the document: saving re-renders the modal and drops focus to
+        // <body>, where a listener on the overlay never heard Escape again.
+        function onModalKeydown(e) {
+            if (!overlay.isConnected) {
+                document.removeEventListener('keydown', onModalKeydown, true);
+                return;
+            }
+            if (e.key !== 'Escape') return;
+            e.preventDefault();
+            e.stopPropagation();
+            if (editorState) {
+                editorState = null;
+                render();
+            } else {
+                closeModal();
+            }
         }
 
         function buttonStyle(kind) {
@@ -328,7 +373,7 @@
                 return 'border:1px solid transparent;background:transparent;color:' + palette.error + ';';
             }
             if (kind === 'primary') {
-                return 'border:1px solid var(--dtu-ad-accent-border);background:var(--dtu-ad-accent);color:#fff;';
+                return 'border:1px solid var(--dtu-ad-accent-border);background:var(--dtu-ad-accent);color:var(--dtu-ad-accent-on, #ffffff);';
             }
             return 'border:1px solid ' + palette.border + ';background:' + palette.field + ';color:' + palette.text + ';';
         }
@@ -411,10 +456,10 @@
                 || ('/d2l/le/lessons/' + courseId);
             if (target === defaultHref) {
                 setContentShortcutOverride(courseId, '', null);
-                noticeText = 'Course ' + courseId + ' now uses its normal Content page.';
+                noticeText = (getCourseNamesOnPage()[courseId] || ('Course ' + courseId)) + ' now uses its normal Content page.';
             } else {
                 setContentShortcutOverride(courseId, target, null);
-                noticeText = 'Custom link saved for course ' + courseId + '.';
+                noticeText = 'Custom link saved for ' + (getCourseNamesOnPage()[courseId] || ('course ' + courseId)) + '.';
             }
             editorState = null;
             insertContentButtons();
@@ -422,6 +467,14 @@
         }
 
         function render() {
+            renderModalBody();
+            // Re-rendering removes whatever had focus; keep it inside the dialog.
+            if (!editorState && overlay.isConnected && !overlay.contains(document.activeElement)) {
+                try { overlay.focus(); } catch (eFocus) { }
+            }
+        }
+
+        function renderModalBody() {
             while (modal.firstChild) modal.removeChild(modal.firstChild);
 
             var header = document.createElement('div');
@@ -524,6 +577,14 @@
                     editorState = null;
                     render();
                 });
+                [courseInput, targetInput].forEach(function (inputEl) {
+                    if (!inputEl) return;
+                    inputEl.addEventListener('keydown', function (e) {
+                        if (e.key !== 'Enter') return;
+                        e.preventDefault();
+                        saveBtn.click();
+                    });
+                });
                 editorActions.appendChild(saveBtn);
                 editorActions.appendChild(cancelBtn);
                 editor.appendChild(editorActions);
@@ -543,6 +604,7 @@
             listWrap.style.cssText = 'border:1px solid ' + palette.border + ';border-radius:10px;overflow:hidden;';
 
             var rows = getContentShortcutOverridesMap();
+            var courseNames = getCourseNamesOnPage();
             var keys = Object.keys(rows).sort(function (a, b) { return Number(a) - Number(b); });
 
             if (!keys.length) {
@@ -566,7 +628,7 @@
                     var idEl = document.createElement('div');
                     markExt(idEl);
                     idEl.style.cssText = 'font-size:12px;font-weight:700;color:' + palette.heading + ';';
-                    idEl.textContent = 'Course ' + courseId;
+                    idEl.textContent = courseNames[courseId] || ('Course ' + courseId);
 
                     var hrefEl = document.createElement('div');
                     markExt(hrefEl);
@@ -633,17 +695,7 @@
         overlay.addEventListener('click', function (e) {
             if (e.target === overlay) closeModal();
         });
-        overlay.addEventListener('keydown', function (e) {
-            if (e.key === 'Escape') {
-                e.preventDefault();
-                if (editorState) {
-                    editorState = null;
-                    render();
-                } else {
-                    closeModal();
-                }
-            }
-        });
+        document.addEventListener('keydown', onModalKeydown, true);
 
         render();
         overlay.appendChild(modal);
@@ -852,18 +904,21 @@
             var header = styleRoot.querySelector('.d2l-card-header, .d2l-enrollment-card-image-container, [slot="header"]');
             var container = header || styleRoot.querySelector('.d2l-card-container, .d2l-enrollment-card-content, .d2l-enrollment-card-content-flex, .d2l-enrollment-card-container');
             if (!container) return;
-            container.style.setProperty('position', 'relative', 'important');
+            if (container.style.getPropertyValue('position') !== 'relative') {
+                container.style.setProperty('position', 'relative', 'important');
+            }
 
             var roots = [styleRoot, ecShadow];
             var courseId = extractCourseId(ec, card, roots);
             var fallbackHref = extractFallbackHref(ec, card, roots);
             if (!courseId && !fallbackHref) return;
             var defaultHref = courseId ? ('/d2l/le/lessons/' + courseId) : fallbackHref;
+            var courseName = getCourseNameFromCard(ecShadow, card);
 
             var existingBtn = container.querySelector('.dtu-dark-content-btn');
             if (existingBtn) {
                 setContentShortcutButtonIcon(existingBtn);
-                if (!applyContentShortcutTargetToButton(existingBtn, courseId, defaultHref)) {
+                if (!applyContentShortcutTargetToButton(existingBtn, courseId, defaultHref, courseName)) {
                     try { existingBtn.remove(); } catch (eRm0) { }
                 }
                 return;
@@ -872,7 +927,7 @@
             var btn = document.createElement('a');
             btn.className = 'dtu-dark-content-btn';
             setContentShortcutButtonIcon(btn);
-            if (!applyContentShortcutTargetToButton(btn, courseId, defaultHref)) return;
+            if (!applyContentShortcutTargetToButton(btn, courseId, defaultHref, courseName)) return;
             btn.addEventListener('click', function (e) {
                 if (isContentShortcutEditGesture(e)) {
                     try { e.preventDefault(); } catch (e0) { }

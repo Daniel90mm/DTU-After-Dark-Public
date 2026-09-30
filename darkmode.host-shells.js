@@ -39,22 +39,32 @@
         return '';
     }
 
-    function neutralizeCampusnetGradeCourseNumbers(gradesTable) {
+    function styleCampusnetGradeCourseNumbers(gradesTable) {
         if (!gradesTable || !gradesTable.querySelectorAll) return;
+        var linkColor = isDarkModeEnabled()
+            ? 'var(--dtu-ad-accent-mark-dark, #ff6b6b)'
+            : 'var(--dtu-ad-accent-mark-light, #990000)';
+        function setIfChanged(el, name, value) {
+            if (el.style.getPropertyValue(name) === value && el.style.getPropertyPriority(name) === 'important') return;
+            el.style.setProperty(name, value, 'important');
+        }
         gradesTable.querySelectorAll('tr.context_direct, tr.context_alternating').forEach(function (row) {
             if (!row || !row.querySelector) return;
             var firstTd = row.querySelector('td:first-child');
             if (!firstTd || !firstTd.style) return;
 
-            // Course numbers are identifiers, not navigation calls-to-action.
-            // Keep them on the row's text colour in both themes, including after
-            // GPA Hide/Back clears its temporary muted inline styles.
+            // Course numbers link to their grade distribution on karakterer.dtu.dk, so
+            // they read as links: accent at 4.5:1 on this surface, underlined. The cell
+            // text itself (KU codes have no link) stays on the row's text colour, and a
+            // row hidden from the GPA keeps the muted style GPA Hide gives it.
             var isExcluded = row.classList && row.classList.contains('gpa-actual-excluded');
-            if (!isExcluded) firstTd.style.removeProperty('color');
+            if (!isExcluded && firstTd.style.getPropertyValue('color')) firstTd.style.removeProperty('color');
             firstTd.querySelectorAll('a').forEach(function (link) {
                 if (!link || !link.style) return;
-                link.removeAttribute('data-dtu-accent-link');
-                link.style.setProperty('color', 'inherit', 'important');
+                if (link.getAttribute('data-dtu-accent-link') != null) link.removeAttribute('data-dtu-accent-link');
+                if (isExcluded) return;
+                setIfChanged(link, 'color', linkColor);
+                setIfChanged(link, 'text-decoration', 'underline');
             });
         });
     }
@@ -119,7 +129,7 @@
             if (bg === 'rgb(0, 0, 0)') {
                 header.style.setProperty('background', 'var(--dtu-ad-accent-deep)', 'important');
                 header.style.setProperty('background-color', 'var(--dtu-ad-accent-deep)', 'important');
-                header.style.setProperty('color', '#ffffff', 'important');
+                header.style.setProperty('color', 'var(--dtu-ad-accent-deep-on, #ffffff)', 'important');
             }
         });
 
@@ -171,23 +181,23 @@
             var accentHex = theme.accent || '#990000';
             var accentHoverHex = theme.accentHover || '#b30000';
             var accentSoftHex = theme.accentSoft || accentHex;
-            var linkColor = isDarkModeEnabled() ? accentSoftHex : accentDeepHex;
+            var linkColor = isDarkModeEnabled() ? accentSoftHex : 'var(--dtu-ad-accent-deep-text, ' + accentDeepHex + ')';
             // The base/deep accent is too dark against CampusNet's dark canvas.
             // Keep the user-selected soft accent in dark mode; interaction is
             // signalled with an underline rather than reverting to a fixed red.
-            var linkHoverColor = isDarkModeEnabled() ? accentSoftHex : accentHoverHex;
+            var linkHoverColor = isDarkModeEnabled() ? accentSoftHex : 'var(--dtu-ad-accent-text-hover, ' + accentHoverHex + ')';
 
             document.querySelectorAll('.widget__header').forEach(function (header) {
                 if (!header || !header.style) return;
                 header.style.setProperty('background', accentDeepHex, 'important');
                 header.style.setProperty('background-color', accentDeepHex, 'important');
                 header.style.setProperty('border-bottom-color', accentDeepHoverHex, 'important');
-                header.style.setProperty('color', '#ffffff', 'important');
+                header.style.setProperty('color', 'var(--dtu-ad-accent-deep-on, #ffffff)', 'important');
             });
 
             document.querySelectorAll('.widget__header .widget__title, h2.widget__title').forEach(function (title) {
                 if (!title || !title.style) return;
-                title.style.setProperty('color', '#ffffff', 'important');
+                title.style.setProperty('color', 'var(--dtu-ad-accent-deep-on, #ffffff)', 'important');
                 title.style.setProperty('background', 'transparent', 'important');
                 title.style.setProperty('background-color', 'transparent', 'important');
             });
@@ -215,7 +225,7 @@
                 icon.style.setProperty('background-color', accentHex, 'important');
                 icon.style.setProperty('border-color', accentHex, 'important');
                 icon.style.setProperty('border-radius', '999px', 'important');
-                icon.style.setProperty('color', '#ffffff', 'important');
+                icon.style.setProperty('color', 'var(--dtu-ad-accent-on, #ffffff)', 'important');
                 icon.style.setProperty('fill', '#ffffff', 'important');
                 icon.style.setProperty('stroke', '#ffffff', 'important');
             });
@@ -223,7 +233,7 @@
                 if (!icon || !icon.style) return;
                 icon.style.setProperty('background', 'transparent', 'important');
                 icon.style.setProperty('background-color', 'transparent', 'important');
-                icon.style.setProperty('color', '#ffffff', 'important');
+                icon.style.setProperty('color', 'var(--dtu-ad-accent-on, #ffffff)', 'important');
                 icon.style.setProperty('fill', '#ffffff', 'important');
                 icon.style.setProperty('stroke', '#ffffff', 'important');
             });
@@ -234,7 +244,7 @@
             });
             document.querySelectorAll('.nav__icon .fa-stack-1x, .nav__icon .fa-heart, .nav__icon .fa-user').forEach(function (icon) {
                 if (!icon || !icon.style) return;
-                icon.style.setProperty('color', '#ffffff', 'important');
+                icon.style.setProperty('color', 'var(--dtu-ad-accent-on, #ffffff)', 'important');
             });
             document.querySelectorAll('.nav__icon, .nav__icon .fa-stack, .nav__icon i').forEach(function (el) {
                 if (!el || !el.style) return;
@@ -247,8 +257,9 @@
 
             document.querySelectorAll('.group-menu__item, .group-menu__item-burger').forEach(function (el) {
                 if (!el || !el.style) return;
-                el.style.setProperty('background', accentDeepHex, 'important');
-                el.style.setProperty('background-color', accentDeepHex, 'important');
+                var menuBody = 'var(--dtu-ad-campusnet-menu-body, ' + accentDeepHex + ')';
+                el.style.setProperty('background', menuBody, 'important');
+                el.style.setProperty('background-color', menuBody, 'important');
                 el.style.setProperty('border-color', accentDeepHex, 'important');
             });
             document.querySelectorAll('.group-menu__item header, .group-menu__item-burger header').forEach(function (el) {
@@ -352,7 +363,7 @@
                         }, true);
                     }
                 });
-                neutralizeCampusnetGradeCourseNumbers(gradesTable);
+                styleCampusnetGradeCourseNumbers(gradesTable);
             }
 
             function forceAccentBorder(el) {
@@ -399,14 +410,14 @@
                     title.style.setProperty('background', 'transparent', 'important');
                     title.style.setProperty('background-color', 'transparent', 'important');
                     title.style.setProperty('background-image', 'none', 'important');
-                    title.style.setProperty('color', '#ffffff', 'important');
+                    title.style.setProperty('color', 'var(--dtu-ad-accent-deep-on, #ffffff)', 'important');
                 }
                 var icon = section.querySelector('.group-menu__item-burger-expander');
                 if (icon && icon.style) {
                     icon.style.setProperty('background', 'transparent', 'important');
                     icon.style.setProperty('background-color', 'transparent', 'important');
                     icon.style.setProperty('background-image', 'none', 'important');
-                    icon.style.setProperty('color', '#ffffff', 'important');
+                    icon.style.setProperty('color', 'var(--dtu-ad-accent-deep-on, #ffffff)', 'important');
                 }
             });
 
@@ -529,11 +540,11 @@
                 if (!el || !el.style) return;
                 el.style.setProperty('background-color', 'var(--dtu-ad-accent-deep)', 'important');
                 el.style.setProperty('background', 'var(--dtu-ad-accent-deep)', 'important');
-                el.style.setProperty('color', '#ffffff', 'important');
+                el.style.setProperty('color', 'var(--dtu-ad-accent-deep-on, #ffffff)', 'important');
             });
             document.querySelectorAll('h4.category__title a, h4.category__title .arc-menu-burger-expander, h4.category__title .toggle-category').forEach(function (el) {
                 if (!el || !el.style) return;
-                el.style.setProperty('color', '#ffffff', 'important');
+                el.style.setProperty('color', 'var(--dtu-ad-accent-deep-on, #ffffff)', 'important');
             });
         } catch (e7) { }
 
@@ -573,7 +584,7 @@
                     icon.style.setProperty('background-color', 'var(--dtu-ad-accent)', 'important');
                     icon.style.setProperty('border-color', 'var(--dtu-ad-accent)', 'important');
                     icon.style.setProperty('border-radius', '999px', 'important');
-                    icon.style.setProperty('color', '#ffffff', 'important');
+                    icon.style.setProperty('color', 'var(--dtu-ad-accent-on, #ffffff)', 'important');
                     icon.style.setProperty('fill', '#ffffff', 'important');
                     icon.style.setProperty('stroke', '#ffffff', 'important');
                     icon.style.removeProperty('filter');
@@ -583,7 +594,7 @@
                     if (!icon || !icon.style) return;
                     icon.style.setProperty('background', 'transparent', 'important');
                     icon.style.setProperty('background-color', 'transparent', 'important');
-                    icon.style.setProperty('color', '#ffffff', 'important');
+                    icon.style.setProperty('color', 'var(--dtu-ad-accent-on, #ffffff)', 'important');
                     icon.style.setProperty('fill', '#ffffff', 'important');
                     icon.style.setProperty('stroke', '#ffffff', 'important');
                     icon.style.removeProperty('filter');
@@ -603,7 +614,7 @@
                 if (!h2 || !h2.style) return;
                 h2.style.setProperty('background-color', 'transparent', 'important');
                 h2.style.setProperty('background', 'transparent', 'important');
-                h2.style.setProperty('color', '#ffffff', 'important');
+                h2.style.setProperty('color', 'var(--dtu-ad-accent-deep-on, #ffffff)', 'important');
             });
             document.querySelectorAll('#afrapporteringWidget .boxHeader').forEach(function (h) {
                 if (!h || !h.style) return;
@@ -613,7 +624,7 @@
             });
             document.querySelectorAll('#afrapporteringWidget .boxHeader h2').forEach(function (h2) {
                 if (!h2 || !h2.style) return;
-                h2.style.setProperty('color', '#ffffff', 'important');
+                h2.style.setProperty('color', 'var(--dtu-ad-accent-deep-on, #ffffff)', 'important');
             });
             document.querySelectorAll('#afrapporteringWidget .lessonplan__progressbar .progressbar__percentage').forEach(function (p) {
                 if (!p || !p.style) return;
@@ -628,7 +639,7 @@
             });
             document.querySelectorAll('.box.widget .boxHeader h2').forEach(function (h2) {
                 if (!h2 || !h2.style) return;
-                h2.style.setProperty('color', '#ffffff', 'important');
+                h2.style.setProperty('color', 'var(--dtu-ad-accent-deep-on, #ffffff)', 'important');
             });
         } catch (e11) { }
 

@@ -53,6 +53,8 @@
         }).sort(function (a, b) { return b.count - a.count; });
 
         deps.loadParticipantIntel(function (intel) {
+            if (!deps.isFeatureFlagEnabled(deps.featureParticipantIntelKey)
+                || !deps.isFeatureFlagEnabled(deps.featureParticipantIntelDemographicsKey)) return;
             var selfProgram = intel.self ? deps.normalizeProgramLabel(intel.self.program) : null;
             var retentionSummary = null;
             if (deps.isFeatureFlagEnabled(deps.featureParticipantIntelRetentionKey)) {
@@ -97,10 +99,8 @@
     function getCurrentCourseRetentionSnapshots(intel) {
         var deps = getDeps();
         if (!deps) return [];
-        var courseCode = deps.getCampusnetCourseCodeFromPage();
-        var semester = deps.getCampusnetSemesterFromPage();
-        if (!courseCode) return [];
-        var key = courseCode + '_' + semester;
+        var key = deps.getCampusnetRetentionKey();
+        if (!key) return [];
         var retention = intel && intel.retention ? intel.retention : null;
         var snapshots = retention && Array.isArray(retention[key]) ? retention[key].slice() : [];
         return snapshots.filter(function (s) {
@@ -498,6 +498,8 @@
         });
 
         deps.loadParticipantIntel(function (intel) {
+            if (!deps.isFeatureFlagEnabled(deps.featureParticipantIntelKey)
+                || !deps.isFeatureFlagEnabled(deps.featureParticipantIntelSharedHistoryKey)) return;
             var items = userItems;
             var isDark = getIsDark();
             var selfSNumber = '';
@@ -569,7 +571,7 @@
                     + 'font-size:10px;font-weight:600;vertical-align:middle;cursor:help;';
                 badge.style.setProperty('background', isDark ? 'rgba(var(--dtu-ad-accent-rgb),0.2)' : 'rgba(var(--dtu-ad-accent-rgb),0.1)', 'important');
                 badge.style.setProperty('background-color', isDark ? 'rgba(var(--dtu-ad-accent-rgb),0.2)' : 'rgba(var(--dtu-ad-accent-rgb),0.1)', 'important');
-                badge.style.setProperty('color', isDark ? 'var(--dtu-ad-accent-soft)' : 'var(--dtu-ad-accent-deep)', 'important');
+                badge.style.setProperty('color', isDark ? 'var(--dtu-ad-accent-soft)' : 'var(--dtu-ad-accent-deep-text, var(--dtu-ad-accent-deep))', 'important');
             }
         });
     }
@@ -597,6 +599,8 @@
         }
 
         deps.loadParticipantIntel(function (intel) {
+            if (!deps.isFeatureFlagEnabled(deps.featureParticipantIntelKey)
+                || !deps.isFeatureFlagEnabled(deps.featureParticipantIntelSharedHistoryKey)) return;
             var existing = document.querySelector('[data-dtu-profile-history]');
             var student = intel.students[sNumber];
             if (!student || !student.courses || !student.courses.length) {
@@ -673,19 +677,19 @@
             return;
         }
 
-        var courseCode = deps.getCampusnetCourseCodeFromPage();
-        var semester = deps.getCampusnetSemesterFromPage();
-        if (!courseCode) return;
+        // Groups inside a course get their own series, see getCampusnetRetentionKey.
+        var rKey = deps.getCampusnetRetentionKey();
+        if (!rKey) return;
 
         var count = deps.getCampusnetUsersCountFromPage();
         if (!count) count = deps.getCampusnetUsersParticipantElements().length;
         if (!count) return;
 
-        var rKey = courseCode + '_' + semester;
-
         retentionSnapshotInFlight = true;
         deps.loadParticipantIntel(function (intel) {
             retentionSnapshotInFlight = false;
+            if (!deps.isFeatureFlagEnabled(deps.featureParticipantIntelKey)
+                || !deps.isFeatureFlagEnabled(deps.featureParticipantIntelRetentionKey)) return;
             if (!intel.retention[rKey]) intel.retention[rKey] = [];
             var snapshots = intel.retention[rKey];
             var now = Date.now();
@@ -713,7 +717,8 @@
 
     function renderRetentionIndicator(snapshots) {
         var deps = getDeps();
-        if (!deps) return;
+        if (!deps || !deps.isFeatureFlagEnabled(deps.featureParticipantIntelKey)
+            || !deps.isFeatureFlagEnabled(deps.featureParticipantIntelRetentionKey)) return;
         var summary = buildRetentionRadarSummary(snapshots, deps.getCampusnetUsersCountFromPage() || deps.getCampusnetUsersParticipantElements().length);
         var existing = document.querySelector('[data-dtu-retention-indicator]');
         if (!summary) {
@@ -738,6 +743,12 @@
             deps.markExt(card);
         }
         placeParticipantIntelHost(card, listRoot);
+
+        var sig = (getIsDark() ? 'd' : 'l') + '|' + summary.latestCount + '|'
+            + summary.snapshotCount + '|' + summary.baselineTs + '|' + summary.latestTs + '|'
+            + summary.previousDeltaCount + '|' + summary.windowDeltaCount;
+        if (card.getAttribute('data-dtu-retention-sig') === sig) return;
+        card.setAttribute('data-dtu-retention-sig', sig);
 
         var grid = prepareParticipantIntelHost(card, getIsDark());
         grid.setAttribute('data-single', '1');

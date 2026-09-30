@@ -10,9 +10,11 @@ class FakeStyle {
     constructor() {
         this.cssText = '';
         this.properties = new Map();
+        this.writes = 0;
     }
 
     setProperty(name, value, priority = '') {
+        this.writes++;
         this.properties.set(name, { value: String(value), priority });
     }
 
@@ -25,6 +27,7 @@ class FakeStyle {
     }
 
     removeProperty(name) {
+        this.writes++;
         this.properties.delete(name);
     }
 }
@@ -36,6 +39,7 @@ class FakeElement {
         this.parentNode = null;
         this.parentElement = null;
         this.attributes = {};
+        this.writes = 0;
         this.className = '';
         this.id = '';
         this.style = new FakeStyle();
@@ -47,6 +51,7 @@ class FakeElement {
         return {
             contains(name) { return element.className.split(/\s+/).filter(Boolean).includes(name); },
             toggle(name, force) {
+                element.writes++;
                 const classes = new Set(element.className.split(/\s+/).filter(Boolean));
                 const enabled = force === undefined ? !classes.has(name) : !!force;
                 if (enabled) classes.add(name);
@@ -66,6 +71,20 @@ class FakeElement {
         child.parentElement = this;
         return child;
     }
+
+    addEventListener() {}
+
+    get nextSibling() {
+        if (!this.parentNode) return null;
+        return this.parentNode.children[this.parentNode.children.indexOf(this) + 1] || null;
+    }
+
+    get previousElementSibling() {
+        if (!this.parentNode) return null;
+        return this.parentNode.children[this.parentNode.children.indexOf(this) - 1] || null;
+    }
+
+    after(child) { this.parentNode.insertBefore(child, this.nextSibling); }
 
     insertBefore(child, before) {
         if (child.parentNode) child.remove();
@@ -90,6 +109,7 @@ class FakeElement {
     }
 
     setAttribute(name, value) {
+        this.writes++;
         const stringValue = String(value);
         this.attributes[name] = stringValue;
         if (name === 'id') this.id = stringValue;
@@ -103,6 +123,7 @@ class FakeElement {
     }
 
     removeAttribute(name) {
+        this.writes++;
         delete this.attributes[name];
     }
 
@@ -234,7 +255,7 @@ function buildGradesFixture(document) {
     return table;
 }
 
-function loadCampusnetGpaApi({ document = new FakeDocument(), dark = false } = {}) {
+function loadCampusnetGpaApi({ document = new FakeDocument(), dark = false, storage = null } = {}) {
     const fileUrl = new URL('darkmode.campusnet-gpa.js', ROOT);
     let source = fs.readFileSync(fileUrl, 'utf8');
     source = source.replace(
@@ -247,6 +268,10 @@ function loadCampusnetGpaApi({ document = new FakeDocument(), dark = false } = {
             applyCampusnetActualGradeExcludedRowInlineStyles:
                 typeof applyCampusnetActualGradeExcludedRowInlineStyles === 'function'
                     ? applyCampusnetActualGradeExcludedRowInlineStyles : undefined,
+            applyCampusnetActualGradeExclusionState,
+            applyCampusnetActualGradeColumnLayout,
+            clearCampusnetActualGradeColumnLayout,
+            createSimRow,
             publicApi: globalThis.DTUAfterDarkCampusnetGpa
         };})();`
     );
@@ -255,7 +280,7 @@ function loadCampusnetGpaApi({ document = new FakeDocument(), dark = false } = {
         console,
         document,
         globalThis: null,
-        localStorage: { getItem() { return null; }, setItem() {} },
+        localStorage: storage || { getItem() { return null; }, setItem() {} },
         window: { location: { hostname: 'test.invalid', pathname: '/' } }
     };
     sandbox.DTUAfterDarkCampusnetGpaDeps = {
@@ -275,9 +300,9 @@ function loadCampusnetHostShellTestApi() {
     source = source.replace(
         /\}\)\(\);\s*$/,
         `globalThis.__campusnetHostShellTestApi = {
-            neutralizeCampusnetGradeCourseNumbers:
-                typeof neutralizeCampusnetGradeCourseNumbers === 'function'
-                    ? neutralizeCampusnetGradeCourseNumbers : undefined
+            styleCampusnetGradeCourseNumbers:
+                typeof styleCampusnetGradeCourseNumbers === 'function'
+                    ? styleCampusnetGradeCourseNumbers : undefined
         };})();`
     );
 
@@ -315,7 +340,7 @@ test('the CampusNet GPA public API exposes no speculative degree-progress render
     assert.equal(api.publicApi?.insertECTSProgressBar, undefined);
 });
 
-test('CampusNet grade course numbers stay neutral after extension-owned styles are refreshed', () => {
+test('CampusNet grade course numbers read as accent links after extension-owned styles are refreshed', () => {
     const api = loadCampusnetHostShellTestApi();
     const link = new FakeElement('a');
     link.setAttribute('data-dtu-accent-link', '1');
@@ -354,20 +379,22 @@ test('CampusNet grade course numbers stay neutral after extension-owned styles a
         }
     };
 
-    api.neutralizeCampusnetGradeCourseNumbers?.(table);
+    assert.equal(typeof api.styleCampusnetGradeCourseNumbers, 'function');
+    api.styleCampusnetGradeCourseNumbers(table);
 
-    assert.equal(link.style.getPropertyValue('color'), 'inherit');
+    assert.match(link.style.getPropertyValue('color'), /^var\(--dtu-ad-accent-mark-(?:dark|light), #[0-9a-f]{6}\)$/);
     assert.equal(link.style.getPropertyPriority('color'), 'important');
+    assert.equal(link.style.getPropertyValue('text-decoration'), 'underline');
     assert.equal(firstCell.style.getPropertyValue('color'), '');
     assert.equal(link.getAttribute('data-dtu-accent-link'), null);
     assert.equal(excludedCell.style.getPropertyValue('color'), '#a8afb8');
-    assert.equal(excludedLink.style.getPropertyValue('color'), 'inherit');
+    assert.equal(excludedLink.style.getPropertyValue('color'), '#a8afb8', 'a row hidden from the GPA keeps its muted link');
     assert.equal(toggleButton.style.getPropertyValue('color'), '#e65b5b');
     assert.equal(headerLink.style.getPropertyValue('color'), '#e65b5b');
 });
 
 for (const dark of [true, false]) {
-    test(`restoring a hidden CampusNet grade immediately restores its neutral course number in ${dark ? 'dark' : 'light'} mode`, () => {
+    test(`restoring a hidden CampusNet grade immediately restores its course number link in ${dark ? 'dark' : 'light'} mode`, () => {
         const api = loadCampusnetGpaApi({ dark });
         const link = new FakeElement('a');
         link.style.setProperty('color', 'inherit', 'important');
@@ -391,7 +418,126 @@ for (const dark of [true, false]) {
 
         api.applyCampusnetActualGradeExcludedRowInlineStyles(entry, false);
 
-        assert.equal(link.style.getPropertyValue('color'), 'inherit');
+        assert.equal(link.style.getPropertyValue('color'),
+            dark ? 'var(--dtu-ad-accent-mark-dark, #ff6b6b)' : 'var(--dtu-ad-accent-mark-light, #990000)');
         assert.equal(link.style.getPropertyPriority('color'), 'important');
+        assert.equal(link.style.getPropertyValue('text-decoration'), 'underline');
     });
 }
+
+test('unchanged actual-grade controls and excluded styling make zero writes', () => {
+    const api = loadCampusnetGpaApi();
+    const row = new FakeElement('tr');
+    const cell = row.appendChild(new FakeElement('td'));
+    const link = cell.appendChild(new FakeElement('a'));
+    const btn = new FakeElement('button');
+    const all = [row, cell, link, btn];
+    row.querySelectorAll = selector => selector === 'td' ? [cell]
+        : selector === 'td span, td a' ? [link]
+        : selector.startsWith('[data-gpa-actual-inline-muted') ? [cell, link].filter(e => e.getAttribute('data-gpa-actual-inline-muted') === '1') : [];
+    const entry = { row, cells: [cell] };
+    for (const excluded of [false, true, false]) {
+        api.applyCampusnetActualGradeExclusionState(entry, btn, excluded);
+        all.forEach(e => { e.writes = e.style.writes = 0; });
+        for (let i = 0; i < 10; i++) api.applyCampusnetActualGradeExclusionState(entry, btn, excluded);
+        assert.equal(all.reduce((n,e) => n + e.writes + e.style.writes, 0), 0, 'idle state must not rewrite attributes or styles');
+    }
+});
+
+test('malformed saved simulations cannot crash the GPA calculator', () => {
+    for (const raw of ['{', '{}', 'null', '[null,1,[]]', '[{"grade":99,"ects":5},{"grade":7,"ects":-5}]']) {
+        const document = new FakeDocument();
+        const table = buildGradesFixture(document);
+        const api = loadCampusnetGpaApi({ document, storage: { getItem: k => k === 'gpaSimEntries' ? raw : null, setItem() {} } });
+        assert.doesNotThrow(() => api.publicApi.insertGPASimulator());
+        assert.equal(table.querySelectorAll('.gpa-sim-row').length, 0);
+        assert.equal(table.querySelectorAll('.gpa-sim-add-row').length, 1);
+    }
+});
+
+test('valid saved simulations are restored after filtering malformed entries', () => {
+    const document = new FakeDocument();
+    const table = buildGradesFixture(document);
+    const raw = JSON.stringify([null, { code: '34032', name: 'Optics', grade: 7, ects: 5 }]);
+    const api = loadCampusnetGpaApi({ document, storage: { getItem: k => k === 'gpaSimEntries' ? raw : null, setItem() {} } });
+    api.publicApi.insertGPASimulator();
+    const rows = table.querySelectorAll('.gpa-sim-row');
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].querySelector('input').value, '34032');
+});
+
+test('CSSOM color and background serialization does not restart idle styling', () => {
+    const api = loadCampusnetGpaApi({ dark: true });
+    const btn = new FakeElement('button');
+    const row = new FakeElement('tr');
+    row.querySelectorAll = () => [];
+    const set = btn.style.setProperty.bind(btn.style);
+    btn.style.setProperty = (name, value, priority) => {
+        set(name, value === '0' ? '0px' : value, priority);
+        if (name === 'background-image') set('background', 'none transparent', priority);
+    };
+    api.applyCampusnetActualGradeExclusionState({ row, cells: [] }, btn, false);
+    btn.style.writes = 0;
+    api.applyCampusnetActualGradeExclusionState({ row, cells: [] }, btn, false);
+    assert.equal(btn.style.writes, 0);
+    // An outside renderer changing a value must still be repaired.
+    btn.style.setProperty('color', 'black');
+    api.applyCampusnetActualGradeExclusionState({ row, cells: [] }, btn, false);
+    assert.equal(btn.style.getPropertyValue('color'), 'var(--dtu-ad-accent-soft)');
+});
+
+test('grade columns keep fixed widths so hiding or adding a grade cannot shift them, and switching off restores them', () => {
+    const api = loadCampusnetGpaApi();
+    const table = new FakeElement('table');
+    table.className = 'gradesList';
+    const header = new FakeElement('tr');
+    header.className = 'gradesListHeader';
+    for (let i = 0; i < 5; i++) header.appendChild(new FakeElement('td'));
+    table.appendChild(header);
+
+    api.applyCampusnetActualGradeColumnLayout(table);
+    assert.equal(table.style.getPropertyValue('table-layout'), 'fixed');
+    assert.equal(table.style.getPropertyValue('width'), '100%');
+    assert.deepEqual(header.children.map(cell => cell.style.getPropertyValue('width')), ['220px', '', '96px', '84px', '100px']);
+
+    const writes = table.writes;
+    api.applyCampusnetActualGradeColumnLayout(table);
+    assert.equal(table.writes, writes, 'an unchanged layout makes no writes');
+
+    api.clearCampusnetActualGradeColumnLayout(table);
+    assert.equal(table.style.getPropertyValue('table-layout'), '');
+    assert.equal(table.getAttribute('data-gpa-fixed-columns'), null);
+    assert.deepEqual(header.children.map(cell => cell.style.getPropertyValue('width')), ['', '', '', '', '']);
+});
+
+test('a planned grade row has no accent stripe and its inputs fit the fixed columns', () => {
+    const api = loadCampusnetGpaApi({ dark: true });
+    const row = api.createSimRow({ code: '', name: '', grade: 7, ects: 5 });
+    assert.equal(row.style.getPropertyValue('border-left'), '');
+    const select = row.children[2].children[0];
+    const ects = row.children[3].children[0];
+    assert.match(select.style.cssText, /width: 72px/);
+    assert.match(ects.style.cssText, /max-width: 100%/);
+    const css = fs.readFileSync(new URL('darkmode.css', ROOT), 'utf8');
+    const simRule = css.match(/table\.gradesList tr\.gpa-sim-row \{[^}]*\}/)[0];
+    assert.doesNotMatch(simRule, /border-left/);
+});
+
+test('"Add planned grade" sits beside "Only show passed courses" and the estimate note only shows with planned grades', () => {
+    for (const saved of [null, JSON.stringify([{ code: '22052', name: 'Signals', grade: 10, ects: 5 }])]) {
+        const document = new FakeDocument();
+        const table = buildGradesFixture(document);
+        const controls = document.createElement('div');
+        controls.className = 'educationPassedOnly';
+        document.body.appendChild(controls);
+        const api = loadCampusnetGpaApi({ document, storage: { getItem: k => k === 'gpaSimEntries' ? saved : null, setItem() {} } });
+        api.publicApi.insertGPASimulator();
+
+        const button = controls.children.find(child => child.className === 'gpa-sim-add-btn');
+        assert.ok(button, 'button is placed with the page controls');
+        assert.equal(button.children.map(child => child.textContent).join(''), '+Add planned grade');
+        assert.equal(button.style.getPropertyValue('background'), 'transparent', 'outlined, not a filled pill');
+        assert.equal(table.querySelector('.gpa-sim-add-row').style.getPropertyValue('display'), 'none');
+        assert.equal(table.querySelectorAll('.gpa-sim-disclaimer-row').length, saved ? 1 : 0);
+    }
+});

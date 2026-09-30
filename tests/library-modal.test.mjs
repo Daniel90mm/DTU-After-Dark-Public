@@ -80,7 +80,7 @@ function loadLibraryTestApi() {
     let source = fs.readFileSync(fileUrl, 'utf8');
     source = source.replace(
         /\}\)\(\);\s*$/,
-        'globalThis.__libraryModalTestApi = { ensureLibraryFallbackStyles, showLibraryPanel };})();'
+        'globalThis.__libraryModalTestApi = { ensureLibraryFallbackStyles, showLibraryPanel, hideLibraryPanel };})();'
     );
 
     const document = new FakeDocument();
@@ -140,4 +140,20 @@ test('library modal limits automatic occupancy refreshes to once every five minu
     api.showLibraryPanel(null);
 
     assert.deepEqual(api.intervalDelays, [5 * 60 * 1000]);
+});
+
+test('closing the library panel gives the page its scrolling back, whatever the shared state keeps', () => {
+    const api = loadLibraryTestApi();
+    api.document.documentElement.style.overflow = '';
+    api.document.body.style.overflow = 'auto';
+
+    api.showLibraryPanel(null);
+    assert.equal(api.document.documentElement.style.overflow, 'hidden');
+    assert.equal(api.document.body.style.overflow, 'hidden');
+
+    // Opening again while open must not save "hidden" as the page's own value.
+    api.showLibraryPanel(null);
+    api.hideLibraryPanel();
+    assert.equal(api.document.documentElement.style.overflow, '');
+    assert.equal(api.document.body.style.overflow, 'auto');
 });

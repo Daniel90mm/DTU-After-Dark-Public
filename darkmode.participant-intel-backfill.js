@@ -126,18 +126,7 @@
                     if (/education|uddannelse/i.test(headers[h].textContent)) {
                         var infoDiv = headers[h].closest('.ui-participant-infobox');
                         if (infoDiv) {
-                            var lists = infoDiv.querySelectorAll('.ui-participants-infolist p');
-                            if (lists.length) {
-                                entry.program = deps.normalizeProgramLabel(lists[0].textContent);
-                            } else {
-                                var children = infoDiv.children;
-                                for (var c = 0; c < children.length; c++) {
-                                    if (!children[c].classList.contains('info-header')) {
-                                        var txt = deps.normalizeProgramLabel(children[c].textContent);
-                                        if (txt) { entry.program = txt; break; }
-                                    }
-                                }
-                            }
+                            entry.program = deps.readParticipantProgram(infoDiv);
                         }
                         break;
                     }
@@ -355,7 +344,9 @@
 
     function runCampusnetArchiveBackfill(queue, intel) {
         var deps = getDeps();
-        if (!deps || campusnetArchiveBackfillRunning) return;
+        if (!deps || campusnetArchiveBackfillRunning
+            || !deps.isFeatureFlagEnabled(deps.featureParticipantIntelKey)
+            || !deps.isFeatureFlagEnabled(deps.featureParticipantIntelSharedHistoryKey)) return;
         if (!queue || !queue.length) {
             updateCampusnetArchiveBackfillWidgetStatus('Nothing new to scan.');
             return;
@@ -388,7 +379,9 @@
         }
 
         function step() {
-            if (window.location.hostname !== 'campusnet.dtu.dk') {
+            if (window.location.hostname !== 'campusnet.dtu.dk'
+                || !deps.isFeatureFlagEnabled(deps.featureParticipantIntelKey)
+                || !deps.isFeatureFlagEnabled(deps.featureParticipantIntelSharedHistoryKey)) {
                 campusnetArchiveBackfillAbort = true;
             }
 
@@ -420,6 +413,12 @@
             );
 
             fetchBestCampusnetParticipantsDoc(item.elementId).then(function (best) {
+                if (campusnetArchiveBackfillAbort || !deps.isFeatureFlagEnabled(deps.featureParticipantIntelKey)
+                    || !deps.isFeatureFlagEnabled(deps.featureParticipantIntelSharedHistoryKey)) {
+                    campusnetArchiveBackfillAbort = true;
+                    afterOne();
+                    return;
+                }
                 if (!best || !best.doc) throw new Error((best && best.err) ? best.err : 'fetch_failed');
 
                 var doc = best.doc;
@@ -471,9 +470,16 @@
             return !!it.codeHint && deps.isCampusnetLikelyAcademicCourse(it.codeHint, it.title, { title: it.title });
         });
 
+        function isArchiveHistoryEnabled() {
+            return deps.isCampusnetGroupArchivePage()
+                && deps.isFeatureFlagEnabled(deps.featureParticipantIntelKey)
+                && deps.isFeatureFlagEnabled(deps.featureParticipantIntelSharedHistoryKey);
+        }
+
         if (!existing) archiveBackfillInsertPending = true;
         deps.loadParticipantIntel(function (intel) {
             archiveBackfillInsertPending = false;
+            if (!isArchiveHistoryEnabled()) return;
             existing = document.querySelector('[data-dtu-archive-backfill]');
             var scanned = intel.backfill && intel.backfill.scanned ? intel.backfill.scanned : {};
             var scannedCount = 0;
@@ -555,7 +561,7 @@
                 startBtn.style.cssText = 'padding:8px 12px;border-radius:10px;font-weight:700;font-size:12px;cursor:pointer;border:1px solid transparent;';
                 startBtn.style.setProperty('background', 'var(--dtu-ad-accent)', 'important');
                 startBtn.style.setProperty('background-color', 'var(--dtu-ad-accent)', 'important');
-                startBtn.style.setProperty('color', '#ffffff', 'important');
+                startBtn.style.setProperty('color', 'var(--dtu-ad-accent-on, #ffffff)', 'important');
 
                 var stopBtn = document.createElement('button');
                 stopBtn.type = 'button';
@@ -598,6 +604,7 @@
                 startBtn.addEventListener('click', function () {
                     if (campusnetArchiveBackfillRunning) return;
                     deps.loadParticipantIntel(function (intel2) {
+                        if (!isArchiveHistoryEnabled() || !widget.isConnected) return;
                         var list = parseCampusnetArchivedElements();
                         var scanned2 = (intel2.backfill && intel2.backfill.scanned) ? intel2.backfill.scanned : {};
                         var queue = list.filter(function (it) {
@@ -622,6 +629,7 @@
 
                 autoInput.addEventListener('change', function () {
                     deps.loadParticipantIntel(function (intel3) {
+                        if (!isArchiveHistoryEnabled() || !widget.isConnected) return;
                         intel3.backfill.autoWeekly = !!autoInput.checked;
                         deps.saveParticipantIntel(intel3);
                     });

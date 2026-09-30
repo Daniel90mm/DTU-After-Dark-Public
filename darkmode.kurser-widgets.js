@@ -69,6 +69,7 @@
 
     var _gradeStatsRequested = false;
     var _gradeStatsCourseCode = null;
+    var _gradeStatsRetryTimer = null;
 
     function buildGradeStatsSemesters() {
         var now = new Date();
@@ -498,6 +499,14 @@
         refreshCourseWidgetsLayout();
     }
 
+    function renderGradeStatsUnavailable(container) {
+        prepareCourseWidgetColumn(container);
+        container.setAttribute('data-dtu-cw-state', 'error');
+        container.appendChild(makeColumnHead('Grades'));
+        container.appendChild(makeEl('div', 'dtu-cw-status', 'Grades unavailable. Retrying automatically.'));
+        refreshCourseWidgetsLayout();
+    }
+
     // --- Shared grid ---
 
     function getOrCreateCourseWidgetsGrid(insertAnchor, courseCode) {
@@ -533,6 +542,8 @@
             pruneCourseWidgetsGrid();
             _gradeStatsRequested = false;
             _gradeStatsCourseCode = null;
+            if (_gradeStatsRetryTimer) clearTimeout(_gradeStatsRetryTimer);
+            _gradeStatsRetryTimer = null;
             return;
         }
         if (!isKurserCoursePage()) return;
@@ -543,7 +554,10 @@
         var existingStats = document.querySelector('[data-dtu-grade-stats]');
         if (existingStats) {
             var existingCourse = String(existingStats.getAttribute('data-dtu-grade-stats-course') || '').toUpperCase();
-            if (existingCourse === courseCode) return;
+            if (existingCourse === courseCode) {
+                var retryAt = Number(existingStats.getAttribute('data-dtu-grade-stats-nexttry')) || 0;
+                if (!retryAt || Date.now() < retryAt) return;
+            }
             existingStats.remove();
             _gradeStatsRequested = false;
         }
@@ -575,6 +589,19 @@
             courseCode: courseCode,
             semesters: buildGradeStatsSemesters()
         }, function (response) {
+            if (!container.isConnected || !isFeatureFlagEnabled(getGradeStatsFeatureKey())
+                || getKurserCourseCode() !== courseCode) return;
+            if (!response || (!response.ok && response.error !== 'no_data')) {
+                renderGradeStatsUnavailable(container);
+                container.setAttribute('data-dtu-grade-stats-nexttry', String(Date.now() + 600000));
+                _gradeStatsRequested = false;
+                if (_gradeStatsRetryTimer) clearTimeout(_gradeStatsRetryTimer);
+                _gradeStatsRetryTimer = setTimeout(function () {
+                    _gradeStatsRetryTimer = null;
+                    insertKurserGradeStats();
+                }, 600030);
+                return;
+            }
             var iterations = [];
             if (response && response.ok && Array.isArray(response.iterations) && response.iterations.length) {
                 iterations = response.iterations.filter(function (it) { return it && it.data; });

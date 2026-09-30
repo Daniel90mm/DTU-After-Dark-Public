@@ -18,7 +18,9 @@ const { api } = loadModuleInternals('darkmode.textbooks.js', [
     'buildKurserGoogleBooksUrl',
     'isKurserLiteratureLabel',
     'isLikelyBookFinderTitleCandidate',
-    'isTitleCase'
+    'isTitleCase',
+    'getKurserBarSectionData',
+    'extractLiteratureLineTargets'
 ], { DTUAfterDarkTextbooksDeps: isbn });
 
 test('ISBN-13 and ISBN-10 checksums', () => {
@@ -85,7 +87,7 @@ test('FindIt and Google Books links prefer ISBN, else strip page ranges', () => 
 });
 
 test('literature section labels in English and Danish', () => {
-    for (const label of ['Course literature', 'Litteratur:', 'Kursuslitteratur', 'Recommended course literature']) {
+    for (const label of ['Course literature', 'Litteratur:', 'Kursuslitteratur', 'Recommended course literature', 'Litteraturhenvisninger', 'Litteraturhenvisning:']) {
         assert.equal(api.isKurserLiteratureLabel(label), true, label);
     }
     for (const label of ['', 'Schedule', 'Body text: ' + 'this course covers literature reviews in depth across many fields '.repeat(3)]) {
@@ -100,4 +102,45 @@ test('Book Finder title candidates skip generic resource phrases', () => {
     assert.equal(api.isLikelyBookFinderTitleCandidate('Short'), false);
     assert.equal(api.isTitleCase('The Art of Computer Programming'), true);
     assert.equal(api.isTitleCase('the art of programming'), false);
+});
+
+test('disabling textbook links cancels queued Learn scans and removes existing bars',async()=>{
+ const {extractFunctions}=await import('./_harness.mjs');let removed=0,cleared=0;
+ const {api:ui}=loadModuleInternals('darkmode.textbooks.js',['insertBookFinderLinks'],{globals:{},document:{querySelectorAll:s=>s==='[data-book-finder-bar]'?[{remove:()=>removed++}]:s==='[data-book-finder-injected]'?[{removeAttribute:()=>cleared++}]:[]},DTUAfterDarkTextbooksDeps:{isTopWindow:()=>true,isDTULearnCoursePage:()=>true,isFeatureFlagEnabled:()=>false,featureTextbookLinksKey:'books'}});
+ let cancelled=0;const {api:schedule}=extractFunctions('darkmode.js',['scheduleBookFinderScan'],{prelude:'let _bookFinderTimer=123;const IS_TOP_WINDOW=true,FEATURE_TEXTBOOK_LINKS_KEY="books";',globals:{isDTULearnCoursePage:()=>true,isFeatureFlagEnabled:()=>false,clearTimeout:()=>cancelled++,insertBookFinderLinks:ui.insertBookFinderLinks}});
+ schedule.scheduleBookFinderScan();assert.equal(cancelled,1);assert.equal(removed,1);assert.equal(cleared,1);
+});
+
+const foxTitle = 'Mark Fox, Optical Properties of Solids, 2nd Edition (Oxford University Press, 2010)';
+const foxIsbn = 'ISBN: 978-0-19-957337-0';
+function barLines(lines) {
+    const nodes = lines.map(text => ({ nodeType: 1, tagName: 'P', textContent: text, classList: { contains: () => false } }));
+    nodes.push({ nodeType: 1, tagName: 'DIV', classList: { contains: c => c === 'bar' } });
+    for (let i = 0; i < nodes.length - 1; i++) nodes[i].nextSibling = nodes[i + 1];
+    return plain(api.getKurserBarSectionData({ nextSibling: nodes[0] })).lines;
+}
+
+test('catalog title and following standalone ISBN form one book entry', () => {
+    const lines = barLines([foxTitle, foxIsbn]);
+    assert.deepEqual(lines, [foxTitle + ' ' + foxIsbn]);
+    const parsed = api.parseKurserCitationLine(lines[0]);
+    assert.equal(parsed.isbn, '9780199573370');
+    assert.match(api.buildKurserFinditUrl(parsed), /isbn%3A9780199573370/);
+    assert.match(api.buildKurserGoogleBooksUrl(parsed), /isbn%3A9780199573370/);
+});
+
+test('paragraph-based catalog literature also pairs its title and ISBN', () => {
+    const title = { textContent: foxTitle }; const isbnLine = { textContent: foxIsbn };
+    const items = api.extractLiteratureLineTargets({ querySelectorAll: () => [title, isbnLine] });
+    assert.equal(items.length, 1); assert.equal(items[0].anchor, title);
+    assert.equal(items[0].text, foxTitle + ' ' + foxIsbn);
+});
+
+test('distinct books and independent ISBN entries are preserved', () => {
+    const second = 'Bishop, Pattern Recognition and Machine Learning. Springer, 2006.';
+    const secondIsbn = 'ISBN 978-0-387-31073-2';
+    assert.deepEqual(barLines([foxTitle, foxIsbn, second, secondIsbn]), [foxTitle + ' ' + foxIsbn, second + ' ' + secondIsbn]);
+    assert.deepEqual(barLines([foxIsbn]), [foxIsbn]);
+    assert.deepEqual(barLines([foxTitle + ' ' + foxIsbn, secondIsbn]), [foxTitle + ' ' + foxIsbn, secondIsbn]);
+    assert.deepEqual(barLines([foxTitle, 'ISBN: 978-0-19-957337-1']), [foxTitle, 'ISBN: 978-0-19-957337-1']);
 });

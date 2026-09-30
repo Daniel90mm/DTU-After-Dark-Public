@@ -73,6 +73,10 @@
 !/tests/
 /tests/*
 !/tests/deadlines.test.mjs
+!/tests/course-search.test.mjs
+!/tests/participant-intel.test.mjs
+!/tests/grade-settings.test.mjs
+!/tests/course-eval-settings.test.mjs
 !/tests/campusnet-gpa.test.mjs
 !/tests/bus-config.test.mjs
 !/tests/library-modal.test.mjs
@@ -86,6 +90,15 @@
 !/tests/stylesheet.test.mjs
 !/tests/textbooks.test.mjs
 !/tests/url-pause.test.mjs
+!/tests/settings-footer.test.mjs
+!/tests/dark-mode.test.mjs
+!/tests/accent-theme.test.mjs
+!/tests/mojangles.test.mjs
+!/tests/learn-nav-links.test.mjs
+!/tests/content-shortcut.test.mjs
+!/tests/nav-item-visibility.test.mjs
+!/tests/bus-widget.test.mjs
+!/tests/ui-rules.test.mjs
 
 # Local-only/private items stay ignored by default:
 # AGENTS.md

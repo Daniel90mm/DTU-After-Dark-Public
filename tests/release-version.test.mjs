@@ -10,12 +10,12 @@ function readManifest(name) {
   return JSON.parse(readFileSync(path.join(projectRoot, name), 'utf8'));
 }
 
-test('Firefox and Chrome release manifests ship together as version 8.1.0', () => {
+test('Firefox and Chrome release manifests ship together as version 9.0.0', () => {
   const firefox = readManifest('manifest.json');
   const chrome = readManifest('manifest_chrome.json');
 
-  assert.equal(firefox.version, '8.1.0');
-  assert.equal(chrome.version, '8.1.0');
+  assert.equal(firefox.version, '9.0.0');
+  assert.equal(chrome.version, '9.0.0');
   assert.equal(chrome.version, firefox.version);
   assert.deepEqual(
     firefox.browser_specific_settings?.gecko?.data_collection_permissions?.required,

@@ -327,13 +327,10 @@
 
     async function fetchGradePage(codeVariant, semester) {
         const url = `https://karakterer.dtu.dk/Histogram/1/${encodeURIComponent(codeVariant)}/${semester}`;
-        try {
-            const res = await fetch(url, { cache: 'no-store', credentials: 'omit' });
-            if (!res || !res.ok) return null;
-            return await res.text();
-        } catch (e) {
-            return null;
-        }
+        const res = await fetch(url, { cache: 'no-store', credentials: 'omit' });
+        if (res && res.status === 404) return null;
+        if (!res || !res.ok) throw new Error('grade_http_' + (res ? res.status : 'unknown'));
+        return await res.text();
     }
 
     // A small sitting next to a much bigger one is usually a re-exam: a few
@@ -1198,6 +1195,26 @@
         return best;
     }
 
+    // DTU writes auditoriums as "A081", "A83" or "auditorium 081"; MazeMap names
+    // the POI "AUDITORIUM 81/020" (name, then its room number).
+    function auditoriumNumberFromRoom(room) {
+        const m = /^A?0*(\d{1,3})$/i.exec(String(room || '').trim());
+        return m ? m[1] : '';
+    }
+
+    function pickAuditoriumResult(results, building, number) {
+        if (!Array.isArray(results) || !number) return null;
+        const re = new RegExp('^AUDITORIUM\\s*0*' + number + '(?:\\b|/)', 'i');
+        for (let i = 0; i < results.length; i++) {
+            const item = results[i];
+            if (!item || typeof item.poiId !== 'number') continue;
+            if (!bldMatchesItem(item, building)) continue;
+            const names = [].concat(item.poiNames || [], item.dispPoiNames || [], item.title || [], item.dispTitle || []);
+            if (names.some((n) => re.test(stripHtml(n).trim()))) return item;
+        }
+        return null;
+    }
+
     function pickBestBuildingResult(results, building) {
         if (!Array.isArray(results) || !results.length) return null;
         let best = null;
@@ -1296,6 +1313,24 @@
                     poiId: best.poiId,
                     identifier: best.identifier || '',
                     queryUsed: q
+                };
+            }
+        }
+
+        // Auditorium notation, tried after exact room names so a real room "081"
+        // still wins over "Auditorium 81".
+        const audNo = auditoriumNumberFromRoom(rm);
+        if (audNo) {
+            const qa = `${bld}-${audNo}`;
+            const respA = await fetchMazemapEquery(qa);
+            const bestA = respA && respA.ok ? pickAuditoriumResult(respA.results, bld, audNo) : null;
+            if (bestA) {
+                return {
+                    ok: true,
+                    kind: 'room',
+                    poiId: bestA.poiId,
+                    identifier: bestA.identifier || '',
+                    queryUsed: qa
                 };
             }
         }

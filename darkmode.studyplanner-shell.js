@@ -57,7 +57,7 @@
         var color = getResolvedAccentDeep();
         anchor.style.setProperty('background', color, 'important');
         anchor.style.setProperty('background-color', color, 'important');
-        anchor.style.setProperty('color', '#ffffff', 'important');
+        anchor.style.setProperty('color', 'var(--dtu-ad-accent-deep-on, #ffffff)', 'important');
         anchor.style.setProperty('border-color', color, 'important');
     }
 
@@ -180,7 +180,7 @@
                 );
                 topLinks.forEach(function (a) {
                     if (!a || !a.style) return;
-                    a.style.setProperty('color', '#ffffff', 'important');
+                    a.style.setProperty('color', 'var(--dtu-ad-accent-deep-on, #ffffff)', 'important');
                     a.style.setProperty('padding', '2px 4px', 'important');
                     a.style.setProperty('border-radius', '4px', 'important');
                     a.style.setProperty('text-decoration', 'none', 'important');
@@ -245,7 +245,7 @@
         document.querySelectorAll('.dturedbackground').forEach(function (el) {
             el.style.setProperty('background-color', 'var(--dtu-ad-accent-deep)', 'important');
             el.style.setProperty('background', 'var(--dtu-ad-accent-deep)', 'important');
-            el.style.setProperty('color', '#ffffff', 'important');
+            el.style.setProperty('color', 'var(--dtu-ad-accent-deep-on, #ffffff)', 'important');
             el.style.setProperty('border-color', 'var(--dtu-ad-accent-deep)', 'important');
             el.querySelectorAll('.container, .row, .col-md-12, .pull-right, .pull-right > span:not(.caret)').forEach(function (child) {
                 child.style.setProperty('background-color', 'var(--dtu-ad-accent-deep)', 'important');
@@ -256,14 +256,14 @@
             el.querySelectorAll('.dropdown-toggle.red').forEach(function (btn) {
                 btn.style.setProperty('background-color', 'var(--dtu-ad-accent-deep)', 'important');
                 btn.style.setProperty('background', 'var(--dtu-ad-accent-deep)', 'important');
-                btn.style.setProperty('color', '#ffffff', 'important');
+                btn.style.setProperty('color', 'var(--dtu-ad-accent-deep-on, #ffffff)', 'important');
             });
             el.querySelectorAll('.dropdown-menu.red').forEach(function (menu) {
                 menu.style.setProperty('background-color', 'var(--dtu-ad-accent-deep)', 'important');
                 menu.style.setProperty('border-color', 'var(--dtu-ad-accent-deep-hover)', 'important');
             });
             el.querySelectorAll('a').forEach(function (a) {
-                a.style.setProperty('color', '#ffffff', 'important');
+                a.style.setProperty('color', 'var(--dtu-ad-accent-deep-on, #ffffff)', 'important');
             });
             el.querySelectorAll('.seperator').forEach(function (sep) {
                 sep.style.setProperty('color', 'rgba(255,255,255,0.6)', 'important');
@@ -281,7 +281,7 @@
         document.querySelectorAll('h3[data-bind*="SemesterNumber"]').forEach(function (h3) {
             h3.style.setProperty('background-color', 'var(--dtu-ad-accent-deep)', 'important');
             h3.style.setProperty('background', 'var(--dtu-ad-accent-deep)', 'important');
-            h3.style.setProperty('color', '#ffffff', 'important');
+            h3.style.setProperty('color', 'var(--dtu-ad-accent-deep-on, #ffffff)', 'important');
             h3.style.setProperty('border-left', '1px solid var(--dtu-ad-accent-deep)', 'important');
             h3.style.setProperty('border-right', '1px solid var(--dtu-ad-accent-deep)', 'important');
             h3.style.setProperty('border-bottom-width', '2px', 'important');
@@ -290,21 +290,21 @@
         });
 
         document.querySelectorAll('a.coursecode').forEach(function (a) {
-            a.style.setProperty('color', 'var(--dtu-ad-accent)', 'important');
+            a.style.setProperty('color', 'var(--dtu-ad-accent-text, var(--dtu-ad-accent))', 'important');
         });
 
         try {
             var plannedCourseLinks = document.querySelectorAll('.inverse .overlayArea a.coursecode');
             plannedCourseLinks.forEach(function (a) {
                 if (!a || !a.style) return;
-                a.style.setProperty('color', isDarkModeEnabled() ? 'var(--dtu-ad-accent-soft)' : 'var(--dtu-ad-accent-deep)', 'important');
+                a.style.setProperty('color', isDarkModeEnabled() ? 'var(--dtu-ad-accent-soft)' : 'var(--dtu-ad-accent-deep-text, var(--dtu-ad-accent-deep))', 'important');
             });
         } catch (ePlan) { }
 
         try {
             document.querySelectorAll('a.coursecode[data-bind*="basketCourseGroup"]').forEach(function (a) {
                 if (!a || !a.style) return;
-                a.style.setProperty('color', isDarkModeEnabled() ? 'var(--dtu-ad-accent-soft)' : 'var(--dtu-ad-accent-deep)', 'important');
+                a.style.setProperty('color', isDarkModeEnabled() ? 'var(--dtu-ad-accent-soft)' : 'var(--dtu-ad-accent-deep-text, var(--dtu-ad-accent-deep))', 'important');
             });
         } catch (eBasket) { }
 
@@ -325,7 +325,7 @@
                 var cc = tbl.querySelectorAll('a.coursecode');
                 cc.forEach(function (a) {
                     if (!a || !a.style) return;
-                    a.style.setProperty('color', isDarkModeEnabled() ? 'var(--dtu-ad-accent-soft)' : 'var(--dtu-ad-accent-deep)', 'important');
+                    a.style.setProperty('color', isDarkModeEnabled() ? 'var(--dtu-ad-accent-soft)' : 'var(--dtu-ad-accent-deep-text, var(--dtu-ad-accent-deep))', 'important');
                 });
             });
         } catch (eExam) { }
@@ -333,7 +333,7 @@
         document.querySelectorAll('.btn-dtured').forEach(function (btn) {
             btn.style.setProperty('background-color', 'var(--dtu-ad-accent-deep)', 'important');
             btn.style.setProperty('background', 'var(--dtu-ad-accent-deep)', 'important');
-            btn.style.setProperty('color', '#ffffff', 'important');
+            btn.style.setProperty('color', 'var(--dtu-ad-accent-deep-on, #ffffff)', 'important');
             btn.style.setProperty('border-color', 'var(--dtu-ad-accent-deep)', 'important');
         });
 
@@ -346,8 +346,8 @@
         if (window.location.hostname !== 'kurser.dtu.dk') return;
         if (isDarkModeEnabled()) return;
 
-        var linkColor = 'var(--dtu-ad-accent-deep)';
-        var linkHoverColor = 'var(--dtu-ad-accent-hover)';
+        var linkColor = 'var(--dtu-ad-accent-deep-text, var(--dtu-ad-accent-deep))';
+        var linkHoverColor = 'var(--dtu-ad-accent-text-hover, var(--dtu-ad-accent-hover))';
 
         function accentLink(a) {
             if (!a || !a.style) return;

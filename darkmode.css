@@ -34,7 +34,7 @@
 d2l-labs-navigation-band {
   background-color: var(--dtu-ad-accent-deep) !important;
   background: var(--dtu-ad-accent-deep) !important;
-  color: #ffffff !important;
+  color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
 }
 
 d2l-labs-navigation-band a:hover {
@@ -45,7 +45,7 @@ d2l-labs-navigation-band a:hover {
 .d2l-count-badge-number {
   background-color: var(--dtu-ad-accent-deep) !important;
   background: var(--dtu-ad-accent-deep) !important;
-  color: #ffffff !important;
+  color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
 }
 
 .d2l-w2d-count,
@@ -313,7 +313,7 @@ button:hover,
 button[primary],
 .d2l-button[primary] {
   background-color: var(--dtu-ad-accent) !important;
-  color: #ffffff !important;
+  color: var(--dtu-ad-accent-on, #ffffff) !important;
 }
 
 .d2l-button-primary:hover {
@@ -483,7 +483,7 @@ d2l-tab-panel h2.dhdg_1 {
 .d2l-badge,
 .d2l-notification-count {
   background-color: var(--dtu-ad-accent) !important;
-  color: #ffffff !important;
+  color: var(--dtu-ad-accent-on, #ffffff) !important;
 }
 
 /* Search box */
@@ -1029,7 +1029,7 @@ d2l-menu-item-link,
 .d2l-action-buttons-item .d2l-button,
 button.d2l-button[primary] {
   background-color: var(--dtu-ad-accent) !important;
-  color: #ffffff !important;
+  color: var(--dtu-ad-accent-on, #ffffff) !important;
   border-color: var(--dtu-ad-accent-border) !important;
 }
 
@@ -1443,7 +1443,7 @@ div#header {
 #submitButton,
 .submit {
   background-color: var(--dtu-ad-accent) !important;
-  color: #ffffff !important;
+  color: var(--dtu-ad-accent-on, #ffffff) !important;
   border-color: var(--dtu-ad-accent-border) !important;
 }
 
@@ -2073,7 +2073,7 @@ form[action*="/Answer/SaveAnswers/"],
 
 .button--primary {
   background-color: var(--dtu-ad-accent) !important;
-  color: #ffffff !important;
+  color: var(--dtu-ad-accent-on, #ffffff) !important;
 }
 
 .button--hollow:hover,
@@ -2595,7 +2595,7 @@ form[action*="/d2l/lms/quizzing/user/quiz_submissions_attempt.d2l"] tr.d2l-rowsh
 .btn-dtured {
   background-color: var(--dtu-ad-accent-deep) !important;
   background: var(--dtu-ad-accent-deep) !important;
-  color: #ffffff !important;
+  color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
   border-color: var(--dtu-ad-accent-deep) !important;
 }
 
@@ -2609,7 +2609,7 @@ form[action*="/d2l/lms/quizzing/user/quiz_submissions_attempt.d2l"] tr.d2l-rowsh
   background-color: var(--dtu-ad-accent-deep) !important;
   background: var(--dtu-ad-accent-deep) !important;
   opacity: 0.6 !important;
-  color: #ffffff !important;
+  color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
 }
 
 .dtugreybackground {
@@ -2747,17 +2747,17 @@ h3[data-bind*="SemesterNumber"] {
   border-bottom-width: 2px !important;
   border-bottom-style: solid !important;
   border-bottom-color: var(--dtu-ad-accent-deep) !important;
-  color: #ffffff !important;
+  color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
 }
 
 /* Course codes and links - accent color */
 a.coursecode {
-  color: var(--dtu-ad-accent) !important;
+  color: var(--dtu-ad-accent-text, var(--dtu-ad-accent)) !important;
   background-color: transparent !important;
 }
 
 a.coursecode:hover {
-  color: var(--dtu-ad-accent-hover) !important;
+  color: var(--dtu-ad-accent-text-hover, var(--dtu-ad-accent-hover)) !important;
 }
 
 /* Type boxes - keep their original colors for course type indicators */
@@ -3161,7 +3161,7 @@ em {
 .mofoclass .nav-tabs>li>a {
   background-color: var(--dtu-ad-accent-deep) !important;
   background: var(--dtu-ad-accent-deep) !important;
-  color: #ffffff !important;
+  color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
   border-color: var(--dtu-ad-accent-deep) !important;
 }
 
@@ -3772,55 +3772,60 @@ ul.container_12.topmenuitems {
   border: 1px solid #505050 !important;
 }
 
-/* GPA summary row */
-.gpa-row {
-  background-color: #2d2d2d !important;
-  border-top: 3px solid var(--dtu-ad-accent) !important;
+/* GPA summary row: a hairline above it, on the page surface like the rows. Scoped to
+   the table so it outranks the generic .main__content table td dark 2 fill. */
+table.gradesList tr.gpa-row {
+  background-color: transparent !important;
+  border-top: 1px solid #404040 !important;
   border-bottom: none !important;
 }
 
-.gpa-row td {
-  background-color: #2d2d2d !important;
+table.gradesList tr.gpa-row td {
+  background-color: transparent !important;
   color: #ffffff !important;
   font-weight: bold !important;
   font-size: 14px !important;
   padding: 10px 5px !important;
 }
 
-/* Grades list table */
+/* Grades list table: sits on the dark 1 page surface, as the native table sits on
+   white in light mode, instead of forming a dark 2 block inside the content box */
 table.gradesList {
-  background-color: #2d2d2d !important;
+  background-color: transparent !important;
   border-color: #404040 !important;
 }
 
-table.gradesList tr.gradesListHeader td {
-  background-color: #2d2d2d !important;
-  color: #e0e0e0 !important;
-  border-color: #404040 !important;
+/* The generic .main__content table rule also fills tbody and tr with dark 2 */
+.main__content table.gradesList,
+.main__content table.gradesList > tbody,
+.main__content table.gradesList > tbody > tr {
+  background: transparent !important;
+  background-color: transparent !important;
 }
 
+table.gradesList tr.gradesListHeader td,
 table.gradesList tr.context_direct td,
 table.gradesList tr.context_alternating td {
-  background-color: #2d2d2d !important;
+  background-color: transparent !important;
   color: #e0e0e0 !important;
   border-color: #404040 !important;
 }
 
-table.gradesList tr.context_alternating td {
-  background-color: #252525 !important;
-}
-
-table.gradesList tr:hover td {
-  background-color: #3d3d3d !important;
+table.gradesList tr.context_direct:hover td,
+table.gradesList tr.context_alternating:hover td {
+  background-color: #262626 !important;
 }
 
 table.gradesList a {
   color: #66b3ff !important;
 }
 
+/* Course numbers link to their grade distribution; KU codes are plain text */
 table.gradesList tr.context_direct td:first-child a,
 table.gradesList tr.context_alternating td:first-child a {
-  color: inherit !important;
+  color: var(--dtu-ad-accent-mark-dark, #ff6b6b) !important;
+  text-decoration: underline !important;
+  text-underline-offset: 2px;
 }
 
 table.gradesList tr.gradesListHeader td:first-child,
@@ -3895,12 +3900,11 @@ table.gradesList tr.gpa-actual-excluded span[style*="color : green"] {
 }
 
 /* GPA Simulator rows */
-.gpa-sim-row {
+table.gradesList tr.gpa-sim-row {
   background-color: #202124 !important;
-  border-left: 2px solid rgba(var(--dtu-ad-accent-rgb), 0.55) !important;
 }
 
-.gpa-sim-row td {
+table.gradesList tr.gpa-sim-row td {
   background-color: #202124 !important;
   color: #e0e0e0 !important;
   padding: 6px 8px !important;
@@ -3952,30 +3956,19 @@ table.gradesList tr.gpa-actual-excluded span[style*="color : green"] {
   border-color: rgba(239, 83, 80, 0.3) !important;
 }
 
-.gpa-sim-add-row {
-  background-color: #1a1a1a !important;
+/* Scoped to the table so the generic .main__content table td dark 2 fill loses */
+table.gradesList tr.gpa-sim-add-row,
+table.gradesList tr.gpa-sim-add-row td,
+table.gradesList tr.gpa-sim-disclaimer-row,
+table.gradesList tr.gpa-sim-disclaimer-row td {
+  background-color: transparent !important;
 }
 
-.gpa-sim-add-row td {
-  background-color: #1a1a1a !important;
-}
-
-.gpa-sim-add-btn {
-  background-color: rgba(var(--dtu-ad-accent-rgb), 0.12) !important;
-  color: var(--dtu-ad-accent-soft) !important;
-  border: 1px solid rgba(var(--dtu-ad-accent-rgb), 0.55) !important;
-  border-radius: 8px !important;
-  cursor: pointer !important;
-  padding: 6px 14px !important;
-  font-size: 13px !important;
-  font-weight: 600 !important;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease !important;
-}
-
-.gpa-sim-add-btn:hover {
-  background-color: rgba(var(--dtu-ad-accent-rgb), 0.2) !important;
-  border-color: rgba(var(--dtu-ad-accent-rgb), 0.8) !important;
-  color: #ffffff !important;
+/* "+ Add planned grade" is a small outlined control beside "Only show passed courses";
+   its look is set inline in darkmode.campusnet-gpa.js so light mode matches. */
+.gradesEducation .gpa-sim-add-btn:focus-visible {
+  outline: 2px solid #e0e0e0 !important;
+  outline-offset: 2px !important;
 }
 
 .gpa-projected-row {
@@ -4149,7 +4142,7 @@ h2.widget__title {
   background: var(--dtu-ad-accent) !important;
   border-color: var(--dtu-ad-accent) !important;
   border-radius: 999px !important;
-  color: #ffffff !important;
+  color: var(--dtu-ad-accent-on, #ffffff) !important;
   fill: #ffffff !important;
   stroke: #ffffff !important;
 }
@@ -4162,7 +4155,7 @@ h2.widget__title {
   background-color: var(--dtu-ad-accent) !important;
   background: var(--dtu-ad-accent) !important;
   border-color: var(--dtu-ad-accent) !important;
-  color: #ffffff !important;
+  color: var(--dtu-ad-accent-on, #ffffff) !important;
   fill: #ffffff !important;
   stroke: #ffffff !important;
 }
@@ -4197,7 +4190,13 @@ h2.widget__title {
 .box.mainContentPageTemplate .boxHeader h2 {
   background: transparent !important;
   background-color: transparent !important;
-  color: #ffffff !important;
+  color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
+}
+
+/* CampusNet menu bodies match Toolbox; accent stays on headers and borders. */
+.group-menu__item,
+.group-menu__item-burger {
+  --dtu-ad-campusnet-menu-body: #2d2d2d;
 }
 
 /* CampusNet group-menu burger headers:
@@ -4234,7 +4233,7 @@ h2.widget__title {
 }
 
 #afrapporteringWidget .boxHeader h2 {
-  color: #ffffff !important;
+  color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
 }
 
 #afrapporteringWidget .lessonplan__progressbar .progressbar__percentage {
@@ -4251,7 +4250,7 @@ h2.widget__title {
 }
 
 .box.widget .boxHeader h2 {
-  color: #ffffff !important;
+  color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
 }
 
 /* CampusNet element links - light blue */
@@ -4511,12 +4510,12 @@ h4.category__title,
 h4.category__title a {
   background-color: var(--dtu-ad-accent-deep) !important;
   background: var(--dtu-ad-accent-deep) !important;
-  color: #ffffff !important;
+  color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
 }
 
 h4.category__title .arc-menu-burger-expander,
 h4.category__title .toggle-category {
-  color: #ffffff !important;
+  color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
 }
 
 h4.category__title:hover,
@@ -4539,12 +4538,12 @@ h4.category__title:focus-within {
 .ui-participant-categorybar {
   background-color: var(--dtu-ad-accent) !important;
   border-color: var(--dtu-ad-accent) !important;
-  color: #ffffff !important;
+  color: var(--dtu-ad-accent-on, #ffffff) !important;
 }
 
 .ui-participant-categorybar h3 {
   background-color: transparent !important;
-  color: #ffffff !important;
+  color: var(--dtu-ad-accent-on, #ffffff) !important;
 }
 
 .ui-participant-details {
@@ -4595,7 +4594,7 @@ h4.category__title:focus-within {
 .dturedbackground {
   background-color: var(--dtu-ad-accent-deep) !important;
   background: var(--dtu-ad-accent-deep) !important;
-  color: #ffffff !important;
+  color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
   border-color: var(--dtu-ad-accent-deep) !important;
   margin: 0 !important;
   padding-top: 0 !important;
@@ -4610,29 +4609,29 @@ h4.category__title:focus-within {
 .dturedbackground a,
 .dturedbackground .pull-right a,
 .dturedbackground .pull-right span a {
-  color: #ffffff !important;
+  color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
 }
 
 .dturedbackground a:hover,
 .dturedbackground .pull-right a:hover,
 .dturedbackground .pull-right span a:hover {
-  color: #ffffff !important;
+  color: var(--dtu-ad-accent-deep-hover-on, #ffffff) !important;
   background-color: var(--dtu-ad-accent-deep-hover) !important;
 }
 
 .dturedbackground .seperator {
-  color: rgba(255, 255, 255, 0.6) !important;
+  color: color-mix(in srgb, var(--dtu-ad-accent-deep-on, #ffffff) 60%, transparent) !important;
 }
 
 .dturedbackground .caret,
 .dturedbackground b.caret {
-  border-top-color: #ffffff !important;
+  border-top-color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
 }
 
 .dturedbackground .dropdown-toggle.red {
   background-color: var(--dtu-ad-accent-deep) !important;
   background: var(--dtu-ad-accent-deep) !important;
-  color: #ffffff !important;
+  color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
 }
 
 .dturedbackground .dropdown-menu.red {
@@ -4641,7 +4640,7 @@ h4.category__title:focus-within {
 }
 
 .dturedbackground .dropdown-menu.red li a {
-  color: #ffffff !important;
+  color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
 }
 
 .dturedbackground .dropdown-menu.red li a:hover {
@@ -4698,7 +4697,7 @@ h4.category__title:focus-within {
 /* KursussÃ¸gning tab - DTU red */
 .nav-tabs>li[role="presentation"]>a[href*="kurser.dtu.dk"] {
   background-color: var(--dtu-ad-accent-deep) !important;
-  color: #ffffff !important;
+  color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
 }
 
 .nav-tabs>li[role="presentation"]>a[href*="kurser.dtu.dk"]:hover {

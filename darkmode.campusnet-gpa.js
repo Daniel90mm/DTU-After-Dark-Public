@@ -222,49 +222,74 @@
         });
     }
 
+    function setCampusnetGpaAttribute(el, name, value) {
+        if (el.getAttribute(name) !== value) el.setAttribute(name, value);
+    }
+
+    var _campusnetGpaStyleState = new WeakMap();
+
+    function setCampusnetGpaStyle(el, name, value, priority) {
+        var expectedPriority = priority || '';
+        var current = el.style.getPropertyValue(name);
+        var currentPriority = el.style.getPropertyPriority(name);
+        var saved = _campusnetGpaStyleState.get(el);
+        var previous = saved && saved[name];
+        // CSSOM canonicalizes values such as hex colors and zero-width borders.
+        // Compare with the value read back after the last write, while detecting
+        // styles overwritten by another renderer.
+        if (previous && previous.value === value && previous.priority === expectedPriority
+            && previous.actual === current && currentPriority === expectedPriority) return;
+        if (current !== value || currentPriority !== expectedPriority) {
+            el.style.setProperty(name, value, expectedPriority);
+        }
+        if (!saved) { saved = {}; _campusnetGpaStyleState.set(el, saved); }
+        saved[name] = { value: value, priority: expectedPriority, actual: el.style.getPropertyValue(name) };
+    }
+
     function applyCampusnetActualGradeToggleButtonState(btn, excluded) {
         if (!btn || !btn.style) return;
-        btn.classList.toggle('is-excluded', !!excluded);
-        btn.setAttribute('aria-pressed', excluded ? 'true' : 'false');
-        btn.textContent = excluded ? 'Back' : 'Hide';
-        btn.title = excluded
+        if (btn.classList.contains('is-excluded') !== !!excluded) btn.classList.toggle('is-excluded', !!excluded);
+        setCampusnetGpaAttribute(btn, 'aria-pressed', excluded ? 'true' : 'false');
+        var text = excluded ? 'Back' : 'Hide';
+        if (btn.textContent !== text) btn.textContent = text;
+        var title = excluded
             ? 'Include this course again in GPA and ECTS calculations'
             : 'Ignore this course in GPA and ECTS calculations';
-        btn.setAttribute('aria-label', excluded ? 'Include this course in GPA again' : 'Exclude this course from GPA');
+        if (btn.title !== title) btn.title = title;
+        setCampusnetGpaAttribute(btn, 'aria-label', excluded ? 'Include this course in GPA again' : 'Exclude this course from GPA');
         // The base accent at reduced opacity was ~1.3:1 on the dark rows;
         // the soft accent is the dark-surface text accent used elsewhere.
         var fg = isDarkMode()
             ? (excluded ? '#c9ced6' : 'var(--dtu-ad-accent-soft)')
             : (excluded ? 'rgba(var(--dtu-ad-accent-deep-rgb), 0.78)' : 'rgba(var(--dtu-ad-accent-deep-rgb), 0.92)');
-        btn.style.setProperty('background', 'transparent', 'important');
-        btn.style.setProperty('background-color', 'transparent', 'important');
-        btn.style.setProperty('background-image', 'none', 'important');
-        btn.style.setProperty('color', fg, 'important');
-        btn.style.setProperty('border', '0', 'important');
-        btn.style.setProperty('border-radius', '0', 'important');
-        btn.style.setProperty('box-shadow', 'none', 'important');
-        btn.style.setProperty('appearance', 'none', 'important');
-        btn.style.setProperty('-webkit-appearance', 'none', 'important');
+        setCampusnetGpaStyle(btn, 'background', 'transparent', 'important');
+        setCampusnetGpaStyle(btn, 'background-color', 'transparent', 'important');
+        setCampusnetGpaStyle(btn, 'color', fg, 'important');
+        setCampusnetGpaStyle(btn, 'border', '0', 'important');
+        setCampusnetGpaStyle(btn, 'border-radius', '0', 'important');
+        setCampusnetGpaStyle(btn, 'box-shadow', 'none', 'important');
+        setCampusnetGpaStyle(btn, 'appearance', 'none', 'important');
+        setCampusnetGpaStyle(btn, '-webkit-appearance', 'none', 'important');
         // Padding lifts the click target from 24x13 to at least 24px tall.
-        btn.style.setProperty('padding', '5px 6px', 'important');
-        btn.style.setProperty('min-height', '24px', 'important');
-        btn.style.setProperty('display', 'inline-flex', 'important');
-        btn.style.setProperty('align-items', 'center', 'important');
-        btn.style.setProperty('justify-content', 'center', 'important');
-        btn.style.setProperty('float', 'right', 'important');
-        btn.style.setProperty('clear', 'none', 'important');
-        btn.style.setProperty('margin-top', '0', 'important');
-        btn.style.setProperty('margin-left', '0', 'important');
-        btn.style.setProperty('margin-right', '6px', 'important');
-        btn.style.setProperty('line-height', '1.2', 'important');
-        btn.style.setProperty('white-space', 'nowrap', 'important');
-        btn.style.setProperty('vertical-align', 'middle', 'important');
+        setCampusnetGpaStyle(btn, 'padding', '5px 6px', 'important');
+        setCampusnetGpaStyle(btn, 'min-height', '24px', 'important');
+        setCampusnetGpaStyle(btn, 'display', 'inline-flex', 'important');
+        setCampusnetGpaStyle(btn, 'align-items', 'center', 'important');
+        setCampusnetGpaStyle(btn, 'justify-content', 'center', 'important');
+        setCampusnetGpaStyle(btn, 'float', 'right', 'important');
+        setCampusnetGpaStyle(btn, 'clear', 'none', 'important');
+        setCampusnetGpaStyle(btn, 'margin-top', '0', 'important');
+        setCampusnetGpaStyle(btn, 'margin-left', '0', 'important');
+        setCampusnetGpaStyle(btn, 'margin-right', '6px', 'important');
+        setCampusnetGpaStyle(btn, 'line-height', '1.2', 'important');
+        setCampusnetGpaStyle(btn, 'white-space', 'nowrap', 'important');
+        setCampusnetGpaStyle(btn, 'vertical-align', 'middle', 'important');
     }
 
     function applyCampusnetActualGradeExcludedRowInlineStyles(entry, excluded) {
         if (!entry || !entry.row || !entry.row.querySelectorAll) return;
 
-        entry.row.querySelectorAll('[data-gpa-actual-inline-muted="1"]').forEach(function (el) {
+        if (!excluded) entry.row.querySelectorAll('[data-gpa-actual-inline-muted="1"]').forEach(function (el) {
             if (!el || !el.style) return;
             el.removeAttribute('data-gpa-actual-inline-muted');
             el.style.removeProperty('background');
@@ -276,9 +301,15 @@
         if (!excluded) {
             var courseNumberCell = entry.cells && entry.cells[0];
             if (courseNumberCell && courseNumberCell.querySelectorAll) {
+                // Course numbers link to their grade distribution, so they read as links
+                // in the accent kept at 4.5:1 on this surface. KU codes have no link.
+                var linkColor = isDarkMode()
+                    ? 'var(--dtu-ad-accent-mark-dark, #ff6b6b)'
+                    : 'var(--dtu-ad-accent-mark-light, #990000)';
                 courseNumberCell.querySelectorAll('a').forEach(function (link) {
                     if (!link || !link.style) return;
-                    link.style.setProperty('color', 'inherit', 'important');
+                    setCampusnetGpaStyle(link, 'color', linkColor, 'important');
+                    setCampusnetGpaStyle(link, 'text-decoration', 'underline', 'important');
                 });
             }
             return;
@@ -289,38 +320,73 @@
 
         entry.row.querySelectorAll('td').forEach(function (cell) {
             if (!cell || !cell.style) return;
-            cell.setAttribute('data-gpa-actual-inline-muted', '1');
-            cell.style.setProperty('background', rowBg, 'important');
-            cell.style.setProperty('background-color', rowBg, 'important');
-            cell.style.setProperty('color', mutedText, 'important');
-            cell.style.setProperty('text-decoration', 'line-through', 'important');
+            setCampusnetGpaAttribute(cell, 'data-gpa-actual-inline-muted', '1');
+            setCampusnetGpaStyle(cell, 'background', rowBg, 'important');
+            setCampusnetGpaStyle(cell, 'background-color', rowBg, 'important');
+            setCampusnetGpaStyle(cell, 'color', mutedText, 'important');
+            setCampusnetGpaStyle(cell, 'text-decoration', 'line-through', 'important');
         });
 
         entry.row.querySelectorAll('td span, td a').forEach(function (el) {
             if (!el || !el.style) return;
             if (el.closest && el.closest('.gpa-actual-toggle-btn')) return;
-            el.setAttribute('data-gpa-actual-inline-muted', '1');
-            el.style.setProperty('color', mutedText, 'important');
-            el.style.setProperty('text-decoration', 'line-through', 'important');
+            setCampusnetGpaAttribute(el, 'data-gpa-actual-inline-muted', '1');
+            setCampusnetGpaStyle(el, 'color', mutedText, 'important');
+            setCampusnetGpaStyle(el, 'text-decoration', 'line-through', 'important');
         });
     }
+
+    // Grade, ECTS and Date widths, wide enough for the planned-grade inputs and the
+    // "N ignored" note. The Title column takes the rest.
+    var CAMPUSNET_GRADE_COLUMN_WIDTHS = ['220px', null, '96px', '84px', '100px'];
 
     function applyCampusnetActualGradeColumnLayout(table) {
         var scope = table || getCampusnetGradesTable();
         if (!scope) return;
         scope.querySelectorAll('tr.gradesListHeader td:first-child, tr.context_direct td:first-child, tr.context_alternating td:first-child').forEach(function (cell) {
             if (!cell || !cell.style) return;
-            cell.style.setProperty('width', '220px', 'important');
-            cell.style.setProperty('min-width', '220px', 'important');
-            cell.style.setProperty('white-space', 'nowrap', 'important');
+            setCampusnetGpaStyle(cell, 'width', '220px', 'important');
+            setCampusnetGpaStyle(cell, 'min-width', '220px', 'important');
+            setCampusnetGpaStyle(cell, 'white-space', 'nowrap', 'important');
+        });
+        // Fixed layout takes column widths from the header row, so hiding a grade (which
+        // adds "1 ignored" under Date) or adding a planned grade (inputs under Grade
+        // and ECTS) can no longer push the right-hand columns sideways.
+        var header = scope.querySelector && scope.querySelector('tr.gradesListHeader');
+        if (!header || !header.children || header.children.length !== CAMPUSNET_GRADE_COLUMN_WIDTHS.length) return;
+        setCampusnetGpaAttribute(scope, 'data-gpa-fixed-columns', '1');
+        setCampusnetGpaStyle(scope, 'table-layout', 'fixed', 'important');
+        setCampusnetGpaStyle(scope, 'width', '100%', 'important');
+        CAMPUSNET_GRADE_COLUMN_WIDTHS.forEach(function (width, index) {
+            var cell = header.children[index];
+            if (!width || !cell || !cell.style) return;
+            setCampusnetGpaStyle(cell, 'width', width, 'important');
+        });
+    }
+
+    function clearCampusnetActualGradeColumnLayout(table) {
+        var scope = table || getCampusnetGradesTable();
+        if (!scope || !scope.getAttribute || scope.getAttribute('data-gpa-fixed-columns') !== '1') return;
+        scope.removeAttribute('data-gpa-fixed-columns');
+        scope.style.removeProperty('table-layout');
+        scope.style.removeProperty('width');
+        var header = scope.querySelector('tr.gradesListHeader');
+        var cells = header ? Array.prototype.slice.call(header.children) : [];
+        cells = cells.concat(Array.prototype.slice.call(
+            scope.querySelectorAll('tr.context_direct td:first-child, tr.context_alternating td:first-child')));
+        cells.forEach(function (cell) {
+            if (!cell || !cell.style) return;
+            cell.style.removeProperty('width');
+            cell.style.removeProperty('min-width');
+            cell.style.removeProperty('white-space');
         });
     }
 
     function applyCampusnetActualGradeExclusionState(entry, btn, excluded) {
         if (!entry || !entry.row) return;
-        entry.row.classList.toggle('gpa-actual-excluded', !!excluded);
-        if (excluded) entry.row.setAttribute('data-gpa-actual-excluded', '1');
-        else entry.row.removeAttribute('data-gpa-actual-excluded');
+        if (entry.row.classList.contains('gpa-actual-excluded') !== !!excluded) entry.row.classList.toggle('gpa-actual-excluded', !!excluded);
+        if (excluded) setCampusnetGpaAttribute(entry.row, 'data-gpa-actual-excluded', '1');
+        else if (entry.row.getAttribute('data-gpa-actual-excluded') !== null) entry.row.removeAttribute('data-gpa-actual-excluded');
         applyCampusnetActualGradeExcludedRowInlineStyles(entry, excluded);
         applyCampusnetActualGradeToggleButtonState(btn, excluded);
     }
@@ -375,7 +441,7 @@
                 codeCell.appendChild(btn);
             }
 
-            btn.setAttribute('data-gpa-signature', entry.signature);
+            setCampusnetGpaAttribute(btn, 'data-gpa-signature', entry.signature);
             applyCampusnetActualGradeExclusionState(entry, btn, summary.excludedSet.has(entry.signature));
         });
     }
@@ -386,6 +452,7 @@
             var disabledTable = getCampusnetGradesTable();
             if (disabledTable) {
                 clearCampusnetActualGradeExclusionUi(disabledTable);
+                clearCampusnetActualGradeColumnLayout(disabledTable);
                 var existing = disabledTable.querySelector('.gpa-row');
                 if (existing) existing.remove();
                 var projected = disabledTable.querySelector('.gpa-projected-row');
@@ -443,12 +510,16 @@
         else table.appendChild(gpaRow);
     }
 
+    // The estimate note belongs to Projected GPA, so it only shows while planned grades
+    // exist and sits under the totals rather than at the top of the table.
     function syncGpaSimulatorDisclaimer(table) {
         if (!table) return;
-        var addRow = table.querySelector('.gpa-sim-add-row');
-        if (!addRow) return;
-
         var disclaimerRow = table.querySelector('.gpa-sim-disclaimer-row');
+        var simRows = table.querySelectorAll('.gpa-sim-row');
+        if (!simRows.length) {
+            if (disclaimerRow) disclaimerRow.remove();
+            return;
+        }
         if (!disclaimerRow) {
             disclaimerRow = document.createElement('tr');
             disclaimerRow.className = 'gpa-sim-disclaimer-row';
@@ -459,12 +530,11 @@
             td.setAttribute('data-dtu-ext', '1');
             td.style.cssText = 'text-align:right;padding:4px 6px 2px;font-size:10px;';
             td.style.setProperty('color', isDarkMode() ? '#9aa1aa' : '#6b7280', 'important');
-            td.textContent = 'Hypothetical GPA is an estimate. Always verify official grades/GPA in DTU systems.';
+            td.textContent = 'Projected GPA is an estimate. Always verify official grades/GPA in DTU systems.';
             disclaimerRow.appendChild(td);
         }
 
-        var simRows = table.querySelectorAll('.gpa-sim-row');
-        var anchor = simRows.length ? simRows[simRows.length - 1] : addRow;
+        var anchor = table.querySelector('.gpa-projected-row') || table.querySelector('.gpa-row') || simRows[simRows.length - 1];
         if (anchor && anchor.parentNode && disclaimerRow.previousElementSibling !== anchor) {
             anchor.after(disclaimerRow);
         }
@@ -593,13 +663,13 @@
             var lastRow = table.querySelector('tr:last-child');
             if (lastRow) lastRow.after(projRow);
         }
+        syncGpaSimulatorDisclaimer(table);
     }
 
     function createSimRow(entry) {
         var tr = document.createElement('tr');
         tr.className = 'gpa-sim-row';
         tr.setAttribute('data-dtu-ext', '1');
-        tr.style.setProperty('border-left', '2px solid rgba(var(--dtu-ad-accent-rgb), 0.55)', 'important');
 
         var tdCode = document.createElement('td');
         tdCode.setAttribute('data-dtu-ext', '1');
@@ -631,6 +701,7 @@
         var gradeSelect = document.createElement('select');
         gradeSelect.className = 'gpa-sim-select';
         gradeSelect.setAttribute('data-dtu-ext', '1');
+        gradeSelect.style.cssText = 'width: 72px; max-width: 100%;';
         DANISH_GRADES.forEach(function (g) {
             var option = document.createElement('option');
             option.setAttribute('data-dtu-ext', '1');
@@ -652,7 +723,7 @@
         ectsInput.min = '1';
         ectsInput.max = '60';
         ectsInput.value = entry.ects || 5;
-        ectsInput.style.cssText = 'width: 67px; text-align: left; padding-left: 10px; padding-right: 22px; box-sizing: border-box;';
+        ectsInput.style.cssText = 'width: 67px; max-width: 100%; text-align: left; padding-left: 10px; padding-right: 22px; box-sizing: border-box;';
         ectsInput.addEventListener('input', function () { saveSimEntries(); updateProjectedGPA(); });
         tdECTS.appendChild(ectsInput);
 
@@ -687,8 +758,14 @@
     function insertGPASimulator() {
         if (!isTopWindow()) return;
         if (!isFeatureEnabled()) {
-            document.querySelectorAll('.gpa-sim-row, .gpa-sim-add-row, .gpa-projected-row, .gpa-sim-disclaimer-row').forEach(function (el) {
+            document.querySelectorAll('.gpa-sim-row, .gpa-sim-add-row, .gpa-sim-add-btn, .gpa-projected-row, .gpa-sim-disclaimer-row').forEach(function (el) {
                 el.remove();
+            });
+            document.querySelectorAll('[data-gpa-controls-flex="1"]').forEach(function (el) {
+                el.removeAttribute('data-gpa-controls-flex');
+                el.style.removeProperty('display');
+                el.style.removeProperty('align-items');
+                el.style.removeProperty('flex-wrap');
             });
             return;
         }
@@ -703,23 +780,53 @@
             var stored = localStorage.getItem(GPA_SIM_STORAGE_KEY);
             if (stored) savedEntries = JSON.parse(stored);
         } catch (e) { }
+        if (!Array.isArray(savedEntries)) savedEntries = [];
+        savedEntries = savedEntries.filter(function (entry) {
+            return entry && typeof entry === 'object' && !Array.isArray(entry)
+                && DANISH_GRADES.indexOf(entry.grade) >= 0
+                && Number.isFinite(entry.ects) && entry.ects > 0;
+        });
 
+        // The row stays as the anchor planned rows are inserted after (right under the
+        // header). The button itself sits with the page's own controls, next to "Only
+        // show passed courses", as a small outlined control (design C, 2026-09-30).
         var addRow = document.createElement('tr');
         addRow.className = 'gpa-sim-add-row';
         addRow.setAttribute('data-dtu-ext', '1');
-        var addTd = document.createElement('td');
-        addTd.setAttribute('data-dtu-ext', '1');
-        addTd.colSpan = 5;
-        addTd.style.cssText = 'text-align: left; padding: 6px 0;';
         var addBtn = document.createElement('button');
         addBtn.type = 'button';
         addBtn.className = 'gpa-sim-add-btn';
         addBtn.setAttribute('data-dtu-ext', '1');
-        addBtn.textContent = '+ Add hypothetical grade';
-        addBtn.style.setProperty('background', 'rgba(var(--dtu-ad-accent-rgb), 0.12)', 'important');
-        addBtn.style.setProperty('background-color', 'rgba(var(--dtu-ad-accent-rgb), 0.12)', 'important');
-        addBtn.style.setProperty('color', isDarkMode() ? 'var(--dtu-ad-accent-soft)' : 'var(--dtu-ad-accent-deep)', 'important');
-        addBtn.style.setProperty('border-color', 'rgba(var(--dtu-ad-accent-rgb), 0.55)', 'important');
+        var plus = document.createElement('span');
+        plus.className = 'gpa-sim-add-plus';
+        plus.setAttribute('data-dtu-ext', '1');
+        plus.setAttribute('aria-hidden', 'true');
+        plus.textContent = '+';
+        addBtn.appendChild(plus);
+        var label = document.createElement('span');
+        label.setAttribute('data-dtu-ext', '1');
+        label.textContent = 'Add planned grade';
+        addBtn.appendChild(label);
+        var dark = isDarkMode();
+        var restingBorder = dark ? '#505050' : '#b8b8b8';
+        var accentMark = dark ? 'var(--dtu-ad-accent-mark-dark, #ff6b6b)' : 'var(--dtu-ad-accent-mark-light, #990000)';
+        [
+            ['display', 'inline-flex'], ['align-items', 'center'], ['gap', '6px'],
+            ['height', '30px'], ['margin', '0 0 0 16px'], ['padding', '0 12px'],
+            ['border', '1px solid ' + restingBorder], ['border-radius', '4px'],
+            ['background', 'transparent'], ['background-color', 'transparent'],
+            ['color', dark ? '#e0e0e0' : '#1a1a1a'], ['font-size', '13px'], ['font-weight', '400'],
+            ['line-height', '1'], ['vertical-align', 'middle'], ['cursor', 'pointer'], ['box-shadow', 'none']
+        ].forEach(function (pair) { addBtn.style.setProperty(pair[0], pair[1], 'important'); });
+        plus.style.setProperty('font-size', '16px', 'important');
+        plus.style.setProperty('line-height', '1', 'important');
+        plus.style.setProperty('color', accentMark, 'important');
+        ['mouseenter', 'focus'].forEach(function (type) {
+            addBtn.addEventListener(type, function () { addBtn.style.setProperty('border-color', accentMark, 'important'); });
+        });
+        ['mouseleave', 'blur'].forEach(function (type) {
+            addBtn.addEventListener(type, function () { addBtn.style.setProperty('border-color', restingBorder, 'important'); });
+        });
         addBtn.addEventListener('click', function (e) {
             e.preventDefault();
             setSuppressHeavyWork(true);
@@ -731,21 +838,30 @@
             saveSimEntries();
             updateProjectedGPA();
             setSuppressHeavyWork(false);
+            var firstInput = newRow.querySelector('input');
+            if (firstInput && firstInput.focus) firstInput.focus();
         });
-        addBtn.addEventListener('mouseenter', function () {
-            addBtn.style.setProperty('background-color', 'rgba(var(--dtu-ad-accent-rgb), 0.2)', 'important');
-            addBtn.style.setProperty('background', 'rgba(var(--dtu-ad-accent-rgb), 0.2)', 'important');
-            addBtn.style.setProperty('border-color', 'rgba(var(--dtu-ad-accent-rgb), 0.8)', 'important');
-            addBtn.style.setProperty('color', '#ffffff', 'important');
-        });
-        addBtn.addEventListener('mouseleave', function () {
-            addBtn.style.setProperty('background', 'rgba(var(--dtu-ad-accent-rgb), 0.12)', 'important');
-            addBtn.style.setProperty('background-color', 'rgba(var(--dtu-ad-accent-rgb), 0.12)', 'important');
-            addBtn.style.setProperty('color', isDarkMode() ? 'var(--dtu-ad-accent-soft)' : 'var(--dtu-ad-accent-deep)', 'important');
-            addBtn.style.setProperty('border-color', 'rgba(var(--dtu-ad-accent-rgb), 0.55)', 'important');
-        });
-        addTd.appendChild(addBtn);
-        addRow.appendChild(addTd);
+
+        var controlsHost = document.querySelector('.educationPassedOnly');
+        if (controlsHost) {
+            addRow.style.setProperty('display', 'none', 'important');
+            // The label is a floated line of text and the button is 30px tall; centring
+            // the line keeps label, checkbox and button on one axis.
+            controlsHost.setAttribute('data-gpa-controls-flex', '1');
+            controlsHost.style.setProperty('display', 'flex', 'important');
+            controlsHost.style.setProperty('align-items', 'center', 'important');
+            controlsHost.style.setProperty('flex-wrap', 'wrap', 'important');
+            controlsHost.appendChild(addBtn);
+        } else {
+            // CampusNet changed its controls: keep the button in its own row instead.
+            var addTd = document.createElement('td');
+            addTd.setAttribute('data-dtu-ext', '1');
+            addTd.colSpan = 5;
+            addTd.style.cssText = 'text-align: left; padding: 6px 0;';
+            addBtn.style.setProperty('margin', '0', 'important');
+            addTd.appendChild(addBtn);
+            addRow.appendChild(addTd);
+        }
 
         headerRow.after(addRow);
 

@@ -244,3 +244,123 @@ test('zip part names: plain when there is one part, numbered once split', () => 
     assert.equal(api.getZipPartFileName('', 2, true), 'DTU-Learn-Bulk-Download - part 2.zip');
     assert.doesNotMatch(api.getZipPartFileName('a/b:c', 1, false), /[/:]/);
 });
+
+// Exercise cancellation against a pending metadata request. No course material
+// is fetched: scanned topics are explicitly non-file topics.
+async function runnerFixture({ legacy = false } = {}) {
+    const { extractFunctions } = await import('./_harness.mjs');
+    const pending = [], legacyPending = [];
+    const statuses = [];
+    let enabled = true, lessonsPage = true;
+    const { api } = extractFunctions('darkmode.lessons-bulk.js', [
+        'runLessonsBulkDownload', 'cancelLessonsBulkRun', 'resetLessonsBulkState',
+        'throwIfLessonsBulkAborted', 'isLessonsBulkRunAborted', 'getLessonsBulkStateRefs'
+    ], {
+        prelude: `let _lessonsBulkRunAbort = null, _lessonsBulkZipPartsSaved = 0;
+            let _lessonsBulkUiState = { sections: [], running: false };
+            let _lessonsBulkUrlNameHints = new Map();
+            let _lessonsLegacyApiSectionsCache = {}, _lessonsLegacyModuleStructureCache = new Map(), _lessonsLegacyBackgroundResolveState = { resolvedKeys: new Set() };
+            const LESSONS_BULK_SCAN_CONCURRENCY = 4;`,
+        globals: {
+            AbortController, document: {},
+            isLessonsBulkDownloadEnabled: () => enabled,
+            isDTULearnLessonsPage: () => lessonsPage,
+            isLegacyLessonsTreeDocument: () => legacy,
+            maybeStartLegacyApiSectionsHydration() {}, refreshLessonsBulkDownloadUi() {},
+            legacySectionHasOnlyUnitUrls: s => !!s.key,
+            resolveLegacySectionUnitUrlsViaHiddenFrame: () => new Promise(resolve => legacyPending.push(resolve)),
+            applyResolvedUrlsToLegacySections() {},
+            sanitizeLessonsSectionUnitUrls: a => a,
+            logLessonsBulkDebug() {},
+            setLessonsBulkControlsDisabled() {},
+            updateLessonsBulkRunButton() {},
+            setLessonsBulkStatus: (root, text) => statuses.push(text),
+            getCurrentLessonsOrgUnitId: () => '123',
+            loadLessonsTocIndex: () => new Promise(resolve => pending.push(resolve)),
+            fetchLessonsUnitDownloadResult: async () => ({ links: [], notFile: true }),
+            isStrictFileDownloadUrl: () => false
+        }
+    });
+    const root = { isConnected: true, ownerDocument: {}, querySelectorAll: () => [{ checked: true, getAttribute: () => 'section' }] };
+    const seed = () => { api.getLessonsBulkStateRefs().uiState.sections = [{key:'section',unitUrls:['https://learn.inside.dtu.dk/d2l/le/lessons/123/topics/456']}]; };
+    seed();
+    return { api, root, seed, pending, legacyPending, statuses, enable(v) { enabled = v; }, page(v) { lessonsPage = v; } };
+}
+test('turning download off and back on cannot overlap a still-cancelling run', async () => {
+    const f = await runnerFixture();
+    const first = f.api.runLessonsBulkDownload(f.root);
+    assert.equal(f.pending.length, 1);
+    f.api.resetLessonsBulkState();
+    f.seed();
+    const second = f.api.runLessonsBulkDownload(f.root);
+    const callsBeforeSettlement = f.pending.length;
+    f.pending.forEach(resolve => resolve());
+    await Promise.all([first, second]);
+    assert.equal(callsBeforeSettlement, 1, 'the previous abort controller must remain active until its run settles');
+    assert.ok(f.statuses.some(s => /Cancelled/.test(s)));
+    const third = f.api.runLessonsBulkDownload(f.root);
+    assert.equal(f.pending.length, 2, 'a fresh run may start after cancellation finishes');
+    f.pending[1]();
+    await third;
+});
+test('disabled content download does not request metadata or files', async () => {
+    const f = await runnerFixture();
+    f.enable(false);
+    await f.api.runLessonsBulkDownload(f.root);
+    assert.equal(f.pending.length, 0);
+});
+
+test('late Lessons TOC mounting is retried without unrelated page mutations', async () => {
+    const { extractFunctions, readSource } = await import('./_harness.mjs');
+    const timers = new Map(); let nextId = 0, passes = 0, enabled = true;
+    const { api, context } = extractFunctions('darkmode.lessons-bulk.js', ['runLessonsBulkDownloadChecks', ...(readSource('darkmode.lessons-bulk.js').includes('function scheduleLessonsBulkBootstrap(') ? ['scheduleLessonsBulkBootstrap'] : [])], {
+        prelude: 'let _lessonsBulkUiInserted = false, _lessonsBulkBootstrapTimer = null;',
+        globals: {
+            window: { location: { hostname: 'learn.inside.dtu.dk' } },
+            isTopWindow: () => true, isLessonsBulkDownloadEnabled: () => enabled, isDTULearnLessonsPage: () => true,
+            insertLessonsBulkDownloadControl: () => { passes++; if (passes === 4) context.evalInserted(); },
+            removeLessonsBulkDownloadControl() {},
+            scheduleLessonsBulkBootstrap() {},
+            setInterval: fn => { timers.set(++nextId, fn); return nextId; },
+            clearInterval: id => timers.delete(id)
+        }
+    });
+    // Set the same insertion flag the production mount path sets.
+    const vm = await import('node:vm');
+    context.evalInserted = () => vm.runInContext('_lessonsBulkUiInserted = true', context);
+    api.runLessonsBulkDownloadChecks();
+    assert.equal(timers.size, 1);
+    for (let i = 0; i < 4; i++) [...timers.values()].forEach(fn => fn());
+    assert.equal(passes, 4);
+    assert.equal(timers.size, 0, 'the poll ends as soon as the control mounts');
+    vm.runInContext('_lessonsBulkUiInserted = false', context);
+    api.runLessonsBulkDownloadChecks();
+    enabled = false;
+    [...timers.values()].forEach(fn => fn());
+    assert.equal(timers.size, 0, 'switching the setting off stops the bootstrap');
+});
+
+async function settleLegacyPreflight(f, runs) {
+    f.legacyPending.forEach(resolve => resolve(['https://learn.inside.dtu.dk/d2l/le/lessons/123/topics/456']));
+    for (let i = 0; i < 8; i++) await Promise.resolve();
+    f.pending.forEach(resolve => resolve());
+    await Promise.all(runs);
+}
+for (const action of ['disable', 'cancel', 'leave']) {
+    test(`legacy download preflight cannot request metadata after ${action}`, async () => {
+        const f = await runnerFixture({ legacy: true }); const run = f.api.runLessonsBulkDownload(f.root);
+        assert.equal(f.legacyPending.length, 1);
+        if (action === 'disable') { f.enable(false); f.api.resetLessonsBulkState(); }
+        if (action === 'cancel') f.api.cancelLessonsBulkRun();
+        if (action === 'leave') { f.page(false); f.root.isConnected = false; }
+        await settleLegacyPreflight(f, [run]);
+        assert.equal(f.pending.length, 0);
+    });
+}
+test('duplicate download clicks cannot overlap legacy preflight', async () => {
+    const f = await runnerFixture({ legacy: true });
+    const first = f.api.runLessonsBulkDownload(f.root), second = f.api.runLessonsBulkDownload(f.root);
+    const count = f.legacyPending.length;
+    await settleLegacyPreflight(f, [first, second]);
+    assert.equal(count, 1); assert.equal(f.pending.length, 1);
+});

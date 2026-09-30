@@ -203,6 +203,66 @@
         return (deps && deps.lineColors) || {};
     }
 
+    // Movia's type colours (S blue, E green, A red). The badge is a split tag: the number
+    // on a neutral chip and the type letter in its colour; numbered lines have no letter.
+    var BUS_TYPE_COLORS = { S: '#1d62b3', E: '#1e7a3c', A: '#c21f32' };
+
+    function splitBusLine(line) {
+        var text = String(line || '').trim();
+        var match = text.match(/^(\d+)([A-Z])$/);
+        return match ? { number: match[1], type: match[2] } : { number: text, type: '' };
+    }
+
+    // Widget badges are styled by the widget stylesheet. opts.inline styles the badge
+    // inline for the setup window, where page CSS would otherwise repaint it.
+    function createBusLineBadge(line, opts) {
+        var o = opts || {};
+        var parts = splitBusLine(line);
+        var badge = document.createElement('span');
+        markExt(badge);
+        badge.className = 'dtu-bus-badge';
+        badge.setAttribute('data-dtu-bus-line-badge', parts.number + parts.type);
+        var num = document.createElement('span');
+        markExt(num);
+        num.className = 'dtu-bus-badge-num';
+        num.textContent = parts.number;
+        badge.appendChild(num);
+        var type = null;
+        if (parts.type) {
+            type = document.createElement('span');
+            markExt(type);
+            type.className = 'dtu-bus-badge-type';
+            type.textContent = parts.type;
+            type.style.setProperty('--bus-type-color', BUS_TYPE_COLORS[parts.type] || '#4b5563');
+            badge.appendChild(type);
+        }
+        if (o.inline) {
+            var dark = !!o.dark;
+            var fontSize = o.fontSize || 13;
+            var padY = Math.round(fontSize * 0.28);
+            var set = function (el, name, value) { el.style.setProperty(name, value, 'important'); };
+            [['display', 'inline-flex'], ['align-items', 'stretch'], ['overflow', 'hidden'],
+                ['border-radius', Math.max(3, Math.round(fontSize * 0.22)) + 'px'],
+                ['background', dark ? '#3a3a3a' : '#f1f1f1'], ['border', '0'],
+                ['box-shadow', 'inset 0 0 0 1px ' + (dark ? '#505050' : '#d0d0d0')],
+                ['font-size', fontSize + 'px'], ['font-weight', '700'], ['line-height', '1.2'],
+                ['vertical-align', 'middle'], ['flex-shrink', '0'], ['opacity', '1']
+            ].forEach(function (pair) { set(badge, pair[0], pair[1]); });
+            if (o.minWidth) set(badge, 'min-width', o.minWidth);
+            set(num, 'flex', '1 1 auto');
+            set(num, 'text-align', 'center');
+            set(num, 'padding', padY + 'px ' + Math.round(fontSize * 0.4) + 'px');
+            set(num, 'background', 'transparent');
+            set(num, 'color', dark ? '#e0e0e0' : '#1f2937');
+            if (type) {
+                set(type, 'padding', padY + 'px ' + Math.round(fontSize * 0.32) + 'px');
+                set(type, 'background', BUS_TYPE_COLORS[parts.type] || '#4b5563');
+                set(type, 'color', '#ffffff');
+            }
+        }
+        return badge;
+    }
+
     function getBusCampusOrder() {
         var deps = getDeps();
         return (deps && Array.isArray(deps.campusOrder)) ? deps.campusOrder : [];
@@ -233,103 +293,248 @@
         return (deps && deps.featureLibraryDropdownKey) || 'dtuAfterDarkFeatureLibraryDropdown';
     }
 
+    /* Hallmark: component: nav-bar departures widget + setup prompt, genre: utilitarian,
+     * theme: DTU After Dark tokens (dark #2d2d2d/#e0e0e0, light #fff/#1f2937, --dtu-ad-accent).
+     * states: default, hover, focus-visible, active (buttons); stale, empty, late (widget). */
+    var BUS_STYLE_ID = 'dtu-bus-styles';
+    var BUS_STYLE_CSS = ''
+        // Scoped under the nav wrapper: darkmode.css paints '.d2l-navigation-s-main-wrapper *'
+        // with !important, and at equal specificity load order decided, so Firefox lost
+        // the badge colours in dark mode.
+        + '.d2l-navigation-s-main-wrapper .dtu-bus-departures{--bus-bg:#2d2d2d;--bus-text:#e0e0e0;--bus-muted:#a3a3a3;--bus-rule:#404040;--bus-late:#fdba74;--bus-chip:#3a3a3a;--bus-chip-line:#505050;'
+        + 'display:grid;grid-template-columns:auto minmax(0,11em) auto auto;column-gap:8px;row-gap:2px;align-items:center;align-self:center;'
+        + 'margin-left:auto;margin-right:12px;padding:3px 12px;max-width:min(360px,40vw);min-width:92px;flex:0 1 auto;overflow:hidden;box-sizing:border-box;'
+        + 'border-left:2px solid var(--dtu-ad-accent);border-radius:0 6px 6px 0;background:var(--bus-bg) !important;color:var(--bus-text) !important;font-size:12px;line-height:15px;'
+        + 'font-variant-numeric:tabular-nums;white-space:nowrap}'
+        + '.d2l-navigation-s-main-wrapper .dtu-bus-departures[data-theme="light"]{--bus-bg:#ffffff;--bus-text:#1f2937;--bus-muted:#5f6673;--bus-rule:#e5e7eb;--bus-late:#b45309;--bus-chip:#f1f1f1;--bus-chip-line:#d0d0d0}'
+        + '.d2l-navigation-s-main-wrapper .dtu-bus-departures[data-stale="1"]{opacity:.6}'
+        + '.d2l-navigation-s-main-wrapper .dtu-bus-departures .dtu-bus-row{display:contents}'
+        // Split tag: stretched to the column so every badge is the same width, the number
+        // takes the spare room and the type letter sits flush right in Movia's colour.
+        + '.d2l-navigation-s-main-wrapper .dtu-bus-departures .dtu-bus-badge{justify-self:stretch;display:inline-flex;align-items:stretch;overflow:hidden;border-radius:3px;'
+        + 'font-weight:700;font-size:11px;line-height:15px;background:var(--bus-chip) !important;box-shadow:inset 0 0 0 1px var(--bus-chip-line);color:var(--bus-text) !important}'
+        + '.d2l-navigation-s-main-wrapper .dtu-bus-departures .dtu-bus-badge-num{flex:1 1 auto;text-align:center;padding:0 4px;background:transparent !important;color:var(--bus-text) !important}'
+        + '.d2l-navigation-s-main-wrapper .dtu-bus-departures .dtu-bus-badge-type{padding:0 3px;background:var(--bus-type-color) !important;color:#ffffff !important}'
+        + '.d2l-navigation-s-main-wrapper .dtu-bus-departures .dtu-bus-badge[data-repeat="1"]{visibility:hidden}'
+        + '.d2l-navigation-s-main-wrapper .dtu-bus-departures .dtu-bus-dir{color:var(--bus-muted) !important;background:transparent !important;overflow:hidden;text-overflow:ellipsis;min-width:0}'
+        + '.d2l-navigation-s-main-wrapper .dtu-bus-departures .dtu-bus-min{font-weight:700;color:var(--bus-text) !important;background:transparent !important;justify-self:end}'
+        + '.d2l-navigation-s-main-wrapper .dtu-bus-departures .dtu-bus-late{color:var(--bus-late) !important;background:transparent !important;font-weight:600;font-size:11px}'
+        + '.d2l-navigation-s-main-wrapper .dtu-bus-departures .dtu-bus-none{color:var(--bus-muted) !important;background:transparent !important;grid-column:2 / -1}'
+        + '.d2l-navigation-s-main-wrapper .dtu-bus-departures .dtu-bus-status{color:var(--bus-muted) !important;background:transparent !important;grid-column:1 / -1;overflow:hidden;text-overflow:ellipsis;min-width:0}'
+        + '@media (max-width:1180px){' + '.d2l-navigation-s-main-wrapper .dtu-bus-departures{grid-template-columns:auto auto;padding:3px 8px;column-gap:6px}'
+        + '.d2l-navigation-s-main-wrapper .dtu-bus-departures .dtu-bus-dir,' + '.d2l-navigation-s-main-wrapper .dtu-bus-departures .dtu-bus-late{display:none}'
+        + '.d2l-navigation-s-main-wrapper .dtu-bus-departures .dtu-bus-min{justify-self:start}' + '.d2l-navigation-s-main-wrapper .dtu-bus-departures .dtu-bus-none{font-size:0}'
+        + '.d2l-navigation-s-main-wrapper .dtu-bus-departures .dtu-bus-none::after{content:attr(data-short);font-size:12px}}'
+        + '.dtu-bus-setup-prompt{--bp-bg:#2d2d2d;--bp-text:#e0e0e0;--bp-muted:#b3b3b3;--bp-rule:#404040;--bp-shadow:rgba(0,0,0,.45);'
+        + 'position:fixed;bottom:24px;right:24px;z-index:999999;box-sizing:border-box;width:min(340px,calc(100vw - 32px));'
+        + 'padding:16px 18px;border:1px solid var(--bp-rule);border-radius:10px;'
+        + 'background:var(--bp-bg) !important;color:var(--bp-text) !important;box-shadow:0 6px 24px var(--bp-shadow);font:inherit;'
+        + 'opacity:0;transform:translateY(8px);transition:opacity .22s cubic-bezier(.2,.8,.2,1),transform .22s cubic-bezier(.2,.8,.2,1)}'
+        + '.dtu-bus-setup-prompt[data-theme="light"]{--bp-bg:#ffffff;--bp-text:#1f2937;--bp-muted:#4b5563;--bp-rule:#e5e7eb;--bp-shadow:rgba(15,23,42,.14)}'
+        + '.dtu-bus-setup-prompt[data-open="1"]{opacity:1;transform:none}'
+        + '.dtu-bus-setup-prompt h2{margin:0 0 6px;font-size:15px;line-height:1.3;font-weight:700;font-style:normal;color:var(--bp-text) !important;background:transparent !important}'
+        + '.dtu-bus-setup-prompt p{margin:0 0 14px;font-size:13px;line-height:1.5;color:var(--bp-muted) !important;background:transparent !important}'
+        + '.dtu-bus-setup-actions{display:flex;gap:8px}'
+        + '.dtu-bus-setup-prompt button{font:inherit;font-size:13px;font-weight:600;line-height:1.2;padding:8px 14px;border-radius:6px;cursor:pointer;'
+        + 'transition:background-color .15s cubic-bezier(.2,.8,.2,1),border-color .15s cubic-bezier(.2,.8,.2,1)}'
+        + '.dtu-bus-setup-primary{flex:1 1 auto;border:1px solid var(--dtu-ad-accent-border, var(--dtu-ad-accent)) !important;'
+        + 'background:var(--dtu-ad-accent) !important;color:var(--dtu-ad-accent-on, #ffffff) !important}'
+        + '.dtu-bus-setup-primary:hover{background:var(--dtu-ad-accent-hover) !important}'
+        + '.dtu-bus-setup-secondary{border:1px solid var(--bp-rule) !important;background:transparent !important;color:var(--bp-text) !important}'
+        + '.dtu-bus-setup-secondary:hover{border-color:var(--bp-muted) !important}'
+        + '.dtu-bus-setup-prompt button:focus-visible{outline:2px solid var(--dtu-ad-accent);outline-offset:2px}'
+        + '.dtu-bus-setup-prompt button:active{transform:translateY(1px)}'
+        + '@media (prefers-reduced-motion: reduce){.dtu-bus-setup-prompt,.dtu-bus-setup-prompt button{transition:none}}';
+
+    function ensureBusStyles() {
+        var style = document.getElementById(BUS_STYLE_ID);
+        if (!style) {
+            style = document.createElement('style');
+            style.id = BUS_STYLE_ID;
+            markExt(style);
+            (document.head || document.documentElement).appendChild(style);
+        }
+        if (style.textContent !== BUS_STYLE_CSS) style.textContent = BUS_STYLE_CSS;
+    }
+
+    // Minutes are recomputed from the departure time on every render, so the
+    // widget counts down between fetches and drops buses that have left.
+    function busMinutesNow(dep, nowTs) {
+        if (dep && typeof dep.at === 'number') return Math.floor((dep.at - nowTs) / 60000);
+        return (dep && typeof dep.minutes === 'number') ? dep.minutes : null;
+    }
+
+    function formatBusClock(ts) {
+        var d = new Date(ts);
+        return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    }
+
+    // One row per line (its next bus) so three lines fit the nav bar; with a
+    // single line its next three buses fill the rows. Each row's title lists the
+    // line's next three departures with their directions.
+    function buildBusWidgetModel(departures, config, nowTs) {
+        var groups = {};
+        (departures || []).forEach(function (dep) {
+            if (!dep || !dep.line) return;
+            var mins = busMinutesNow(dep, nowTs);
+            if (mins !== null && mins < 0) return;
+            (groups[dep.line] = groups[dep.line] || []).push({ dep: dep, mins: mins });
+        });
+        var order = [];
+        var configured = (config && Array.isArray(config.lines)) ? config.lines.map(function (l) { return l && l.line; }).filter(Boolean) : [];
+        configured.forEach(function (line) { if (order.indexOf(line) === -1) order.push(line); });
+        Object.keys(groups).sort().forEach(function (line) { if (order.indexOf(line) === -1) order.push(line); });
+        order = order.slice(0, 3);
+
+        function describe(line, r) {
+            var delay = typeof r.dep.delay === 'number' ? r.dep.delay : 0;
+            var when = r.mins === null ? String(r.dep.time || '') : (r.mins <= 0 ? 'Now' : (r.mins < 60 ? r.mins + ' min' : formatBusClock(r.dep.at)));
+            return {
+                direction: r.dep.direction || '',
+                when: when,
+                delay: delay,
+                text: line + ' to ' + (r.dep.direction || '') + ': ' + when + (delay > 0 ? ', delayed ' + delay + ' min' : '')
+            };
+        }
+
+        var rows = [];
+        order.forEach(function (line) {
+            var next = (groups[line] || []).sort(function (a, b) {
+                return (a.mins === null ? 999 : a.mins) - (b.mins === null ? 999 : b.mins);
+            }).slice(0, 3).map(function (r) { return describe(line, r); });
+            var title = next.length ? next.map(function (d) { return d.text; }).join('\n') : line + ': no departures in the next hour';
+            if (!next.length) {
+                rows.push({ line: line, repeat: false, none: true, title: title });
+                return;
+            }
+            var shown = order.length === 1 ? next : next.slice(0, 1);
+            shown.forEach(function (d, i) {
+                rows.push({ line: line, repeat: i > 0, none: false, direction: d.direction, when: d.when, delay: d.delay, title: title });
+            });
+        });
+        return rows;
+    }
+
+    var _busRenderTimer = null;
+
     function insertBusDisplay() {
         if (!isDTULearnHomepage() || !isBusEnabled()) {
             var existing = document.querySelector('.dtu-bus-departures');
             if (existing) existing.remove();
+            if (_busRenderTimer) { clearInterval(_busRenderTimer); _busRenderTimer = null; }
             return;
         }
 
         var mainWrapper = document.querySelector('.d2l-navigation-s-main-wrapper');
         if (!mainWrapper) return;
+        ensureBusStyles();
 
         var container = document.querySelector('.dtu-bus-departures');
         if (!container) {
             container = document.createElement('div');
             container.className = 'dtu-bus-departures';
             container.setAttribute('role', 'listitem');
+            container.setAttribute('aria-label', 'Bus departures');
+            markExt(container);
             mainWrapper.appendChild(container);
         } else if (container.parentElement !== mainWrapper) {
-            try {
-                mainWrapper.appendChild(container);
-            } catch (e) {
-            }
+            try { mainWrapper.appendChild(container); } catch (e) { }
         }
 
-        var isDark = isDarkModeEnabled();
-        container.style.cssText = 'display: flex; gap: 12px; padding: 2px 14px; '
-            + 'font-size: 12px; margin-left: auto; margin-right: 12px; '
-            + 'border-left: 2px solid var(--dtu-ad-accent); align-self: center; border-radius: 0 6px 6px 0; '
-            + (isDark
-                ? 'background: #2d2d2d !important; color: #e0e0e0 !important;'
-                : 'background: #ffffff !important; color: #333 !important;');
+        var theme = isDarkModeEnabled() ? 'dark' : 'light';
+        if (container.getAttribute('data-theme') !== theme) container.setAttribute('data-theme', theme);
+
+        var state = readUiState();
+        var now = Date.now();
+        var departures = Array.isArray(state.cachedDepartures) ? state.cachedDepartures : [];
+        var model = buildBusWidgetModel(departures, getBusConfig(), now);
+        var hasRows = model.some(function (r) { return !r.none; });
+        var stale = !!(state.lastBusFetch && (now - state.lastBusFetch) > 5 * 60 * 1000);
+        // "Loading" only until the first fetch finishes, so a refetch never flips an empty
+        // widget back and forth; a failed fetch says so instead of claiming no buses.
+        var status = hasRows ? '' : (isApiQuotaExhausted() ? 'Bus times paused until next month'
+            : (!state.busHasResult ? 'Loading bus times'
+                : (state.busLastFetchFailed ? 'Bus times unavailable, retrying' : 'No upcoming buses')));
+        var sig = JSON.stringify([model, status, stale]);
+
+        if (!_busRenderTimer) {
+            _busRenderTimer = setInterval(function () {
+                if (document.hidden) return;
+                if (!document.querySelector('.dtu-bus-departures')) {
+                    clearInterval(_busRenderTimer);
+                    _busRenderTimer = null;
+                    return;
+                }
+                // Re-render the countdown; this also refetches early once every
+                // cached bus has left (the poll interval drops to 15 s then).
+                updateBusDepartures();
+            }, 30000);
+        }
+        if (container.getAttribute('data-sig') === sig) return;
+        container.setAttribute('data-sig', sig);
+        if (stale) {
+            container.setAttribute('data-stale', '1');
+            container.title = 'Last updated ' + formatBusClock(state.lastBusFetch);
+        } else {
+            container.removeAttribute('data-stale');
+            container.removeAttribute('title');
+        }
 
         while (container.firstChild) container.removeChild(container.firstChild);
 
-        var state = readUiState();
-        var departures = Array.isArray(state.cachedDepartures) ? state.cachedDepartures : [];
-        var fetchInProgress = !!state.busFetchInProgress;
-        if (departures.length === 0) {
+        if (!hasRows) {
             var empty = document.createElement('span');
-            empty.style.cssText = 'color: ' + (isDark ? '#888' : '#999') + ' !important; font-style: italic; font-size: 11px;';
-            empty.textContent = fetchInProgress ? 'Loading bus times...' : 'No upcoming buses';
+            markExt(empty);
+            empty.className = 'dtu-bus-status';
+            empty.textContent = status;
             container.appendChild(empty);
             return;
         }
 
-        var lineGroups = {};
-        departures.forEach(function (dep) {
-            if (!lineGroups[dep.line]) lineGroups[dep.line] = [];
-            lineGroups[dep.line].push(dep);
-        });
+        model.forEach(function (r) {
+            var row = document.createElement('div');
+            markExt(row);
+            row.className = 'dtu-bus-row';
+            row.setAttribute('role', 'group');
+            row.setAttribute('aria-label', r.title.replace(/\n/g, '; '));
 
-        var lineOrder = Object.keys(lineGroups).sort();
-        lineOrder.forEach(function (line) {
-            lineGroups[line].sort(function (a, b) { return (a.minutes != null ? a.minutes : 999) - (b.minutes != null ? b.minutes : 999); });
-        });
+            var badge = createBusLineBadge(r.line);
+            badge.title = r.title;
+            if (r.repeat) badge.setAttribute('data-repeat', '1');
+            row.appendChild(badge);
 
-        var colors = getBusLineColors();
-        lineOrder.forEach(function (line, li) {
-            var col = document.createElement('div');
-            col.style.cssText = 'display: flex; flex-direction: column; gap: 1px; min-width: 0;'
-                + (li < lineOrder.length - 1 ? ' padding-right: 12px; border-right: 1px solid ' + (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.1)') + ';' : '');
-
-            var color = colors[line] || '#1565c0';
-            var badge = document.createElement('span');
-            badge.style.cssText = 'display: inline-block; background-color: ' + color + ' !important; color: #fff !important; '
-                + 'padding: 1px 7px; border-radius: 4px; font-weight: 700; font-size: 11px; margin-bottom: 1px; '
-                + 'letter-spacing: 0.3px; text-align: center; align-self: flex-start;';
-            badge.textContent = line;
-            col.appendChild(badge);
-
-            lineGroups[line].forEach(function (dep) {
-                var row = document.createElement('div');
-                row.style.cssText = 'display: flex; align-items: center; gap: 6px; white-space: nowrap;';
-
+            if (r.none) {
+                var none = document.createElement('span');
+                markExt(none);
+                none.className = 'dtu-bus-none';
+                none.textContent = 'none soon';
+                none.setAttribute('data-short', 'none');
+                none.title = r.title;
+                row.appendChild(none);
+            } else {
                 var dir = document.createElement('span');
-                dir.style.cssText = 'color: ' + (isDark ? '#b0b0b0' : '#666') + ' !important; overflow: hidden; text-overflow: ellipsis; flex: 1; font-size: 11px;';
-                dir.textContent = dep.direction;
+                markExt(dir);
+                dir.className = 'dtu-bus-dir';
+                dir.textContent = r.direction;
+                dir.title = r.title;
 
-                var time = document.createElement('span');
-                var timeColor = dep.delayed
-                    ? (isDark ? '#ffa726' : '#e65100')
-                    : (isDark ? '#66bb6a' : '#2e7d32');
-                time.style.cssText = 'font-weight: bold; font-size: 11px; color: ' + timeColor + ' !important;';
-                time.textContent = dep.time;
+                var mins = document.createElement('span');
+                markExt(mins);
+                mins.className = 'dtu-bus-min';
+                mins.textContent = r.when;
 
+                var late = document.createElement('span');
+                markExt(late);
+                late.className = 'dtu-bus-late';
+                late.textContent = r.delay > 0 ? 'delayed ' + r.delay + ' min' : '';
+
+                // Reads "150S  Nørreport St.  7 min"; below 1180px the direction
+                // and late tag are hidden so the minutes always fit.
                 row.appendChild(dir);
-                row.appendChild(time);
-
-                if (dep.delayTag) {
-                    var delay = document.createElement('span');
-                    delay.style.cssText = 'font-size: 10px; color: ' + (isDark ? '#ffa726' : '#e65100') + ' !important; font-weight: 600;';
-                    delay.textContent = dep.delayTag;
-                    row.appendChild(delay);
-                }
-                col.appendChild(row);
-            });
-
-            container.appendChild(col);
+                row.appendChild(mins);
+                row.appendChild(late);
+            }
+            container.appendChild(row);
         });
     }
 
@@ -338,74 +543,68 @@
         if (!isDTULearnHomepage()) return;
         if (localStorage.getItem(getBusSetupDoneKey())) return;
         if (document.querySelector('.dtu-bus-setup-prompt')) return;
+        ensureBusStyles();
 
         var prompt = document.createElement('div');
+        markExt(prompt);
         prompt.className = 'dtu-bus-setup-prompt';
-        prompt.style.cssText = 'position: fixed; bottom: 24px; right: 24px; z-index: 999999; '
-            + 'background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); '
-            + 'border: 1px solid #1565c0; border-radius: 12px; padding: 20px 24px; '
-            + 'box-shadow: 0 8px 32px rgba(21,101,192,0.3), 0 0 0 1px rgba(21,101,192,0.1); '
-            + 'max-width: 360px; font-family: sans-serif; '
-            + 'transform: translateX(120%); transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);';
+        prompt.setAttribute('role', 'dialog');
+        prompt.setAttribute('aria-modal', 'false');
+        prompt.setAttribute('aria-labelledby', 'dtu-bus-setup-title');
+        prompt.setAttribute('data-theme', isDarkModeEnabled() ? 'dark' : 'light');
 
-        requestAnimationFrame(function () {
-            requestAnimationFrame(function () {
-                prompt.style.transform = 'translateX(0)';
-            });
-        });
+        var title = document.createElement('h2');
+        markExt(title);
+        title.id = 'dtu-bus-setup-title';
+        title.textContent = 'Bus times in the menu bar';
 
-        var header = document.createElement('div');
-        header.style.cssText = 'display: flex; align-items: center; gap: 10px; margin-bottom: 10px;';
+        var desc = document.createElement('p');
+        markExt(desc);
+        desc.textContent = 'Pick up to three bus lines near your campus and see their next departures next to Library. You can change this later in Settings.';
 
-        var busIcon = document.createElement('span');
-        busIcon.style.cssText = 'font-size: 28px; line-height: 1;';
-        busIcon.textContent = '\uD83D\uDE8C';
+        var actions = document.createElement('div');
+        markExt(actions);
+        actions.className = 'dtu-bus-setup-actions';
 
-        var title = document.createElement('div');
-        title.style.cssText = 'color: #fff; font-size: 16px; font-weight: bold;';
-        title.textContent = 'Never miss your bus!';
-
-        header.appendChild(busIcon);
-        header.appendChild(title);
-
-        var desc = document.createElement('div');
-        desc.style.cssText = 'color: #b0b0b0; font-size: 13px; margin-bottom: 16px; line-height: 1.5;';
-        desc.textContent = 'Get live departure times for buses near DTU right here on your homepage.';
-
-        var btnRow = document.createElement('div');
-        btnRow.style.cssText = 'display: flex; gap: 10px;';
+        function closePrompt(after) {
+            document.removeEventListener('keydown', onKey, true);
+            prompt.removeAttribute('data-open');
+            setTimeout(function () {
+                prompt.remove();
+                if (after) after();
+            }, 220);
+        }
+        function onKey(e) {
+            if (e.key === 'Escape' && prompt.isConnected) closePrompt(null);
+        }
 
         var setupBtn = document.createElement('button');
-        setupBtn.style.cssText = 'background: #1565c0; color: #fff; border: none; padding: 8px 20px; '
-            + 'border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; flex: 1; '
-            + 'transition: background 0.2s;';
-        setupBtn.textContent = 'Set it up';
-        setupBtn.addEventListener('mouseenter', function () { setupBtn.style.background = '#1976d2'; });
-        setupBtn.addEventListener('mouseleave', function () { setupBtn.style.background = '#1565c0'; });
-        setupBtn.addEventListener('click', function () {
-            prompt.style.transform = 'translateX(120%)';
-            setTimeout(function () { prompt.remove(); showBusConfigModal(); }, 300);
-        });
+        markExt(setupBtn);
+        setupBtn.type = 'button';
+        setupBtn.className = 'dtu-bus-setup-primary';
+        setupBtn.textContent = 'Choose lines';
+        setupBtn.addEventListener('click', function () { closePrompt(showBusConfigModal); });
 
         var dismissBtn = document.createElement('button');
-        dismissBtn.style.cssText = 'background: transparent; color: #666; border: 1px solid #444; '
-            + 'padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; '
-            + 'transition: border-color 0.2s, color 0.2s;';
+        markExt(dismissBtn);
+        dismissBtn.type = 'button';
+        dismissBtn.className = 'dtu-bus-setup-secondary';
         dismissBtn.textContent = 'Not now';
-        dismissBtn.addEventListener('mouseenter', function () { dismissBtn.style.borderColor = '#666'; dismissBtn.style.color = '#999'; });
-        dismissBtn.addEventListener('mouseleave', function () { dismissBtn.style.borderColor = '#444'; dismissBtn.style.color = '#666'; });
         dismissBtn.addEventListener('click', function () {
             localStorage.setItem(getBusSetupDoneKey(), 'dismissed');
-            prompt.style.transform = 'translateX(120%)';
-            setTimeout(function () { prompt.remove(); }, 300);
+            closePrompt(null);
         });
 
-        btnRow.appendChild(setupBtn);
-        btnRow.appendChild(dismissBtn);
-        prompt.appendChild(header);
+        actions.appendChild(setupBtn);
+        actions.appendChild(dismissBtn);
+        prompt.appendChild(title);
         prompt.appendChild(desc);
-        prompt.appendChild(btnRow);
+        prompt.appendChild(actions);
         document.body.appendChild(prompt);
+        document.addEventListener('keydown', onKey, true);
+        requestAnimationFrame(function () {
+            requestAnimationFrame(function () { prompt.setAttribute('data-open', '1'); });
+        });
     }
 
     function showBusConfigModal() {
@@ -500,16 +699,6 @@
             var set = {};
             getCampusLineCodes(campuses).forEach(function (line) { set[line] = true; });
             return set;
-        }
-
-        function enforceBusLineBadgeStyle(badgeEl, lineColor) {
-            if (!badgeEl || !badgeEl.style) return;
-            var color = String(lineColor || '').trim() || '#1565c0';
-            badgeEl.style.setProperty('background-color', color, 'important');
-            badgeEl.style.setProperty('background', color, 'important');
-            badgeEl.style.setProperty('color', '#ffffff', 'important');
-            badgeEl.style.setProperty('border', 'none', 'important');
-            badgeEl.style.setProperty('opacity', '1', 'important');
         }
 
         function persistCampusSelection(campuses) {
@@ -679,21 +868,14 @@
             modal.appendChild(campusBtnRow);
 
             var lineCount = (config && config.lines) ? config.lines.length : 0;
-            var colors = getBusLineColors();
             if (config && config.lines) {
                 config.lines.forEach(function (lineCfg, idx) {
-                    var color = colors[lineCfg.line] || '#1565c0';
                     var card = document.createElement('div');
                     markExt(card);
                     card.style.cssText = 'display:flex;align-items:center;gap:12px;padding:12px 0;'
                         + (idx > 0 ? ('border-top:1px solid ' + (isDarkTheme ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.10)') + ';') : '');
 
-                    var badge = document.createElement('span');
-                    badge.style.cssText = 'background-color:' + color + ';color:#fff;padding:7px 0;'
-                        + 'border-radius:2px;font-weight:800;font-size:16px;min-width:56px;text-align:center;';
-                    badge.textContent = lineCfg.line;
-                    badge.setAttribute('data-dtu-bus-line-badge', lineCfg.line);
-                    enforceBusLineBadgeStyle(badge, color);
+                    var badge = createBusLineBadge(lineCfg.line, { inline: true, dark: isDarkTheme, fontSize: 16, minWidth: '64px' });
 
                     var info = document.createElement('div');
                     info.style.cssText = 'flex: 1; font-size: 13px; color: ' + modalTheme.subtle + '; overflow: hidden; text-overflow: ellipsis;';
@@ -800,10 +982,10 @@
                 var color = colors[bus.line] || '#1565c0';
                 var baseSurface = isDarkTheme ? 'rgba(255,255,255,0.015)' : 'rgba(15,23,42,0.018)';
                 var hoverSurface = isDarkTheme ? rgbaFromHex(color, 0.055, color) : rgbaFromHex(color, 0.038, color);
-                var baseRing = 'inset 4px 0 0 ' + rgbaFromHex(color, isDarkTheme ? 0.85 : 0.70, color)
-                    + ', inset 0 -1px 0 ' + (isDarkTheme ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.08)');
-                var hoverRing = 'inset 4px 0 0 ' + rgbaFromHex(color, 1, color)
-                    + ', inset 0 -1px 0 ' + rgbaFromHex(color, isDarkTheme ? 0.32 : 0.18, color);
+                // No coloured stripe on the card's edge (CLAUDE.md UI Rules): a bottom hairline,
+                // and a faint tint of the line's type colour on hover.
+                var baseRing = 'inset 0 -1px 0 ' + (isDarkTheme ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.08)');
+                var hoverRing = 'inset 0 -1px 0 ' + rgbaFromHex(color, isDarkTheme ? 0.32 : 0.18, color);
                 var card = document.createElement('button');
                 card.style.cssText = 'display:flex;align-items:flex-start;gap:16px;padding:18px 18px 18px 20px;min-height:104px;'
                     + 'cursor:pointer;border:none;border-radius:0;background:' + baseSurface + ';'
@@ -818,13 +1000,8 @@
                     card.style.boxShadow = baseRing;
                 });
 
-                var badge = document.createElement('span');
-                badge.style.cssText = 'background-color:' + color + ';color:#fff;padding:10px 0;border-radius:2px;'
-                    + 'font-weight:800;font-size:19px;min-width:84px;text-align:center;letter-spacing:0.5px;'
-                    + 'line-height:1;flex-shrink:0;align-self:flex-start;';
-                badge.textContent = bus.line;
-                badge.setAttribute('data-dtu-bus-line-badge', bus.line);
-                enforceBusLineBadgeStyle(badge, color);
+                var badge = createBusLineBadge(bus.line, { inline: true, dark: isDarkTheme, fontSize: 19, minWidth: '84px' });
+                badge.style.setProperty('align-self', 'flex-start', 'important');
 
                 var textCol = document.createElement('div');
                 textCol.style.cssText = 'display:flex;flex-direction:column;justify-content:center;gap:8px;min-width:0;flex:1;';
@@ -891,7 +1068,6 @@
             while (modal.firstChild) modal.removeChild(modal.firstChild);
             setModalLayout('520px');
 
-            var color = getBusLineColors()[selectedLine] || '#1565c0';
 
             var titleEl = document.createElement('h2');
             titleEl.style.cssText = 'margin: 0 0 6px 0; font-size: 22px; font-weight: 700; color: ' + modalTheme.heading + '; letter-spacing: -0.3px;';
@@ -901,11 +1077,7 @@
             var subtitle = document.createElement('p');
             subtitle.style.cssText = 'margin: 0 0 20px 0; font-size: 14px; color: ' + modalTheme.subtle + '; line-height: 1.4;';
 
-            var lineTag = document.createElement('span');
-            lineTag.style.cssText = 'background-color: ' + color + '; color: #fff; padding: 2px 8px; border-radius: 4px; font-weight: 700; font-size: 13px;';
-            lineTag.textContent = selectedLine;
-            lineTag.setAttribute('data-dtu-bus-line-badge', selectedLine);
-            enforceBusLineBadgeStyle(lineTag, color);
+            var lineTag = createBusLineBadge(selectedLine, { inline: true, dark: isDarkTheme, fontSize: 13 });
             subtitle.appendChild(document.createTextNode('Select directions for '));
             subtitle.appendChild(lineTag);
             subtitle.appendChild(document.createTextNode(':'));
@@ -1163,16 +1335,19 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
     };
 
     // Badge colors per bus line
+    // Movia colour-codes line numbers by bus type since December 2024: S-buses white on
+    // blue, E-buses white on green, A-buses white on red. Numbered lines have no type
+    // colour and use a neutral grey. Only the type letter of a badge carries this colour.
     const LINE_COLORS = {
-        '150S': '#1565c0',
-        '300S': '#2e7d32',
-        '40E': '#6a1b9a',
-        '15E': '#c62828',
-        '193': '#e65100',
-        '350S': '#00838f',
-        '55E': '#ad1457',
-        '216': '#5d4037',
-        '600S': '#283593'
+        '150S': '#1d62b3',
+        '300S': '#1d62b3',
+        '350S': '#1d62b3',
+        '600S': '#1d62b3',
+        '40E': '#1e7a3c',
+        '15E': '#1e7a3c',
+        '55E': '#1e7a3c',
+        '193': '#4b5563',
+        '216': '#4b5563'
     };
 
     // Campus presets: stop IDs + commonly used lines.
@@ -1217,6 +1392,10 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
     let _lastBusFetch = 0;
     let _cachedDepartures = [];
     let _busFetchInProgress = false;
+    // A fetch has finished at least once (so the widget can stop saying "Loading"), and
+    // whether the last one failed (so a failure is not reported as "No upcoming buses").
+    let _busHasResult = false;
+    let _busLastFetchFailed = false;
     let _busConsecutiveErrors = 0;
     let _busBackoffUntil = 0;
     let _busConfigModalOpen = false;
@@ -1563,8 +1742,15 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
         if (now - payload.ts > ttl) return false;
         if (expectedConfigSig && payload.configSig !== expectedConfigSig) return false;
         if (payload.ts <= _lastBusFetch && _cachedDepartures.length > 0) return false;
+        // A cache whose buses have all left is no better than none: fetch instead.
+        var upcoming = payload.departures.some(function (dep) {
+            return !dep || typeof dep.at !== 'number' || dep.at >= now - 60000;
+        });
+        if (payload.departures.length && !upcoming) return false;
         _cachedDepartures = payload.departures;
         _lastBusFetch = payload.ts;
+        _busHasResult = true;
+        _busLastFetchFailed = false;
         _busConsecutiveErrors = 0;
         _busBackoffUntil = 0;
         return true;
@@ -1776,7 +1962,7 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
         var crowdBad = '#c62828';
         // Text-sized accents follow the extension's convention: the soft accent
         // on dark surfaces (the base accent is too dark to read there).
-        var accentText = isDarkModeEnabled() ? 'var(--dtu-ad-accent-soft)' : 'var(--dtu-ad-accent)';
+        var accentText = isDarkModeEnabled() ? 'var(--dtu-ad-accent-soft)' : 'var(--dtu-ad-accent-text, var(--dtu-ad-accent))';
 
         var css = [
             '.dtu-library-modal-overlay{position:fixed !important;inset:0 !important;z-index:1000000 !important;display:flex !important;align-items:center !important;justify-content:center !important;padding:20px !important;background:transparent !important;background-color:transparent !important;backdrop-filter:blur(4px) !important;-webkit-backdrop-filter:blur(4px) !important;}',
@@ -3625,16 +3811,11 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
         return true;
     }
 
+    // Pauses fetching until the month changes. The user's Bus setting is left
+    // alone: it used to be switched off and stayed off after the reset.
     function setApiQuotaExhausted() {
         _apiQuotaExhausted = true;
         localStorage.setItem(API_QUOTA_KEY, new Date().toISOString());
-        localStorage.setItem(BUS_ENABLED_KEY, 'false');
-        var toggle = document.querySelector('#bus-departures-toggle');
-        if (toggle) {
-            toggle.checked = false;
-            // Keep any settings UI in sync (e.g. Bus "Edit" button visibility).
-            try { toggle.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) { }
-        }
     }
 
     // Get departures for a specific stop
@@ -3662,8 +3843,12 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
         var controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
         var timeoutId = null;
         if (controller) registerBusFetchController(controller);
+        var timedOut = false;
         if (controller) {
             timeoutId = setTimeout(function () {
+                // A slow proxy is a failed fetch, not the tab leaving: it must back off
+                // instead of being retried at once as an abort is.
+                timedOut = true;
                 controller.abort();
             }, BUS_FETCH_TIMEOUT_MS);
         }
@@ -3672,7 +3857,9 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
             const fetchOptions = controller ? { signal: controller.signal } : undefined;
             const resp = await fetch(url, fetchOptions);
             if (!resp.ok) {
-                if (resp.status === 429 || resp.status === 403) {
+                // Only 429 means the quota is spent; a 403 can be a proxy or WAF
+                // hiccup and gets the normal error backoff instead of a month off.
+                if (resp.status === 429) {
                     setApiQuotaExhausted();
                     showQuotaExhaustedMessage('monthly');
                     return { departures: [], ok: false, reason: 'quota' };
@@ -3699,10 +3886,10 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
             });
             return { departures: arr, ok: true, reason: 'ok' };
         } catch (e) {
-            if (e && e.name === 'AbortError') {
+            if (e && e.name === 'AbortError' && !timedOut) {
                 return { departures: [], ok: false, reason: 'aborted' };
             }
-            return { departures: [], ok: false, reason: 'network' };
+            return { departures: [], ok: false, reason: timedOut ? 'timeout' : 'network' };
         } finally {
             if (timeoutId) clearTimeout(timeoutId);
             if (controller) unregisterBusFetchController(controller);
@@ -3765,14 +3952,9 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
             updateCountdown();
             countdownInterval = setInterval(updateCountdown, 1000);
         } else {
-            msg.textContent = 'The monthly API request limit for Rejseplanen has been reached. '
-                + 'Bus departures have been turned off and will automatically resume next month.';
-            localStorage.setItem(BUS_ENABLED_KEY, 'false');
-            var toggle = document.querySelector('#bus-departures-toggle');
-            if (toggle) {
-                toggle.checked = false;
-                try { toggle.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) { }
-            }
+            // This used to switch Bus off, so it never came back on its own.
+            msg.textContent = 'The monthly request limit for Rejseplanen has been reached. '
+                + 'Bus times are paused and resume automatically next month.';
         }
 
         var dismiss = document.createElement('button');
@@ -3846,8 +4028,26 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
         return ' (+' + delay + ')';
     }
 
+    function departureTimestamp(dep) {
+        var mins = minutesUntilDeparture(dep);
+        if (mins === null) return null;
+        var timeStr = dep.rtTime || dep.time;
+        var dateStr = dep.rtDate || dep.date;
+        var d;
+        if (String(dateStr).includes('.')) {
+            var parts = String(dateStr).split('.');
+            var year = parts[2].length === 2 ? '20' + parts[2] : parts[2];
+            d = new Date(year + '-' + parts[1] + '-' + parts[0] + 'T' + timeStr);
+        } else {
+            d = new Date(dateStr + 'T' + timeStr);
+        }
+        return isNaN(d.getTime()) ? null : d.getTime();
+    }
+
     function mapBusDepartureForDisplay(dep) {
         return {
+            at: departureTimestamp(dep),
+            delay: getDelayMinutes(dep),
             line: dep.line,
             direction: dep.direction,
             time: formatDepartureTime(dep),
@@ -3902,8 +4102,12 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
         var controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
         var timeoutId = null;
         if (controller) registerBusFetchController(controller);
+        var timedOut = false;
         if (controller) {
             timeoutId = setTimeout(function () {
+                // A slow proxy is a failed fetch, not the tab leaving: it must back off
+                // instead of being retried at once as an abort is.
+                timedOut = true;
                 controller.abort();
             }, BUS_FETCH_TIMEOUT_MS);
         }
@@ -3921,7 +4125,9 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
                 signal: controller ? controller.signal : undefined
             });
             if (!resp.ok) {
-                if (resp.status === 429 || resp.status === 403) {
+                // Only 429 means the quota is spent; a 403 can be a proxy or WAF
+                // hiccup and gets the normal error backoff instead of a month off.
+                if (resp.status === 429) {
                     setApiQuotaExhausted();
                     showQuotaExhaustedMessage('monthly');
                     return { departures: [], ok: false, reason: 'quota' };
@@ -3942,10 +4148,10 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
             departures.sort(function (a, b) { return (a.minutes || 999) - (b.minutes || 999); });
             return { departures: departures, ok: true, reason: 'ok' };
         } catch (e) {
-            if (e && e.name === 'AbortError') {
+            if (e && e.name === 'AbortError' && !timedOut) {
                 return { departures: [], ok: false, reason: 'aborted' };
             }
-            return { departures: [], ok: false, reason: 'network' };
+            return { departures: [], ok: false, reason: timedOut ? 'timeout' : 'network' };
         } finally {
             if (timeoutId) clearTimeout(timeoutId);
             if (controller) unregisterBusFetchController(controller);
@@ -3963,6 +4169,7 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
         var requestCount = 0;
         var successCount = 0;
         var errorCount = 0;
+        var aborted = false;
         // Track how many departures we have per line
         const lineCounts = {};
         config.lines.forEach(function (l) { lineCounts[l.line] = 0; });
@@ -3975,10 +4182,13 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
             // Fetch stops one by one, stop early when we have enough
             for (var i = 0; i < config.stopIds.length; i++) {
                 if (hasEnough()) break;
-                var depResult = await getDepartures(config.stopIds[i], { consumeBudget: false });
+                // Each stop is its own upstream call, so each one counts toward the daily cap.
+                var depResult = await getDepartures(config.stopIds[i], {});
+                if (depResult && depResult.reason === 'daily') break;
                 requestCount++;
                 if (depResult && depResult.ok) successCount++;
-                else if (depResult && (depResult.reason === 'http' || depResult.reason === 'network')) errorCount++;
+                else if (depResult && (depResult.reason === 'http' || depResult.reason === 'network' || depResult.reason === 'timeout')) errorCount++;
+                if (depResult && depResult.reason === 'aborted') { aborted = true; break; }
                 var deps = depResult && Array.isArray(depResult.departures) ? depResult.departures : [];
                 deps.forEach(function (dep) {
                     var configLine = config.lines.find(function (l) { return l.line === dep.line; });
@@ -4008,11 +4218,14 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
             _busFetchInProgress = false;
         }
         noteBusFetchOutcome({ requestCount: requestCount, successCount: successCount, errorCount: errorCount });
+        if (aborted) return null;
+        _busLastFetchFailed = successCount === 0 && errorCount > 0;
         allDeps.sort(function (a, b) { return (a.minutes || 999) - (b.minutes || 999); });
         return allDeps;
     }
 
     async function fetchBusDepartures() {
+        _busLastFetchFailed = false;
         if (isApiQuotaExhausted()) return [];
         const config = getBusConfig();
         if (!config || !config.stopIds || config.stopIds.length === 0) return [];
@@ -4030,11 +4243,17 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
                 }
             }
             if (widgetResult && widgetResult.ok) return widgetResult.departures || [];
+            if (widgetResult && (widgetResult.reason === 'http' || widgetResult.reason === 'network' || widgetResult.reason === 'timeout')) {
+                noteBusFetchOutcome({ requestCount: 1, successCount: 0, errorCount: 1 });
+                _busLastFetchFailed = true;
+            }
+            // Aborted means the tab was hidden or left mid-fetch: falling back to
+            // one request per stop here fired up to ten extra calls for nothing.
+            if (widgetResult && widgetResult.reason === 'aborted') return null;
             if (widgetResult && (widgetResult.reason === 'quota' || widgetResult.reason === 'daily')) return [];
             if (!LIVE_TRANSIT_API_BASE && !REJSEPLANEN_KEY) return [];
         }
         if (!LIVE_TRANSIT_API_BASE && !REJSEPLANEN_KEY) return [];
-        if (!consumeBusApiRequestBudget()) return [];
         return fetchBusDeparturesLegacy(config);
     }
 
@@ -4043,6 +4262,8 @@ function getBusUiState() {
             lastBusFetch: _lastBusFetch,
             cachedDepartures: _cachedDepartures,
             busFetchInProgress: _busFetchInProgress,
+            busHasResult: _busHasResult,
+            busLastFetchFailed: _busLastFetchFailed,
             busConfigModalOpen: _busConfigModalOpen
         };
     }
@@ -4092,14 +4313,19 @@ function setBusUiState(patch) {
         updateBusDepartures();
     }
 
-function getSmartPollInterval() {
-        if (_cachedDepartures.length === 0) return 60000; // 60s default
+// Uses real departure times: fetch-time minutes go stale, and once every
+    // cached bus has left the widget would sit empty until the next slow poll.
+    function getSmartPollInterval() {
+        if (_cachedDepartures.length === 0) return 60000;
+        var now = Date.now();
         var soonest = Infinity;
         _cachedDepartures.forEach(function (dep) {
-            if (dep.minutes != null && dep.minutes < soonest) soonest = dep.minutes;
+            var mins = (dep && typeof dep.at === 'number') ? (dep.at - now) / 60000 : (dep ? dep.minutes : null);
+            if (mins != null && mins >= 0 && mins < soonest) soonest = mins;
         });
-        if (soonest <= 15) return 60000;  // â‰¤15 min away: poll every 60s (minimum)
-        return 120000;                     // >15 min: every 2 min
+        if (soonest === Infinity) return 15000; // everything cached has left
+        if (soonest <= 15) return 60000;
+        return 120000;
     }
 
     function getNextBusPollInterval(nowTs) {
@@ -4145,6 +4371,13 @@ function getSmartPollInterval() {
             // Tab became visible â€” do an immediate refresh then resume polling
             updateBusDepartures();
         }
+    });
+
+    // A tab that leaves mid-fetch would otherwise hold the fetch lease for up to
+    // 25 s, and the next Learn homepage would show "Loading" until it expired.
+    window.addEventListener('pagehide', function () {
+        abortInFlightBusRequests();
+        releaseBusFetchLease();
     });
 
     window.addEventListener('storage', function (event) {
@@ -4193,8 +4426,27 @@ function getSmartPollInterval() {
             if (tryAcquireBusFetchLease()) {
                 try {
                     _lastBusFetch = now;
-                    _cachedDepartures = await fetchBusDepartures();
-                    saveBusSharedCache(_cachedDepartures, configSig);
+                    _busFetchInProgress = true;
+                    var fetched;
+                    try {
+                        fetched = await fetchBusDepartures();
+                    } finally {
+                        _busFetchInProgress = false;
+                    }
+                    // null = aborted (tab hidden or left): keep what we had and do not
+                    // overwrite the cache other tabs read with an empty list.
+                    if (fetched === null) {
+                        _lastBusFetch = 0;
+                    } else if (_busLastFetchFailed && !fetched.length) {
+                        // A failed fetch keeps the buses already shown (their minutes keep
+                        // counting down) and is never shared as "no buses".
+                        _busHasResult = true;
+                    } else {
+                        _cachedDepartures = fetched;
+                        _busHasResult = true;
+                        _busLastFetchFailed = false;
+                        saveBusSharedCache(_cachedDepartures, configSig);
+                    }
                 } finally {
                     releaseBusFetchLease();
                 }

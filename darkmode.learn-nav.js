@@ -192,13 +192,9 @@
             item.setAttribute('data-dtu-afterdark-nav-link', spec.id);
             markExt(item);
 
-            function openLink() {
+            // d2l-menu-item fires d2l-menu-item-select once for click, Enter and Space.
+            item.addEventListener('d2l-menu-item-select', function () {
                 try { window.open(spec.url, '_blank', 'noopener,noreferrer'); } catch (e) { }
-            }
-            item.addEventListener('click', openLink);
-            item.addEventListener('keydown', function (e) {
-                if (!e) return;
-                if (e.key === 'Enter' || e.key === ' ') openLink();
             });
 
             var insertBefore = menu.querySelector('d2l-menu-item[last], d2l-menu-item-link[last]') || null;
@@ -261,6 +257,18 @@
 
             if (!chosen.length) return;
 
+            // This runs on every observer tick. Rebuilding an already-ordered menu
+            // removed and re-added every item about 45 times per 10 idle seconds.
+            var rebuiltOrder = chosen.concat(rest);
+            var alreadyOrdered = rebuiltOrder.length === items.length && rebuiltOrder.every(function (it6, idx) { return items[idx] === it6; });
+            if (alreadyOrdered) return;
+
+            if (!menu._dtuAfterDarkNativeOrder) {
+                menu._dtuAfterDarkNativeOrder = items.filter(function (it7) {
+                    return !(it7.hasAttribute && it7.hasAttribute('data-dtu-afterdark-nav-link'));
+                });
+            }
+
             var seps = Array.prototype.slice.call(menu.querySelectorAll('d2l-menu-item-separator'));
             seps.forEach(function (s) { try { s.remove(); } catch (e) { } });
             items.forEach(function (it3) { try { it3.remove(); } catch (e) { } });
@@ -279,16 +287,36 @@
         var panopto = { id: 'panopto', text: 'Panopto', url: 'https://panopto.dtu.dk/Panopto/Pages/Home.aspx' };
         var campusnet = { id: 'campusnet', text: 'CampusNet', url: 'https://campusnet.dtu.dk/cnnet/' };
 
-        getNavDropdownTargets(/^Student Resources$/i).forEach(function (t) { ensureExternalMenuItem(t.menu, panopto); });
-        getNavDropdownTargets(/^Student Resources$/i).forEach(function (t) { ensureExternalMenuItem(t.menu, campusnet); });
-        getNavDropdownTargets(/^Student Resources$/i).forEach(function (t) { reorderStudentResourcesMenu(t.menu); });
+        getNavDropdownTargets(/^Student Resources$/i).forEach(function (t) {
+            ensureExternalMenuItem(t.menu, panopto);
+            ensureExternalMenuItem(t.menu, campusnet);
+            reorderStudentResourcesMenu(t.menu);
+        });
     }
 
     function removeDTULearnNavResourceLinks() {
         if (!isTopWindow()) return;
         if (window.location.hostname !== 'learn.inside.dtu.dk') return;
-        deepQueryAll('[data-dtu-afterdark-nav-link]', document).forEach(function (el) {
+        var added = deepQueryAll('[data-dtu-afterdark-nav-link]', document);
+        if (!added.length) return;
+        var menus = [];
+        added.forEach(function (el) {
+            var menu = el.parentNode;
+            if (menu && menus.indexOf(menu) === -1) menus.push(menu);
             try { el.remove(); } catch (e) { }
+        });
+        // Put D2L's own items back in the order they had before we reordered them.
+        menus.forEach(function (menu) {
+            var native = menu && menu._dtuAfterDarkNativeOrder;
+            if (!native || !native.length) return;
+            try {
+                native.forEach(function (it) { if (it.parentNode === menu) menu.appendChild(it); });
+                native.forEach(function (it) { it.removeAttribute('first'); it.removeAttribute('last'); });
+                var present = native.filter(function (it) { return it.parentNode === menu; });
+                if (present[0]) present[0].setAttribute('first', 'true');
+                if (present.length) present[present.length - 1].setAttribute('last', 'true');
+            } catch (eRestore) { }
+            menu._dtuAfterDarkNativeOrder = null;
         });
     }
 
@@ -329,25 +357,34 @@
         return false;
     }
 
+    // Runs on every feature pass. Even no-op writes (classList.remove of an
+    // absent class, an identical setProperty) queue mutations and wake the
+    // page observer again, so only write what differs.
+    function setNavStyleIfChanged(el, prop, value) {
+        if (el.style.getPropertyValue(prop) !== value || el.style.getPropertyPriority(prop) !== 'important') {
+            el.style.setProperty(prop, value, 'important');
+        }
+    }
+
     function applyAfterDarkNavItemVisibility(navItem) {
         if (!navItem || !navItem.style) return;
-        try { navItem.removeAttribute('data-hidden'); } catch (e0) { }
+        try { if (navItem.hasAttribute('data-hidden')) navItem.removeAttribute('data-hidden'); } catch (e0) { }
         try {
-            if (navItem.classList) navItem.classList.remove('d2l-hidden');
+            if (navItem.classList && navItem.classList.contains('d2l-hidden')) navItem.classList.remove('d2l-hidden');
         } catch (e1) { }
-        navItem.style.setProperty('display', 'block', 'important');
-        navItem.style.setProperty('visibility', 'visible', 'important');
-        navItem.style.setProperty('opacity', '1', 'important');
-        navItem.style.setProperty('flex', '0 0 auto', 'important');
-        navItem.style.setProperty('white-space', 'nowrap', 'important');
+        setNavStyleIfChanged(navItem, 'display', 'block');
+        setNavStyleIfChanged(navItem, 'visibility', 'visible');
+        setNavStyleIfChanged(navItem, 'opacity', '1');
+        setNavStyleIfChanged(navItem, 'flex', '0 0 auto');
+        setNavStyleIfChanged(navItem, 'white-space', 'nowrap');
 
         try {
             navItem.querySelectorAll('a, button, span').forEach(function (el) {
                 if (!el || !el.style) return;
-                el.style.setProperty('visibility', 'visible', 'important');
-                el.style.setProperty('opacity', '1', 'important');
+                setNavStyleIfChanged(el, 'visibility', 'visible');
+                setNavStyleIfChanged(el, 'opacity', '1');
                 if (el.matches && el.matches('a, button')) {
-                    el.style.setProperty('white-space', 'nowrap', 'important');
+                    setNavStyleIfChanged(el, 'white-space', 'nowrap');
                 }
             });
         } catch (e2) { }

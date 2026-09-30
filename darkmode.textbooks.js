@@ -83,9 +83,10 @@
         if (normalized.length > 130) return false;
 
         var lower = normalized.toLowerCase();
-        if (/^(course\s+literature|literature|kursuslitteratur|litteratur)\s*:?\s*$/.test(lower)) return true;
+        // Danish course pages head the section "Litteraturhenvisninger" (one compound word).
+        if (/^(course\s+literature|literature|kursuslitteratur|litteratur|litteraturhenvisning(?:er)?)\s*:?\s*$/.test(lower)) return true;
 
-        if (/\b(literature|litteratur|kursuslitteratur)\b/.test(lower)) {
+        if (/\b(literature|litteratur|kursuslitteratur|litteraturhenvisning(?:er)?)\b/.test(lower)) {
             if (/\b(course|kursus|reading|pensum|material|materials|materiale)\b/.test(lower)) return true;
             if (lower.split(' ').length <= 4) return true;
         }
@@ -148,7 +149,7 @@
         document.querySelectorAll('p, div, td, dd, span, li').forEach(function (el) {
             var txt = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
             if (!txt || txt.length < 20 || txt.length > 3000) return;
-            if (!/\b(course\s+literature|literature|kursuslitteratur|litteratur)\b\s*:/i.test(txt)) return;
+            if (!/\b(course\s+literature|literature|kursuslitteratur|litteratur|litteraturhenvisning(?:er)?)\b\s*:/i.test(txt)) return;
             addCandidate(el);
         });
 
@@ -226,9 +227,26 @@
 
         return {
             text: raw,
-            lines: lines,
+            lines: mergeKurserCitationTargets(lines.map(function (text) { return { text: text }; })).map(function (item) { return item.text; }),
             insertBeforeNode: insertBeforeNode
         };
+    }
+
+    function mergeKurserCitationTargets(items) {
+        var merged = [];
+        items.forEach(function (item) {
+            var text = String(item.text || '').trim();
+            var previous = merged[merged.length - 1];
+            var isIsbnOnly = /^(?:ISBN[-\s]?(?:1[03])?[\s:]*)?[\dXx][\d\s-]*[\dXx][.,;]?$/i.test(text)
+                && !!extractISBNFromCitationLine(text);
+            var previousCitation = previous && isIsbnOnly ? parseKurserCitationLine(previous.text) : null;
+            if (previousCitation && previousCitation.title && !previousCitation.isbn) {
+                previous.text += ' ' + text;
+            } else {
+                merged.push({ text: text, anchor: item.anchor });
+            }
+        });
+        return merged;
     }
 
     function shouldMergeWrappedLiteratureLine(prev, next) {
@@ -280,7 +298,7 @@
         var splitByBracket = one.split(/(?=\[\s*\d+\s*\])/g).map(function (s) { return s.trim(); }).filter(Boolean);
         if (splitByBracket.length > 1) return splitByBracket;
 
-        var splitByNumber = one.split(/(?=\b\d+\s*[.)]\s*[A-Z])/g).map(function (s) { return s.trim(); }).filter(Boolean);
+        var splitByNumber = one.split(/(?=\b\d{1,3}\s*[.)]\s*[A-Z])/g).map(function (s) { return s.trim(); }).filter(Boolean);
         if (splitByNumber.length > 1) return splitByNumber;
 
         var splitBySemicolon = one.split(/\s*;\s*/g).map(function (s) { return s.trim(); }).filter(Boolean);
@@ -553,7 +571,7 @@
         }
 
         var seen = Object.create(null);
-        return items.filter(function (item) {
+        return mergeKurserCitationTargets(items).filter(function (item) {
             if (!item.text || seen[item.text]) return false;
             seen[item.text] = true;
             return true;
@@ -704,7 +722,7 @@
             }
 
             var isDark = isDarkModeEnabled();
-            var accentColor = isDark ? 'var(--dtu-ad-accent-soft)' : 'var(--dtu-ad-accent-deep)';
+            var accentColor = isDark ? 'var(--dtu-ad-accent-soft)' : 'var(--dtu-ad-accent-deep-text, var(--dtu-ad-accent-deep))';
             var textColor = isDark ? '#e0e0e0' : '#333';
             var mutedColor = isDark ? '#888' : '#777';
             var dividerColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';

@@ -257,18 +257,7 @@
                     if (/education|uddannelse/i.test(headers[h].textContent)) {
                         var infoDiv = headers[h].closest('.ui-participant-infobox');
                         if (infoDiv) {
-                            var lists = infoDiv.querySelectorAll('.ui-participants-infolist p');
-                            if (lists.length) {
-                                entry.program = deps.normalizeProgramLabel(lists[0].textContent);
-                            } else {
-                                var children = infoDiv.children;
-                                for (var c = 0; c < children.length; c++) {
-                                    if (!children[c].classList.contains('info-header')) {
-                                        var txt = deps.normalizeProgramLabel(children[c].textContent);
-                                        if (txt) { entry.program = txt; break; }
-                                    }
-                                }
-                            }
+                            entry.program = deps.readParticipantProgram(infoDiv);
                         }
                         break;
                     }
@@ -534,6 +523,8 @@
 
     function collectParticipantData() {
         var deps = getDeps();
+        if (!deps || !deps.isFeatureFlagEnabled(deps.featureParticipantIntelKey)
+            || !deps.isFeatureFlagEnabled(deps.featureParticipantIntelSharedHistoryKey)) return;
         if (!deps || !deps.isCampusnetParticipantPage()) return;
         var courseCode = deps.normalizeIntelCourseCode(deps.getCampusnetCourseCodeFromPage());
         var semester = deps.normalizeIntelCourseSemester(deps.getCampusnetSemesterFromPage());
@@ -549,6 +540,8 @@
 
     function storeParticipantData(participants, courseCode, semester, courseName) {
         var deps = getDeps();
+        if (!deps || !deps.isFeatureFlagEnabled(deps.featureParticipantIntelKey)
+            || !deps.isFeatureFlagEnabled(deps.featureParticipantIntelSharedHistoryKey)) return;
         if (!deps || !participants.length) return;
 
         var now = Date.now();
@@ -560,6 +553,8 @@
         participantIntelLastCollectTs = now;
 
         loadParticipantIntel(function (intel) {
+            if (!deps.isFeatureFlagEnabled(deps.featureParticipantIntelKey)
+                || !deps.isFeatureFlagEnabled(deps.featureParticipantIntelSharedHistoryKey)) return;
             if (courseCode && courseName) {
                 var existingName = intel.courseNames ? intel.courseNames[courseCode] : null;
                 if (!existingName || existingName.length < courseName.length) {

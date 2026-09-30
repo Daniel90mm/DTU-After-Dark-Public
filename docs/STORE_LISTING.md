@@ -36,6 +36,21 @@ Privacy:
 
 DTU After Dark is unofficial and is not affiliated with or endorsed by DTU or any service provider. Information shown by the extension may be delayed, incomplete, or inaccurate; always verify critical information through official DTU channels.
 
+## Version 9.0.0 release notes
+
+- Redesigned the Deadlines widget on the DTU Learn homepage. It now shows one row per semester and exam period, with registration and withdrawal dates labelled on the chart, drawn in your accent colour, and "Closes tomorrow" or "Opens in 15 days" beside each row. DTU's deadline pages are checked once a day, so the refresh button is gone.
+- Redesigned the Bus Departures widget: one row per line with its next bus, minutes that count down, "delayed 3 min" for late buses, and a layout that fits narrow windows. Reaching Rejseplanen's monthly limit no longer switches the widget off, and a slow connection no longer makes it flip between "Loading" and "No upcoming buses". Line badges now use Movia's own colours: blue for S-buses and green for E-buses.
+- Room links now work in DTU Learn announcements and open the exact auditorium in MazeMap.
+- Closing the Library panel no longer leaves the page unable to scroll.
+- Fixed a DTU site occasionally staying light while Dark Mode was on.
+- Textbook links now also appear on Danish course pages.
+- Accent colours stay readable on every preset, including light ones like DTU Yellow and DTU Grey. The custom colour picker previews live and saves once.
+- On CampusNet participant lists, students with both a bachelor and a master count under the master, groups inside a course keep their own Retention Radar count, and the full list loads in Firefox.
+- Every setting was audited: switching a feature off now takes effect cleanly even while it is loading, and many features stopped rewriting the page while idle, so keyboard focus stays put. Textbook links show one set of links per book, and Course Evaluation and Grade Statistics retry after a failed load instead of reporting no data.
+- The CampusNet "My courses and groups" menu matches Toolbox in dark mode.
+- On CampusNet Grades in dark mode, the table sits on the page background instead of a grey block, and course numbers are shown as links to their grade distribution again.
+- The grade table's columns stay put when you hide a grade or add a planned one, and "Add planned grade" is now a small button beside "Only show passed courses".
+
 ## Version 8.1.0 release notes
 
 - Redesigned the grade and evaluation widgets on kurser.dtu.dk. Grade statistics now default to the main exam instead of a small re-exam sitting, pass/fail courses are read correctly, and you can switch between the last four exams.

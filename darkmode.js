@@ -48,17 +48,24 @@
         return null;
     }
 
-    // Save preference to all available stores (localStorage + extension storage)
+    // Save preference to all available stores (localStorage + extension storage).
+    // Resolves once extension storage has the value, so callers can reload without
+    // losing the write (a lost write makes the next load flip the toggle back).
     function saveDarkModePreference(enabled) {
         localStorage.setItem(DARK_MODE_KEY, String(enabled));
         var storage = getExtensionStorageArea();
-        if (storage) {
-            if (storage.api === 'browser') {
-                storage.area.set({ [DARK_MODE_KEY]: enabled });
-            } else {
-                storage.area.set({ [DARK_MODE_KEY]: enabled }, function () { });
+        if (!storage) return Promise.resolve();
+        return new Promise(function (resolve) {
+            try {
+                if (storage.api === 'browser') {
+                    storage.area.set({ [DARK_MODE_KEY]: enabled }).then(resolve, resolve);
+                } else {
+                    storage.area.set({ [DARK_MODE_KEY]: enabled }, function () { resolve(); });
+                }
+            } catch (e) {
+                resolve();
             }
-        }
+        });
     }
 
     function getExtensionUrl(path) {
@@ -268,14 +275,14 @@
                 background-color: var(--dtu-ad-accent-deep) !important;
                 background: var(--dtu-ad-accent-deep) !important;
                 border-bottom-color: var(--dtu-ad-accent-deep-hover) !important;
-                color: #ffffff !important;
+                color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
             }
 
             .boxHeader h2,
             .box.mainContentPageTemplate .boxHeader h2,
             .box.widget .boxHeader h2,
             #afrapporteringWidget .boxHeader h2 {
-                color: #ffffff !important;
+                color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
                 background-color: transparent !important;
             }
 
@@ -284,7 +291,7 @@
             h4.category__title a {
                 background-color: var(--dtu-ad-accent-deep) !important;
                 background: var(--dtu-ad-accent-deep) !important;
-                color: #ffffff !important;
+                color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
             }
 
             h4.category__title:hover,
@@ -296,7 +303,7 @@
             h4.category__title i,
             h4.category__title .toggle-category,
             h4.category__title .arc-menu-burger-expander {
-                color: #ffffff !important;
+                color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
             }
 
             /* Icon base (circle background) */
@@ -309,7 +316,7 @@
             .group-menu__item,
             .group-menu__item-burger {
                 border-color: var(--dtu-ad-accent-deep) !important;
-                background-color: var(--dtu-ad-accent-deep) !important;
+                background-color: var(--dtu-ad-campusnet-menu-body, var(--dtu-ad-accent-deep)) !important;
             }
 
             .group-menu__item header,
@@ -322,22 +329,22 @@
             .group-menu__item-burger .item__title,
             .group-menu__item header h2,
             .group-menu__item-burger header h2 {
-                color: #ffffff !important;
+                color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
             }
 
             .group-menu__item-burger-expander {
-                color: #ffffff !important;
+                color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
             }
 
             /* Links (Generic content links) */
             a:not(.d2l-navigation-s-link),
             .groupLinksTable a:not(.arc-button) {
-                color: var(--dtu-ad-accent) !important;
+                color: var(--dtu-ad-accent-text, var(--dtu-ad-accent)) !important;
                 text-decoration: none;
             }
 
             a:hover {
-                color: var(--dtu-ad-accent-hover) !important;
+                color: var(--dtu-ad-accent-text-hover, var(--dtu-ad-accent-hover)) !important;
             }
 
             /* Exclude top navigation and header links (keep them white) */
@@ -394,7 +401,13 @@
     }
 
     function applyStoredDarkModeValue(storedEnabled) {
-        if (storedEnabled === undefined) return;
+        // Extension storage is the one copy every DTU site shares; each site's localStorage
+        // is only a fast-start cache of it. Unset there means the default (on): a site that
+        // cached "false" long ago (localStorage outlives an extension reinstall) otherwise
+        // stayed light while the Learn toggle showed on.
+        if (storedEnabled === undefined) storedEnabled = true;
+        // Only booleans are ever written; anything else would reload on every load.
+        if (typeof storedEnabled !== 'boolean') return;
         localStorage.setItem(DARK_MODE_KEY, String(storedEnabled));
         if (storedEnabled !== darkModeEnabled && window === window.top) {
             location.reload();
@@ -764,6 +777,57 @@
         return contrastWithBlack >= contrastWithWhite ? dark : light;
     }
 
+    // Text on accent bars/headers/badges: DTU's look is white text, so keep white
+    // unless it drops below 4:1, then use black if that reads better. Keeps Orange
+    // and Bright Green white (4.3/4.4) and flips Yellow, Grey and Pink (2.5 to 3.0).
+    function getAccentBarTextForHex(bgHex) {
+        var rgb = parseHexColorToRgb(bgHex);
+        if (!rgb) return '#ffffff';
+        var lum = relativeLuminanceFromRgb(rgb);
+        var contrastWithWhite = 1.05 / (lum + 0.05);
+        var contrastWithBlack = (lum + 0.05) / 0.05;
+        if (contrastWithWhite >= 4 || contrastWithWhite >= contrastWithBlack) return '#ffffff';
+        return '#000000';
+    }
+
+    // Accent used as text (links, course codes, counters): nudge it toward black
+    // on light pages or toward white on dark ones until it reaches 4.5:1, so light
+    // presets like Yellow stay readable. Colours that already pass are unchanged.
+    function getReadableAccentTextHex(hex, pageBgHex) {
+        var rgb = parseHexColorToRgb(hex);
+        var bg = parseHexColorToRgb(pageBgHex);
+        if (!rgb || !bg) return normalizeHexColor(hex, ACCENT_CUSTOM_DEFAULT) || ACCENT_CUSTOM_DEFAULT;
+        var bgLum = relativeLuminanceFromRgb(bg);
+        var toward = bgLum > 0.18 ? { r: 0, g: 0, b: 0 } : { r: 255, g: 255, b: 255 };
+        function ratio(c) {
+            var l = relativeLuminanceFromRgb(c);
+            return (Math.max(l, bgLum) + 0.05) / (Math.min(l, bgLum) + 0.05);
+        }
+        for (var step = 0; step <= 20; step++) {
+            var candidate = mixRgb(rgb, toward, step * 0.05);
+            candidate = { r: clampByte(candidate.r), g: clampByte(candidate.g), b: clampByte(candidate.b) };
+            if (ratio(candidate) >= 4.5) return rgbToHex(candidate);
+        }
+        return rgbToHex(toward);
+    }
+
+    // Accent for marks and labels drawn on a fixed surface, whichever mode is active. The
+    // accent itself when it already reads (4.5:1); otherwise the preset's own shade for that
+    // surface (soft on dark, deep on light), nudged to 4.5:1. Nudging a dark accent like
+    // Navy straight toward white would drain it to grey instead.
+    function getAccentForSurfaceHex(theme, surfaceHex) {
+        var rgb = parseHexColorToRgb(theme && theme.accent);
+        var bg = parseHexColorToRgb(surfaceHex);
+        if (rgb && bg) {
+            var l1 = relativeLuminanceFromRgb(rgb);
+            var l2 = relativeLuminanceFromRgb(bg);
+            if ((Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05) >= 4.5) return normalizeHexColor(theme.accent, theme.accent);
+        }
+        var darkSurface = bg ? relativeLuminanceFromRgb(bg) <= 0.18 : true;
+        var shade = darkSurface ? (theme && theme.accentSoft) : (theme && theme.accentDeep);
+        return getReadableAccentTextHex(shade || (theme && theme.accent), surfaceHex);
+    }
+
     function hexToRgbTriplet(hex, fallbackTriplet) {
         var rgb = parseHexColorToRgb(hex);
         if (!rgb) return fallbackTriplet || '198,40,40';
@@ -819,8 +883,19 @@
         root.style.setProperty('--dtu-ad-accent-deep', theme.accentDeep);
         root.style.setProperty('--dtu-ad-accent-deep-hover', theme.accentDeepHover || theme.accentHover);
         root.style.setProperty('--dtu-ad-accent-deep-rgb', hexToRgbTriplet(theme.accentDeep, '125,0,0'));
+        root.style.setProperty('--dtu-ad-accent-deep-on', getAccentBarTextForHex(theme.accentDeep));
+        var textPageBg = darkModeEnabled ? '#2d2d2d' : '#ffffff';
+        root.style.setProperty('--dtu-ad-accent-text', getReadableAccentTextHex(theme.accent, textPageBg));
+        root.style.setProperty('--dtu-ad-accent-text-hover', getReadableAccentTextHex(theme.accentHover || theme.accent, textPageBg));
+        // Light-mode links on CampusNet/kurser use the deep shade; keep it, made readable on white.
+        root.style.setProperty('--dtu-ad-accent-deep-text', getReadableAccentTextHex(theme.accentDeep, '#ffffff'));
+        // Hover keeps the resting text colour so text never flips under the mouse.
+        root.style.setProperty('--dtu-ad-accent-deep-hover-on', getAccentBarTextForHex(theme.accentDeep));
 
         root.style.setProperty('--dtu-ad-accent-soft', theme.accentSoft || theme.accent);
+        // Independent of the current mode, so a widget can pick by its own data-theme.
+        root.style.setProperty('--dtu-ad-accent-mark-dark', getAccentForSurfaceHex(theme, '#2d2d2d'));
+        root.style.setProperty('--dtu-ad-accent-mark-light', getAccentForSurfaceHex(theme, '#ffffff'));
         root.style.setProperty('--dtu-ad-accent-border', theme.accentBorder || theme.accentDeep);
 
         // Semantic status colors (stable DTU palette, independent of selected accent).
@@ -865,7 +940,7 @@
         rootEl.style.setProperty('--dtu-am-height', '600px');
 
         rootEl.style.setProperty('--dtu-am-accent', deep);
-        rootEl.style.setProperty('--dtu-am-active-text', isDark ? soft : deep);
+        rootEl.style.setProperty('--dtu-am-active-text', isDark ? soft : getReadableAccentTextHex(deep, '#f3f4f6'));
         rootEl.style.setProperty('--dtu-am-active-bg', isDark ? rgbaFromHex(deep, 0.13) : rgbaFromHex(deep, 0.07));
         rootEl.style.setProperty('--dtu-am-input-bg', isDark ? '#1a1a1a' : '#f9fafb');
         rootEl.style.setProperty('--dtu-am-accent-ring', isDark ? rgbaFromHex(deep, 0.28) : rgbaFromHex(deep, 0.18));
@@ -886,13 +961,6 @@
                 try { inp.style.display = (_accentThemeId === 'custom') ? '' : 'none'; } catch (e1) { }
             });
         } catch (e1) { }
-
-        try {
-            document.querySelectorAll('[data-dtu-accent-contrast-warning]').forEach(function (warning) {
-                if (!warning) return;
-                warning.hidden = _accentThemeId !== 'dtu_grey';
-            });
-        } catch (eWarning) { }
 
         // Keep any open settings UI in sync.
         try {
@@ -1036,7 +1104,10 @@
             } catch (eBfCleanup) { }
         });
         storageLocalGet(FEATURE_FLAG_DEFAULTS, function (flags) {
-            _featureFlags = Object.assign({}, FEATURE_FLAG_DEFAULTS, flags || {});
+            _featureFlags = Object.assign({}, FEATURE_FLAG_DEFAULTS);
+            Object.keys(FEATURE_FLAG_DEFAULTS).forEach(function (key) {
+                if (flags && typeof flags[key] === 'boolean') _featureFlags[key] = flags[key];
+            });
             _featureFlagsLoaded = true;
             if (cb) cb(_featureFlags);
         });
@@ -1125,12 +1196,12 @@
         .d2l-count-badge-number {
             background-color: var(--dtu-ad-accent-deep) !important;
             background: var(--dtu-ad-accent-deep) !important;
-            color: #ffffff !important;
+            color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
         }
         .d2l-count-badge-number > div {
             background: transparent !important;
             background-color: transparent !important;
-            color: #ffffff !important;
+            color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
         }
     `;
 
@@ -1151,7 +1222,7 @@
         el.style.setProperty('background-image', 'none', 'important');
         el.style.setProperty('border-color', color, 'important');
         if (el.tagName === 'A') {
-            el.style.setProperty('color', '#ffffff', 'important');
+            el.style.setProperty('color', 'var(--dtu-ad-accent-deep-on, #ffffff)', 'important');
         }
     }
 
@@ -1919,6 +1990,8 @@
     }
 
     globalThis.DTUAfterDarkParticipantIntelCoreDeps = {
+        isFeatureFlagEnabled: isFeatureFlagEnabled,
+        featureParticipantIntelKey: FEATURE_PARTICIPANT_INTEL_KEY,
         normalizeWhitespace: normalizeWhitespace,
         normalizeIntelCourseCode: normalizeIntelCourseCode,
         normalizeIntelCourseSemester: normalizeIntelCourseSemester,
@@ -1930,6 +2003,7 @@
         getCampusnetSemesterFromPage: getCampusnetSemesterFromPage,
         getCampusnetCourseNameFromPage: getCampusnetCourseNameFromPage,
         normalizeProgramLabel: normalizeProgramLabel,
+        readParticipantProgram: readParticipantProgram,
         isCampusnetParticipantPage: isCampusnetParticipantPage,
         storageLocalGet: storageLocalGet,
         storageLocalSet: storageLocalSet,
@@ -2044,6 +2118,18 @@
         return api.normalizeProgramLabel(raw);
     }
 
+    function readParticipantProgram(infoDiv) {
+        var api = getParticipantIntelHostApi();
+        if (!api || typeof api.readParticipantProgram !== 'function') return '';
+        return api.readParticipantProgram(infoDiv);
+    }
+
+    function getCampusnetRetentionKey() {
+        var api = getParticipantIntelHostApi();
+        if (!api || typeof api.getCampusnetRetentionKey !== 'function') return '';
+        return api.getCampusnetRetentionKey();
+    }
+
     function getCampusnetParticipantCategoryMeta(labelRegex) {
         var api = getParticipantIntelHostApi();
         if (!api || typeof api.getCampusnetParticipantCategoryMeta !== 'function') return null;
@@ -2139,8 +2225,10 @@
         getCampusnetUsersCountFromPage: getCampusnetUsersCountFromPage,
         loadParticipantIntel: loadParticipantIntel,
         normalizeProgramLabel: normalizeProgramLabel,
+        readParticipantProgram: readParticipantProgram,
         getCampusnetCourseCodeFromPage: getCampusnetCourseCodeFromPage,
         getCampusnetSemesterFromPage: getCampusnetSemesterFromPage,
+        getCampusnetRetentionKey: getCampusnetRetentionKey,
         getCampusnetUsersParticipantElements: getCampusnetUsersParticipantElements,
         getCampusnetParticipantSNumber: getCampusnetParticipantSNumber,
         normalizeIntelCourseCode: normalizeIntelCourseCode,
@@ -2198,6 +2286,7 @@
         getCampusnetExplicitSemesterFromPage: getCampusnetExplicitSemesterFromPage,
         getCampusnetCourseNameFromPage: getCampusnetCourseNameFromPage,
         normalizeProgramLabel: normalizeProgramLabel,
+        readParticipantProgram: readParticipantProgram,
         saveParticipantIntel: saveParticipantIntel,
         loadParticipantIntel: loadParticipantIntel,
         isCampusnetGroupArchivePage: isCampusnetGroupArchivePage,
@@ -2921,8 +3010,8 @@
             surfaceInset: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.06)',
             divider: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.10)',
             quietTrack: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)',
-            linkColor: isDark ? 'var(--dtu-ad-accent-soft)' : getResolvedAccentDeep(),
-            accentText: isDark ? 'var(--dtu-ad-accent-soft)' : getResolvedAccentDeep()
+            linkColor: isDark ? 'var(--dtu-ad-accent-soft)' : 'var(--dtu-ad-accent-deep-text, ' + getResolvedAccentDeep() + ')',
+            accentText: isDark ? 'var(--dtu-ad-accent-soft)' : 'var(--dtu-ad-accent-deep-text, ' + getResolvedAccentDeep() + ')'
         };
     }
 
@@ -3353,7 +3442,12 @@
 
     function scheduleBookFinderScan(delayMs) {
         if (!IS_TOP_WINDOW || !isDTULearnCoursePage()) return;
-        if (!isFeatureFlagEnabled(FEATURE_TEXTBOOK_LINKS_KEY)) return;
+        if (!isFeatureFlagEnabled(FEATURE_TEXTBOOK_LINKS_KEY)) {
+            if (_bookFinderTimer) clearTimeout(_bookFinderTimer);
+            _bookFinderTimer = null;
+            insertBookFinderLinks();
+            return;
+        }
         if (_bookFinderTimer) return;
         _bookFinderTimer = setTimeout(function () {
             _bookFinderTimer = null;

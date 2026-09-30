@@ -101,13 +101,13 @@
         .d2l-count-badge-number {
             background-color: var(--dtu-ad-accent-deep) !important;
             background: var(--dtu-ad-accent-deep) !important;
-            color: #ffffff !important;
+            color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
             border-color: #ffffff !important;
         }
         .d2l-count-badge-number > div {
             background: transparent !important;
             background-color: transparent !important;
-            color: #ffffff !important;
+            color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
         }
         .uw-text {
             color: var(--dtu-ad-accent-soft) !important;
@@ -454,12 +454,12 @@
         .d2l-count-badge-number {
             background-color: var(--dtu-ad-accent-deep) !important;
             background: var(--dtu-ad-accent-deep) !important;
-            color: #ffffff !important;
+            color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
         }
         .d2l-count-badge-number > div {
             background: transparent !important;
             background-color: transparent !important;
-            color: #ffffff !important;
+            color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
         }
         .uw-text {
             color: var(--dtu-ad-accent-soft) !important;
@@ -784,7 +784,7 @@
             background-color: var(--dtu-ad-accent-deep) !important;
             background: var(--dtu-ad-accent-deep) !important;
             background-image: none !important;
-            color: #ffffff !important;
+            color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
             border: 0 !important;
             outline: 0 !important;
             box-shadow: none !important;
@@ -792,10 +792,10 @@
         .d2l-count-badge-number > div {
             background: transparent !important;
             background-color: transparent !important;
-            color: #ffffff !important;
+            color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
         }
         .uw-text {
-            color: var(--dtu-ad-accent) !important;
+            color: var(--dtu-ad-accent-text, var(--dtu-ad-accent)) !important;
         }
     `;
 
@@ -957,7 +957,7 @@
             background-color: var(--dtu-ad-accent-deep) !important;
             background: var(--dtu-ad-accent-deep) !important;
             background-image: none !important;
-            color: #ffffff !important;
+            color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
             border: 0 !important;
             outline: 0 !important;
             box-shadow: none !important;
@@ -965,10 +965,10 @@
         .d2l-count-badge-number > div {
             background: transparent !important;
             background-color: transparent !important;
-            color: #ffffff !important;
+            color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
         }
         .uw-text {
-            color: var(--dtu-ad-accent) !important;
+            color: var(--dtu-ad-accent-text, var(--dtu-ad-accent)) !important;
         }
     `;
 
@@ -1002,13 +1002,13 @@
         .d2l-count-badge-number {
             background-color: var(--dtu-ad-accent-deep) !important;
             background: var(--dtu-ad-accent-deep) !important;
-            color: #ffffff !important;
+            color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
             border-color: #ffffff !important;
         }
         .d2l-count-badge-number > div {
             background: transparent !important;
             background-color: transparent !important;
-            color: #ffffff !important;
+            color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
         }
     `;
 
@@ -1871,7 +1871,7 @@
                 btn.style.setProperty('background', 'var(--dtu-ad-accent)', 'important');
                 btn.style.setProperty('background-color', 'var(--dtu-ad-accent)', 'important');
                 btn.style.setProperty('background-image', 'none', 'important');
-                btn.style.setProperty('color', '#ffffff', 'important');
+                btn.style.setProperty('color', 'var(--dtu-ad-accent-on, #ffffff)', 'important');
                 btn.style.setProperty('border-color', 'var(--dtu-ad-accent-border)', 'important');
             });
         } catch (e8) { }
@@ -2054,7 +2054,7 @@
                 } else if ((el.classList && el.classList.contains('fa-stack-1x'))
                     || (el.classList && el.classList.contains('fa-heart'))
                     || (el.classList && el.classList.contains('fa-user'))) {
-                    el.style.setProperty('color', '#ffffff', 'important');
+                    el.style.setProperty('color', 'var(--dtu-ad-accent-on, #ffffff)', 'important');
                 }
                 return;
             }
@@ -2171,7 +2171,7 @@
                 } else if ((el.classList && el.classList.contains('fa-stack-1x'))
                     || (el.classList && el.classList.contains('fa-heart'))
                     || (el.classList && el.classList.contains('fa-user'))) {
-                    el.style.setProperty('color', '#ffffff', 'important');
+                    el.style.setProperty('color', 'var(--dtu-ad-accent-on, #ffffff)', 'important');
                 }
                 return;
             }
@@ -2289,6 +2289,7 @@
         root.querySelectorAll('.dturedbackground').forEach(forceDtuRedBackgroundDark2);
         try {
             var badgeBg = isDarkModeEnabled() ? 'var(--dtu-ad-accent)' : 'var(--dtu-ad-accent-deep)';
+            var badgeText = isDarkModeEnabled() ? 'var(--dtu-ad-accent-on, #ffffff)' : 'var(--dtu-ad-accent-deep-on, #ffffff)';
             var w2dBadgeBg = getResolvedAccent();
             var w2dBadgeText = getContrastTextForHex(w2dBadgeBg, '#ffffff', '#000000');
             root.querySelectorAll('.d2l-w2d-count, .d2l-w2d-heading-3-count').forEach(function (el) {
@@ -2304,7 +2305,7 @@
                 el.style.setProperty('background', badgeBg, 'important');
                 el.style.setProperty('background-color', badgeBg, 'important');
                 el.style.setProperty('background-image', 'none', 'important');
-                el.style.setProperty('color', '#ffffff', 'important');
+                el.style.setProperty('color', badgeText, 'important');
                 el.style.setProperty('border', '0', 'important');
                 el.style.setProperty('outline', '0', 'important');
                 el.style.setProperty('box-shadow', 'none', 'important');
@@ -2313,11 +2314,11 @@
                 if (!el || !el.style) return;
                 el.style.setProperty('background', 'transparent', 'important');
                 el.style.setProperty('background-color', 'transparent', 'important');
-                el.style.setProperty('color', '#ffffff', 'important');
+                el.style.setProperty('color', badgeText, 'important');
             });
             root.querySelectorAll('.uw-text').forEach(function (el) {
                 if (!el || !el.style) return;
-                el.style.setProperty('color', 'var(--dtu-ad-accent)', 'important');
+                el.style.setProperty('color', 'var(--dtu-ad-accent-text, var(--dtu-ad-accent))', 'important');
             });
         } catch (e21) { }
     }

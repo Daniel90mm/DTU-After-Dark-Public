@@ -41,7 +41,8 @@
 
     function saveDarkModePreference(enabled) {
         var deps = getDeps();
-        if (deps && typeof deps.saveDarkModePreference === 'function') deps.saveDarkModePreference(enabled);
+        if (deps && typeof deps.saveDarkModePreference === 'function') return deps.saveDarkModePreference(enabled);
+        return Promise.resolve();
     }
 
     function showSettingsModal() {
@@ -114,14 +115,10 @@
                     img._dtuMojanglesPulseAnim.cancel();
                     img._dtuMojanglesPulseAnim = null;
                 }
-                img.style.display = 'none';
+                img.remove();
             });
             return;
         }
-
-        findAllMojanglesImages(document).forEach(function (img) {
-            img.style.display = '';
-        });
 
         if (!document.getElementById('dtu-mojangles-pulse-style')) {
             var pulseStyle = document.createElement('style');
@@ -133,6 +130,9 @@
         var mojanglesImgSrc = getExtensionUrl(isDarkModeEnabled() ? 'images/mojangles_text.png' : 'images/mojangles_text_darkmode_off.png');
         var isRootHomePage = /^\/d2l\/home\/?$/.test(window.location.pathname);
         var homePulseMs = 1800;
+        var reduceMotion = false;
+        try { reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); } catch (eRm) { }
+        var shouldPulseHere = isRootHomePage && !reduceMotion;
 
         function setMojanglesPulse(img, shouldPulse) {
             if (!img) return;
@@ -155,13 +155,15 @@
                             ],
                             { duration: homePulseMs, iterations: Infinity, easing: 'ease-in-out' }
                         );
-                        img.style.animation = 'none';
+                        if (img.style.animationName !== 'none') img.style.animation = 'none';
                         return;
                     }
                 } catch (e) {
                 }
-                img.style.animation = 'dtuMojanglesPulse 1.8s ease-in-out infinite';
-            } else {
+                if (img.style.animationName !== 'dtuMojanglesPulse') {
+                    img.style.animation = 'dtuMojanglesPulse 1.8s ease-in-out infinite';
+                }
+            } else if (img.style.animationName !== 'none') {
                 img.style.animation = 'none';
             }
         }
@@ -198,107 +200,66 @@
             return container.querySelector(logoSelector) || container.querySelector(linkSelector);
         }
 
-        function insertInRoot(root) {
-            if (!root) return;
+        // Runs on every observer tick, so only touch the DOM when something changed:
+        // rewriting src/style here re-triggered the observer about 4 times a second.
+        function setIfChanged(img, css) {
+            if (img.getAttribute('src') !== mojanglesImgSrc) img.setAttribute('src', mojanglesImgSrc);
+            if (img._dtuMojanglesCss !== css) {
+                img.style.cssText = css;
+                img._dtuMojanglesCss = css;
+            }
+        }
 
-            var headerContainers = root.querySelectorAll('.d2l-labs-navigation-header-container');
-            headerContainers.forEach(function (container) {
-                var img = container.querySelector('.mojangles-text-img');
-                if (!img) {
-                    img = document.createElement('img');
-                    markExt(img);
-                    img.className = 'mojangles-text-img';
-                    img.alt = 'Mojangles';
-                    container.appendChild(img);
-                }
-                img.src = mojanglesImgSrc;
-                img.style.display = 'block';
-                img.style.opacity = '1';
-                img.style.visibility = 'visible';
+        function placeInContainer(container) {
+            var img = container.querySelector('.mojangles-text-img');
+            if (!img) {
+                img = document.createElement('img');
+                markExt(img);
+                img.className = 'mojangles-text-img';
+                // Decorative: screen readers should skip it.
+                img.alt = '';
+                img.setAttribute('aria-hidden', 'true');
+                container.appendChild(img);
+            }
 
-                container.style.position = 'relative';
-                container.style.overflow = 'visible';
+            if (container.style.position !== 'relative') container.style.position = 'relative';
+            if (container.style.overflow !== 'visible') container.style.overflow = 'visible';
 
-                var logo = resolveMojanglesLogoElement(container);
-                var heightPx = isRootHomePage ? 16 : 12;
-                var fallbackLeftPx = isRootHomePage ? 36 : 16;
-                var fallbackTop = isRootHomePage ? 'calc(58% + 3px)' : 'calc(60% + 19px)';
-                var styleBase = 'height:' + heightPx + 'px; position:absolute; transform:translateY(-50%) rotate(-20deg); '
-                    + 'z-index:20; pointer-events:none; display:block; opacity:1; visibility:visible;';
+            var logo = resolveMojanglesLogoElement(container);
+            var heightPx = isRootHomePage ? 16 : 12;
+            var fallbackLeftPx = isRootHomePage ? 36 : 16;
+            var fallbackTop = isRootHomePage ? 'calc(58% + 3px)' : 'calc(60% + 19px)';
+            var styleBase = 'height:' + heightPx + 'px; position:absolute; transform:translateY(-50%) rotate(-20deg); '
+                + 'z-index:20; pointer-events:none; display:block; opacity:1; visibility:visible;';
+            var css = styleBase + ' left:' + fallbackLeftPx + 'px; top:' + fallbackTop + ';';
 
-                if (!logo || !logo.getBoundingClientRect) {
-                    img.style.cssText = styleBase + ' left:' + fallbackLeftPx + 'px; top:' + fallbackTop + ';';
-                    setMojanglesPulse(img, isRootHomePage);
-                    return;
-                }
-
-                var containerRect = container.getBoundingClientRect();
-                var logoRect = logo.getBoundingClientRect();
-                if (!containerRect || !logoRect || logoRect.width <= 0 || containerRect.width <= 0) {
-                    img.style.cssText = styleBase + ' left:' + fallbackLeftPx + 'px; top:' + fallbackTop + ';';
-                    setMojanglesPulse(img, isRootHomePage);
-                    return;
-                }
-
+            var containerRect = container.getBoundingClientRect ? container.getBoundingClientRect() : null;
+            var logoRect = logo && logo.getBoundingClientRect ? logo.getBoundingClientRect() : null;
+            if (containerRect && logoRect && logoRect.width > 0 && containerRect.width > 0) {
                 var leftPx = Math.max(4, Math.round(logoRect.right - containerRect.left + (isRootHomePage ? -26 : 4)));
                 if (leftPx > (containerRect.width * 0.5)) {
                     leftPx = fallbackLeftPx;
                 }
                 var topPx = Math.round((logoRect.top - containerRect.top) + (logoRect.height * (isRootHomePage ? 0.58 : 0.62))) + (isRootHomePage ? 3 : 19);
-                img.style.cssText = styleBase + ' left:' + leftPx + 'px; top:' + topPx + 'px;';
-                setMojanglesPulse(img, isRootHomePage);
-            });
+                css = styleBase + ' left:' + leftPx + 'px; top:' + topPx + 'px;';
+            }
+            setIfChanged(img, css);
+            setMojanglesPulse(img, shouldPulseHere);
         }
 
-        insertInRoot(document);
-
-        function checkShadowRoots(root) {
-            if (!root) return;
-            var elements = root.querySelectorAll('*');
-            elements.forEach(function (el) {
-                if (el.shadowRoot) {
-                    insertInRoot(el.shadowRoot);
-                    checkShadowRoots(el.shadowRoot);
-                }
-            });
+        var deps = getDeps();
+        var containers = null;
+        if (deps && typeof deps.deepQueryAll === 'function') {
+            try { containers = deps.deepQueryAll('.d2l-labs-navigation-header-container', document); } catch (eDeepC) { containers = null; }
         }
-
-        checkShadowRoots(document);
-    }
-
-    function insertMojanglesToggle() {
-        if (!isTopWindow()) return;
-        var placeholder = getAdminToolsPlaceholder();
-        if (!placeholder) return;
-        if (placeholder.querySelector && placeholder.querySelector('#mojangles-toggle')) return;
-
-        var targetList = ensureAfterDarkAdminToolsList();
-        if (!targetList) return;
-
-        var li = document.createElement('li');
-        li.style.cssText = isDarkModeEnabled()
-            ? 'display: flex; align-items: center; gap: 8px; padding: 4px 0; background-color: #2d2d2d !important;'
-            : 'display: flex; align-items: center; gap: 8px; padding: 4px 0;';
-
-        var label = document.createElement('label');
-        label.style.cssText = isDarkModeEnabled()
-            ? 'display: flex; align-items: center; gap: 8px; cursor: pointer; color: #e0e0e0; font-size: 14px; background-color: #2d2d2d !important; background: #2d2d2d !important;'
-            : 'display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px;';
-
-        var toggle = document.createElement('input');
-        toggle.type = 'checkbox';
-        toggle.id = 'mojangles-toggle';
-        toggle.checked = isMojanglesEnabled();
-        toggle.style.cssText = 'width: 16px; height: 16px; cursor: pointer; accent-color: var(--dtu-ad-accent);';
-        toggle.addEventListener('change', function () {
-            localStorage.setItem('mojanglesTextEnabled', toggle.checked.toString());
-            insertMojanglesText();
-        });
-
-        label.appendChild(toggle);
-        label.appendChild(document.createTextNode('Mojangles Text'));
-        li.appendChild(label);
-        targetList.appendChild(li);
+        if (!containers) {
+            containers = [];
+            (function walk(root) {
+                root.querySelectorAll('.d2l-labs-navigation-header-container').forEach(function (c) { containers.push(c); });
+                root.querySelectorAll('*').forEach(function (el) { if (el.shadowRoot) walk(el.shadowRoot); });
+            })(document);
+        }
+        containers.forEach(placeInContainer);
     }
 
     function ensureAfterDarkAdminToolsList() {
@@ -389,8 +350,9 @@
         toggle.checked = isDarkModeEnabled();
         toggle.style.cssText = 'width: 16px; height: 16px; cursor: pointer; accent-color: var(--dtu-ad-accent);';
         toggle.addEventListener('change', function () {
-            saveDarkModePreference(!isDarkModeEnabled());
-            location.reload();
+            Promise.resolve(saveDarkModePreference(!isDarkModeEnabled())).then(function () {
+                location.reload();
+            });
         });
 
         label.appendChild(toggle);
@@ -861,7 +823,6 @@
         globalThis.DTUAfterDarkLearnShellUi = {
             insertMojanglesText: insertMojanglesText,
             insertSettingsAdminEntry: insertSettingsAdminEntry,
-            insertMojanglesToggle: insertMojanglesToggle,
             insertDarkModeToggle: insertDarkModeToggle,
             setupContextCaptureHotkey: setupContextCaptureHotkey,
             insertContextCaptureHelper: insertContextCaptureHelper,

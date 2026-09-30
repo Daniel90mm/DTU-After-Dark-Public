@@ -37,6 +37,9 @@ function loadBackground({ fetchImpl } = {}) {
         'roomMatchesItem',
         'pickBestRoomResult',
         'zeroPadRoom',
+        'auditoriumNumberFromRoom',
+        'pickAuditoriumResult',
+        'resolveMazemapPoi',
         'sanitizeLibraryTrendApiUrl',
         'parseIntLoose',
         'parseGradePeriodLinks',
@@ -353,6 +356,40 @@ test('MazeMap result picking matches building and zero-padded room, highest scor
     assert.equal(api.zeroPadRoom('A1', 3), 'A1');
 });
 
+// Shapes copied from api.mazemap.com equery responses for building 116 (2026-09-30).
+const MM_116_81 = [
+    { poiId: 290659, dispPoiNames: ['AUDITORIUM <em>81</em>/020'], dispBldNames: ['116'], identifier: 'Bygning 116-73336', score: 9 },
+    { poiId: 1001706764, dispPoiNames: ['AUDITORIUM 82/027'], dispBldNames: ['116'], identifier: 'Bygning 116-73339', score: 8 },
+    { poiId: 1001706766, dispPoiNames: ['AUDITORIUM 83/026'], dispBldNames: ['116'], identifier: 'Bygning 116-73340', score: 7 }
+];
+
+test('MazeMap auditorium notation: A081, A83 and 081 map to "AUDITORIUM n"', () => {
+    assert.equal(api.auditoriumNumberFromRoom('A081'), '81');
+    assert.equal(api.auditoriumNumberFromRoom('a83'), '83');
+    assert.equal(api.auditoriumNumberFromRoom('081'), '81');
+    assert.equal(api.auditoriumNumberFromRoom('0.15.A'), '');
+    assert.equal(api.pickAuditoriumResult(MM_116_81, '116', '81').poiId, 290659);
+    assert.equal(api.pickAuditoriumResult(MM_116_81, '116', '8'), null, 'no prefix match: 8 is not 81');
+    assert.equal(api.pickAuditoriumResult(MM_116_81, '306', '81'), null, 'wrong building');
+});
+
+test('MazeMap resolver tries exact room names first, then the auditorium name', async () => {
+    const queries = [];
+    const bg = loadBackground({
+        fetchImpl: async (url) => {
+            const q = decodeURIComponent(/[?&]q=([^&]+)/.exec(url)[1]);
+            queries.push(q);
+            const result = q === '116-81' ? MM_116_81 : [];
+            return { ok: true, status: 200, json: async () => ({ result }) };
+        }
+    });
+    const res = await bg.api.resolveMazemapPoi('116', 'A081');
+    assert.equal(res.ok, true);
+    assert.equal(res.poiId, 290659);
+    assert.equal(res.kind, 'room');
+    assert.deepEqual(queries, ['116-A081', '116.A081', '116-81']);
+});
+
 test('library trend URL must be https; loose ints ignore separators', () => {
     assert.equal(api.sanitizeLibraryTrendApiUrl('https://api.example/x'), 'https://api.example/x');
     assert.equal(api.sanitizeLibraryTrendApiUrl('http://api.example/x'), '');
@@ -419,4 +456,17 @@ test('message router caches "no exams yet" so new courses are not refetched', as
     const second = plain(await ask());
     assert.equal(second.error, 'no_data');
     assert.equal(bg.fetchCalls.length, fetchesAfterFirst, 'second visit is served from the cache');
+});
+
+test('grade HTTP failures are not cached as a course with no exams',async()=>{
+ for(const status of [403,429,503]){
+  const bg=loadBackground({fetchImpl:async()=>({ok:false,status,text:async()=>''})});const [listener]=bg.listeners;
+  const ask=()=>new Promise(resolve=>listener({type:'dtu-grade-stats',courseCode:'34032',semesters:['Winter-2025']},{url:'https://kurser.dtu.dk/course/34032'},resolve));
+  assert.deepEqual(plain(await ask()),{ok:false,error:'fetch_failed'});
+  const calls=bg.fetchCalls.length;await ask();assert.ok(bg.fetchCalls.length>calls,'transient failure must not become a cached no_data result');
+ }
+});
+test('grade network exceptions propagate as fetch failure',async()=>{
+ const bg=loadBackground({fetchImpl:async()=>{throw new Error('offline');}});
+ await assert.rejects(bg.api.fetchLatestIterations('34032',['Winter-2025'],4),/offline/);
 });

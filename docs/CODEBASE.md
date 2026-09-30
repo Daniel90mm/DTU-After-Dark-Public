@@ -84,7 +84,7 @@ This repo is still centered around a large content script, but the runtime bound
   - Owns CampusNet page detection, semester/course parsing, course-title filtering, and participant-list DOM helpers.
 - `darkmode.campusnet-gpa.js`
   - Extracted CampusNet GPA/ECTS/simulator feature shell and table logic.
-  - Owns grade-table parsing, weighted GPA row, ECTS bar, and hypothetical-grade simulator UI.
+  - Owns grade-table parsing, weighted GPA row, ECTS bar, and planned-grade simulator UI.
 - `darkmode.css`
   - Static dark-mode stylesheet loaded by the content script.
 - `scripts/build-firefox.ps1` / `scripts/build-chrome.ps1`
@@ -166,7 +166,7 @@ This repo is still centered around a large content script, but the runtime bound
   - Shared occupancy fetch wiring, chart/heatmap rendering, trend math.
 - CampusNet GPA tools:
   - `darkmode.campusnet-gpa.js`
-  - Grades-table parsing, ignored-grade toggles, weighted GPA summary, hypothetical GPA simulator.
+  - Grades-table parsing, ignored-grade toggles, weighted GPA summary, planned-grade GPA simulator.
 - DTU Learn widgets and nav features:
   - `darkmode.js`
   - Remaining quick links and other unsplit Learn-specific hooks.

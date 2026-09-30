@@ -62,10 +62,18 @@
         return getDepValue('featureSmartRoomLinkerKey', 'dtuAfterDarkFeatureSmartRoomLinker');
     }
 
+    // Announcements are where lecturers name rooms, so they stay linked even
+    // though the news tool counts as a legacy-heavy page. Class lists, groups
+    // and assignment folders stay excluded: long tables, no room text.
+    function isDTULearnAnnouncementsPage() {
+        return window.location.hostname === 'learn.inside.dtu.dk'
+            && /^\/d2l\/lms\/news\//i.test(window.location.pathname || '');
+    }
+
     function shouldRunSmartRoomLinkerInThisWindow() {
         if (!isFeatureFlagEnabled(getFeatureSmartRoomLinkerKey())) return false;
         if (!isSmartRoomLinkerAllowedOnHost()) return false;
-        if (isDTULearnLegacyHeavyCourseToolPage()) return false;
+        if (isDTULearnLegacyHeavyCourseToolPage() && !isDTULearnAnnouncementsPage()) return false;
         if (isTopWindow()) return true;
         return window.location.hostname === 'learn.inside.dtu.dk';
     }
@@ -167,6 +175,7 @@
                 if (anchor.getAttribute('data-dtu-mazemap-bound') === '1') return;
 
                 ev.preventDefault();
+                try { ev.stopPropagation(); } catch (eStop) { }
 
                 var building = anchor.getAttribute('data-dtu-mazemap-building') || '';
                 var room = anchor.getAttribute('data-dtu-mazemap-room') || '';
@@ -428,6 +437,7 @@
 
         anchor.addEventListener('click', function (ev) {
             try { ev.preventDefault(); } catch (e1) { }
+            try { ev.stopPropagation(); } catch (e1b) { }
             if (anchor.getAttribute('data-dtu-mazemap-loading') === '1') return;
 
             setMazemapLinkLoading(anchor, true);
@@ -527,7 +537,7 @@
             }
         }
 
-        var reB = /\bB?\s*([0-9]{3}[A-Za-z]?)\s*[.\-]\s*([A-Za-z]?\s*[0-9]{1,4}\s*[A-Za-z]?)\b/g;
+        var reB = /\bB?\s*([0-9]{3}[A-Za-z]?)\s*[.\-]\s*([A-Za-z]?\s*[0-9]{1,4}[A-Za-z]?)\b/g;
         while ((match = reB.exec(value)) !== null) {
             var roomRaw = (match[2] || '').replace(/\s+/g, '');
             var tail = value.slice(match.index + match[0].length, match.index + match[0].length + 12);
@@ -560,7 +570,27 @@
             });
         }
 
+        // Keep book identifiers intact so the textbook scanner can read them.
+        // A hyphenated ISBN can contain a room-shaped token such as "978-0".
+        var isbnRanges = [];
+        var isbnRe = /\b(?:97[89](?:[\s-]?\d){10}|\d(?:[\s-]?\d){8}[\s-]?[0-9Xx])\b/g;
+        while ((match = isbnRe.exec(value)) !== null) {
+            isbnRanges.push({ start: match.index, end: match.index + match[0].length });
+        }
+        matches = matches.filter(function (room) {
+            return !isbnRanges.some(function (isbn) { return room.start < isbn.end && room.end > isbn.start; });
+        });
         if (!matches.length) return [];
+        // Some patterns end in \s*[A-Za-z]?\b and so swallow the space before the
+        // next word ("B116-A081 and"); keep the link to the room text itself.
+        matches.forEach(function (m) {
+            var lead = m.text.length - m.text.replace(/^\s+/, '').length;
+            var trail = m.text.length - m.text.replace(/\s+$/, '').length;
+            if (!lead && !trail) return;
+            m.start += lead;
+            m.end -= trail;
+            m.text = m.text.slice(lead, m.text.length - trail);
+        });
         matches.sort(function (a, b) {
             if (a.start !== b.start) return a.start - b.start;
             return b.end - a.end;
@@ -586,6 +616,8 @@
         if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT') return true;
         if (tag === 'CODE' || tag === 'PRE') return true;
         if (el.isContentEditable) return true;
+        // A link inside another control would fire both on one click.
+        if (el.closest && el.closest('label, summary, [role="button"], [role="link"], [role="menuitem"], [role="tab"], [role="option"], [role="treeitem"], [onclick]')) return true;
         return false;
     }
 

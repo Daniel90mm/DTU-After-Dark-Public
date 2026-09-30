@@ -77,7 +77,7 @@
     }
 
     function saveDarkModePreference(enabled) {
-        callDep('saveDarkModePreference', [enabled], null);
+        return callDep('saveDarkModePreference', [enabled], null);
     }
 
     function isMojanglesEnabled() {
@@ -229,19 +229,19 @@
     }
 
     function getAccentThemeId() {
-        return callDep('getAccentThemeId', [], 'corporate-red');
+        return callDep('getAccentThemeId', [], 'dtu_red');
     }
 
     function getAccentCustomHex() {
         return callDep('getAccentCustomHex', [], '');
     }
 
-    function setAccentThemeId(nextId) {
-        callDep('setAccentThemeId', [nextId], null);
+    function setAccentThemeId(nextId, opts) {
+        callDep('setAccentThemeId', [nextId, opts], null);
     }
 
-    function setAccentCustomHex(nextHex) {
-        callDep('setAccentCustomHex', [nextHex], null);
+    function setAccentCustomHex(nextHex, opts) {
+        callDep('setAccentCustomHex', [nextHex, opts], null);
     }
 
     function getAccentThemeOrder() {
@@ -366,7 +366,10 @@
 
     function removePausedUrlRulesModal() {
         var existing = document.querySelector('.dtu-paused-url-rules-modal');
-        if (existing) existing.remove();
+        if (existing) {
+            if (typeof existing._dtuPausedCleanup === 'function') existing._dtuPausedCleanup();
+            existing.remove();
+        }
     }
 
     function showPausedUrlRulesModal(opts) {
@@ -398,6 +401,7 @@
             };
 
         removePausedUrlRulesModal();
+        var previousFocus = document.activeElement;
         try { hideSettingsModal(); } catch (e0) { }
 
         var overlay = document.createElement('div');
@@ -411,6 +415,10 @@
 
         var modal = document.createElement('div');
         markExt(modal);
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-labelledby', 'dtu-paused-urls-title');
+        modal.tabIndex = -1;
         modal.style.cssText = 'width:min(720px,94vw);max-height:82vh;overflow:auto;border-radius:8px;padding:18px 18px 14px;'
             + 'background:' + theme.background + ';color:' + theme.text + ';border:1px solid ' + theme.border + ';'
             + 'box-shadow:' + theme.shadow + ';';
@@ -455,6 +463,7 @@
 
         var title = document.createElement('div');
         markExt(title);
+        title.id = 'dtu-paused-urls-title';
         title.textContent = 'Paused URLs';
         title.style.cssText = 'font-size:18px;font-weight:700;color:' + theme.heading + ';margin-bottom:4px;';
         headerCopy.appendChild(title);
@@ -505,6 +514,7 @@
         var ruleInput = document.createElement('input');
         markExt(ruleInput);
         ruleInput.type = 'text';
+        ruleInput.setAttribute('aria-label', 'URL rule to pause');
         ruleInput.value = buildSuggestedPausePatternsForCurrentUrl()[0] || normalizeUrlPausePattern(window.location.origin + window.location.pathname + '*');
         ruleInput.placeholder = 'https://learn.inside.dtu.dk/d2l/home/296283';
         ruleInput.style.cssText = 'min-width:0;flex:1;box-sizing:border-box;padding:9px 10px;border:1px solid ' + theme.softBorder + ';'
@@ -542,6 +552,7 @@
 
         var statusText = document.createElement('div');
         markExt(statusText);
+        statusText.setAttribute('role', 'status');
         statusText.style.cssText = 'font-size:11px;line-height:1.45;color:' + theme.muted + ';min-height:16px;';
         addSection.appendChild(statusText);
 
@@ -634,7 +645,7 @@
                     var matchText = document.createElement('div');
                     markExt(matchText);
                     matchText.textContent = 'Matches this page';
-                    matchText.style.cssText = 'margin-top:3px;font-size:10px;line-height:1.4;color:var(--dtu-ad-accent);';
+                    matchText.style.cssText = 'margin-top:3px;font-size:10px;line-height:1.4;color:var(--dtu-ad-accent-text, var(--dtu-ad-accent));';
                     copy.appendChild(matchText);
                 }
 
@@ -644,6 +655,7 @@
                 markExt(removeBtn);
                 removeBtn.type = 'button';
                 removeBtn.textContent = 'Remove';
+                removeBtn.setAttribute('aria-label', 'Remove paused rule ' + pattern);
                 applyTextActionStyle(removeBtn, '#d14343');
                 removeBtn.addEventListener('click', function () {
                     removeRule(pattern);
@@ -694,12 +706,38 @@
         overlay.addEventListener('click', function (e7) {
             if (e7.target === overlay) closePausedUrlRulesModal(reopenSettingsOnClose);
         });
-        overlay.addEventListener('keydown', function (e8) {
+        var pausedKeyHandler = function (e8) {
             if (e8.key === 'Escape') {
                 e8.preventDefault();
+                e8.stopPropagation();
                 closePausedUrlRulesModal(reopenSettingsOnClose);
+                return;
             }
-        });
+            if (e8.key !== 'Tab') return;
+            var controls = Array.prototype.filter.call(
+                modal.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'),
+                function (el) { return el.getClientRects().length > 0 || el === document.activeElement; }
+            );
+            if (!controls.length) { e8.preventDefault(); modal.focus(); return; }
+            var first = controls[0];
+            var last = controls[controls.length - 1];
+            var active = document.activeElement;
+            if (!modal.contains(active) || (e8.shiftKey && (active === first || active === modal)) || (!e8.shiftKey && active === last)) {
+                e8.preventDefault();
+                (e8.shiftKey ? last : first).focus();
+            }
+        };
+        var previousOverflow = { html: document.documentElement.style.overflow, body: document.body.style.overflow };
+        document.documentElement.style.overflow = 'hidden';
+        document.body.style.overflow = 'hidden';
+        document.addEventListener('keydown', pausedKeyHandler, true);
+        overlay._dtuPausedCleanup = function () {
+            document.removeEventListener('keydown', pausedKeyHandler, true);
+            document.documentElement.style.overflow = previousOverflow.html;
+            document.body.style.overflow = previousOverflow.body;
+            var focusTarget = previousFocus && previousFocus.isConnected ? previousFocus : document.querySelector('.dtu-settings-nav-item button');
+            if (focusTarget) { try { focusTarget.focus({ preventScroll: true }); } catch (eFocus) { } }
+        };
 
         document.body.appendChild(overlay);
         refreshRuleList();
@@ -826,7 +864,7 @@
         var toggleHandlers = {
             'dark-mode-toggle': {
                 getState: function () { return isDarkModeEnabled(); },
-                onChange: function (checked) { saveDarkModePreference(checked); location.reload(); }
+                onChange: function (checked) { Promise.resolve(saveDarkModePreference(checked)).then(function () { location.reload(); }); }
             },
             'mojangles-toggle': {
                 getState: function () { return isMojanglesEnabled(); },
@@ -918,12 +956,12 @@
                 id: 'appearance', label: 'Appearance', desc: 'Theme and visual settings', items: [
                     { tid: 'dark-mode-toggle', title: 'Dark Mode', desc: 'Global dark theme for all DTU sites' },
                     { kind: 'accent-theme', title: 'Accent Color', desc: 'Official DTU color presets plus custom (default: DTU Corporate Red)' },
-                    { tid: 'mojangles-toggle', title: 'Mojangles Font', desc: 'Use the Minecraft font for headers' }
+                    { tid: 'mojangles-toggle', title: 'Mojangles Splash', desc: 'Tilted Minecraft-style "DTU After Dark" text beside the DTU Learn logo' }
                 ]
             },
             {
                 id: 'interface', label: 'Shortcuts & Navigation', desc: 'Quick links, nav entries, and shortcut actions', items: [
-                    { tid: 'feature-learn-nav-resource-links-toggle', title: 'Navigation Quick Links', desc: 'Adds Panopto and CampusNet to the Student Resources menu' },
+                    { tid: 'feature-learn-nav-resource-links-toggle', title: 'Navigation Quick Links', desc: 'Adds Panopto and CampusNet to Student Resources, listed first with Final Grades, Student Email and Course Evaluation' },
                     { tid: 'feature-content-shortcut-toggle', title: 'Content Shortcut', desc: 'Adds a direct Content button to each course card' },
                     { tid: 'library-dropdown-toggle', title: 'Library', desc: 'Quick links and live events/news from DTU Library' },
                     { tid: 'feature-smart-room-linker-toggle', title: 'Room links', desc: 'Turn room mentions into MazeMap links (click-to-resolve)' }
@@ -932,7 +970,7 @@
             {
                 id: 'dashboard', label: 'Dashboard Widgets', desc: 'DTU Learn homepage widgets and dashboard cards', items: [
                     { tid: 'bus-departures-toggle', title: 'Bus Departures', desc: 'Show live bus departure times around campus' },
-                    { tid: 'deadlines-toggle', title: 'Deadlines Widget', desc: 'Timeline of upcoming assignments' },
+                    { tid: 'deadlines-toggle', title: 'Deadlines Widget', desc: 'Timeline of DTU course and exam registration deadlines' },
                     { tid: 'search-widget-toggle', title: 'Course Search', desc: 'Native course search on the dashboard' },
                     { tid: 'feature-lessons-bulk-download-toggle', title: 'Course Content Download', desc: 'Download selected Lessons sections as a ZIP file' }
                 ]
@@ -987,15 +1025,15 @@
             + '.dtu-am-panel-title{font-size:18px;font-weight:600;color:var(--dtu-am-text) !important;margin:0 0 2px}'
             + '.dtu-am-panel-desc{font-size:12px;color:var(--dtu-am-muted) !important;margin-bottom:16px}'
             + '.dtu-nav-i{padding:8px 14px;cursor:pointer;border-radius:6px;margin:2px 6px;transition:background .15s;user-select:none;-webkit-user-select:none;'
-            + 'font-size:13px;color:var(--dtu-am-text) !important;border-left:3px solid transparent;white-space:nowrap}'
+            + 'font-size:13px;color:var(--dtu-am-text) !important;white-space:nowrap}'
             + '.dtu-nav-i:hover{background:var(--dtu-am-hover) !important}'
-            + '.dtu-nav-i.dtu-active{background:var(--dtu-am-active-bg) !important;border-left-color:var(--dtu-am-accent) !important;'
+            + '.dtu-nav-i.dtu-active{background:var(--dtu-am-active-bg) !important;'
             + 'color:var(--dtu-am-active-text) !important;font-weight:600}'
             + '.dtu-set-row{display:flex;align-items:center;justify-content:space-between;gap:16px;'
             + 'padding:12px 0;border-bottom:1px solid var(--dtu-am-border) !important}'
             + '.dtu-set-row:last-child{border-bottom:none}'
             + '.dtu-set-row.dtu-set-row-sub{margin-left:18px;padding-left:12px;padding-top:9px;padding-bottom:9px;'
-            + 'border-bottom:1px dashed var(--dtu-am-border) !important;border-left:2px solid rgba(var(--dtu-ad-accent-rgb),0.32) !important;}'
+            + 'border-bottom:1px dashed var(--dtu-am-border) !important;}'
             + '.dtu-set-row.dtu-set-row-sub .dtu-am-title{font-size:12px;font-weight:600;}'
             + '.dtu-set-row.dtu-set-row-sub .dtu-am-desc{font-size:10.5px;}'
             + '.dtu-am-info{display:flex;flex-direction:column;gap:2px;flex:1;min-width:0}'
@@ -1003,9 +1041,6 @@
             + 'white-space:normal;overflow-wrap:anywhere;word-break:break-word;max-width:100%}'
             + '.dtu-am-desc{font-size:11px;color:var(--dtu-am-muted) !important;line-height:1.25;'
             + 'white-space:normal;overflow-wrap:anywhere;word-break:break-word;max-width:100%}'
-            + '.dtu-am-accent-warning{font-size:11px;line-height:1.35;margin-top:5px;max-width:420px;'
-            + 'color:var(--dtu-ad-status-warning-strong) !important}'
-            + '.dtu-am-accent-warning[hidden]{display:none !important}'
             + '.dtu-am-root a.dtu-am-link{font-size:11px;line-height:1.25;color:var(--dtu-am-action) !important;'
             + 'text-decoration:none !important;margin-top:1px}'
             + '.dtu-am-root a.dtu-am-link:hover{text-decoration:underline !important;color:var(--dtu-am-action) !important}'
@@ -1203,14 +1238,6 @@
                     info0.appendChild(title0);
                     info0.appendChild(desc0);
 
-                    var contrastWarning = document.createElement('div');
-                    markExt(contrastWarning);
-                    contrastWarning.className = 'dtu-am-accent-warning';
-                    contrastWarning.setAttribute('data-dtu-accent-contrast-warning', '1');
-                    contrastWarning.setAttribute('role', 'status');
-                    contrastWarning.setAttribute('aria-live', 'polite');
-                    contrastWarning.textContent = 'Contrast warning: DTU Grey is very light. White text on grey accent surfaces may be difficult to read.';
-                    info0.appendChild(contrastWarning);
                     info0.appendChild(source0);
 
                     var actions0 = document.createElement('div');
@@ -1243,13 +1270,7 @@
                     });
                     try { sel.value = getAccentThemeId(); } catch (eSel) { }
 
-                    function syncAccentContrastWarning() {
-                        contrastWarning.hidden = sel.value !== 'dtu_grey';
-                    }
-                    syncAccentContrastWarning();
-
                     sel.addEventListener('change', function () {
-                        syncAccentContrastWarning();
                         setAccentThemeId(sel.value);
                     });
 
@@ -1260,16 +1281,18 @@
                     color.setAttribute('data-dtu-accent-custom-input', '1');
                     try { color.value = getAccentCustomHex() || getAccentCustomDefault(); } catch (eC0) { }
                     color.style.display = (getAccentThemeId() === 'custom') ? '' : 'none';
-                    function onPickCustomColor() {
+                    // Dragging fires 'input' many times a second: preview it on this page
+                    // only, and save (which re-themes every open DTU tab) on 'change'.
+                    function onPickCustomColor(persist) {
                         var picked = '';
                         try { picked = color.value; } catch (eV0) { picked = ''; }
-                        if (picked) setAccentCustomHex(picked);
-                        setAccentThemeId('custom');
+                        var opts = persist ? undefined : { noStorage: true };
+                        if (picked) setAccentCustomHex(picked, opts);
+                        setAccentThemeId('custom', opts);
                         try { sel.value = 'custom'; } catch (eS1) { }
-                        syncAccentContrastWarning();
                     }
-                    color.addEventListener('input', onPickCustomColor);
-                    color.addEventListener('change', onPickCustomColor);
+                    color.addEventListener('input', function () { onPickCustomColor(false); });
+                    color.addEventListener('change', function () { onPickCustomColor(true); });
 
                     actions0.appendChild(sel);
                     actions0.appendChild(color);

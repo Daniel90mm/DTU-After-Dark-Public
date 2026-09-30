@@ -169,6 +169,42 @@
         return null;
     }
 
+    function getCampusnetPageElementId() {
+        var m = String(window.location.pathname || '').match(/\/cnnet\/element\/(\d+)/i);
+        return m ? m[1] : '';
+    }
+
+    // A group formed inside a course (for example "Group 14" under 12106) has
+    // its own element, but its breadcrumb still names the parent course, so the
+    // course code alone would file the group under the course's user count.
+    // Returns the course's element id when this page is such a group, else ''.
+    function getCampusnetParentCourseElementId(rootDoc) {
+        var doc = rootDoc || document;
+        var pageId = getCampusnetPageElementId();
+        if (!pageId) return '';
+        var breadcrumb = doc.querySelector('#breadcrumb, .breadcrumb, nav[aria-label="breadcrumb"]');
+        if (!breadcrumb) return '';
+        var links = breadcrumb.querySelectorAll('a[href]');
+        for (var i = 0; i < links.length; i++) {
+            if (!/\b(?:\d{5}|KU\d{3})\b/i.test(links[i].textContent || '')) continue;
+            var href = links[i].getAttribute('href') || '';
+            var m = href.match(/elementid=(\d+)/i) || href.match(/\/cnnet\/element\/(\d+)/i);
+            if (!m) return '';
+            return m[1] !== pageId ? m[1] : '';
+        }
+        return '';
+    }
+
+    // Retention Radar series key: course code and semester for the course's
+    // own list, with the group's element id appended on a group page.
+    function getCampusnetRetentionKey(rootDoc) {
+        var courseCode = getCampusnetCourseCodeFromPage(rootDoc);
+        if (!courseCode) return '';
+        var key = courseCode + '_' + getCampusnetSemesterFromPage(rootDoc);
+        if (getCampusnetParentCourseElementId(rootDoc)) key += '_el' + getCampusnetPageElementId();
+        return key;
+    }
+
     function isCampusnetNonCourseTitle(text) {
         var t = normalizeWhitespace(text || '').toLowerCase();
         if (!t) return false;
@@ -259,6 +295,51 @@
         if (!p) return '';
         if (/^g(?:æ|ae)st\s*udl\.?$/i.test(p)) return 'Exchange student';
         return p;
+    }
+
+    // Rank of a CampusNet education label, so a student listed with both a
+    // finished bachelor and a current master counts under the master.
+    function getProgramLevel(label) {
+        var t = String(label || '').toLowerCase();
+        try { t = t.normalize('NFD').replace(/[̀-ͯ]/g, ''); } catch (eNorm) { }
+        if (/\bph\.?\s*d\b/.test(t)) return 4;
+        if (/\b(?:master|msc|m\.sc|kandidat|civilingenior)/.test(t)) return 3;
+        if (/\b(?:bachelor|bsc|b\.sc|b\.eng|diplom)/.test(t)) return 2;
+        return 1;
+    }
+
+    // Several listed programs: the highest degree wins, and between equals the
+    // one listed last, which is the most recent enrolment.
+    function pickParticipantProgram(labels) {
+        var best = '';
+        var bestLevel = 0;
+        (labels || []).forEach(function (raw) {
+            var label = normalizeProgramLabel(raw);
+            if (!label) return;
+            var level = getProgramLevel(label);
+            if (level >= bestLevel) {
+                best = label;
+                bestLevel = level;
+            }
+        });
+        return best;
+    }
+
+    // The education infobox lists one <p> per program. Older markup puts the
+    // label straight in a child div.
+    function readParticipantProgram(infoDiv) {
+        if (!infoDiv) return '';
+        var paras = infoDiv.querySelectorAll('.ui-participants-infolist p');
+        var texts = [];
+        if (paras.length) {
+            for (var i = 0; i < paras.length; i++) texts.push(paras[i].textContent);
+        } else {
+            var children = infoDiv.children;
+            for (var c = 0; c < children.length; c++) {
+                if (!children[c].classList.contains('info-header')) texts.push(children[c].textContent);
+            }
+        }
+        return pickParticipantProgram(texts);
     }
 
     function getCampusnetParticipantCategoryMeta(labelRegex, rootDoc) {
@@ -370,10 +451,14 @@
             getCampusnetExplicitSemesterFromPage: getCampusnetExplicitSemesterFromPage,
             getCampusnetSemesterFromPage: getCampusnetSemesterFromPage,
             getCampusnetCourseCodeFromPage: getCampusnetCourseCodeFromPage,
+            getCampusnetParentCourseElementId: getCampusnetParentCourseElementId,
+            getCampusnetRetentionKey: getCampusnetRetentionKey,
             isCampusnetNonCourseTitle: isCampusnetNonCourseTitle,
             isCampusnetLikelyAcademicCourse: isCampusnetLikelyAcademicCourse,
             getCampusnetCourseNameFromPage: getCampusnetCourseNameFromPage,
             normalizeProgramLabel: normalizeProgramLabel,
+            pickParticipantProgram: pickParticipantProgram,
+            readParticipantProgram: readParticipantProgram,
             getCampusnetParticipantCategoryMeta: getCampusnetParticipantCategoryMeta,
             getCampusnetUsersCategoryMeta: getCampusnetUsersCategoryMeta,
             getCampusnetUsersCountFromPage: getCampusnetUsersCountFromPage,

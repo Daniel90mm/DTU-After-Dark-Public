@@ -99,25 +99,34 @@
         return false;
     }
 
+    // Runs on every feature pass. Even no-op writes (classList.remove of an
+    // absent class, an identical setProperty) queue mutations and wake the
+    // page observer again, so only write what differs.
+    function setNavStyleIfChanged(el, prop, value) {
+        if (el.style.getPropertyValue(prop) !== value || el.style.getPropertyPriority(prop) !== 'important') {
+            el.style.setProperty(prop, value, 'important');
+        }
+    }
+
     function applyLibraryNavItemVisibility(navItem) {
         if (!navItem || !navItem.style) return;
-        try { navItem.removeAttribute('data-hidden'); } catch (e0) { }
+        try { if (navItem.hasAttribute('data-hidden')) navItem.removeAttribute('data-hidden'); } catch (e0) { }
         try {
-            if (navItem.classList) navItem.classList.remove('d2l-hidden');
+            if (navItem.classList && navItem.classList.contains('d2l-hidden')) navItem.classList.remove('d2l-hidden');
         } catch (e1) { }
-        navItem.style.setProperty('display', 'block', 'important');
-        navItem.style.setProperty('visibility', 'visible', 'important');
-        navItem.style.setProperty('opacity', '1', 'important');
-        navItem.style.setProperty('flex', '0 0 auto', 'important');
-        navItem.style.setProperty('white-space', 'nowrap', 'important');
+        setNavStyleIfChanged(navItem, 'display', 'block');
+        setNavStyleIfChanged(navItem, 'visibility', 'visible');
+        setNavStyleIfChanged(navItem, 'opacity', '1');
+        setNavStyleIfChanged(navItem, 'flex', '0 0 auto');
+        setNavStyleIfChanged(navItem, 'white-space', 'nowrap');
 
         try {
             navItem.querySelectorAll('a, button, span').forEach(function (el) {
                 if (!el || !el.style) return;
-                el.style.setProperty('visibility', 'visible', 'important');
-                el.style.setProperty('opacity', '1', 'important');
+                setNavStyleIfChanged(el, 'visibility', 'visible');
+                setNavStyleIfChanged(el, 'opacity', '1');
                 if (el.matches && el.matches('a, button')) {
-                    el.style.setProperty('white-space', 'nowrap', 'important');
+                    setNavStyleIfChanged(el, 'white-space', 'nowrap');
                 }
             });
         } catch (e2) { }
@@ -296,6 +305,31 @@
         );
     }
 
+    // The page's own overflow values while the panel has scrolling locked. Kept in this
+    // module: the shared UI state only stores the keys it knows, so a scroll lock saved
+    // there was dropped and closing the panel left the page unable to scroll.
+    var _libraryScrollLock = null;
+
+    function lockPageScroll() {
+        if (_libraryScrollLock) return;
+        _libraryScrollLock = {
+            html: document.documentElement.style.overflow,
+            body: document.body ? document.body.style.overflow : ''
+        };
+        document.documentElement.style.overflow = 'hidden';
+        if (document.body) document.body.style.overflow = 'hidden';
+    }
+
+    function unlockPageScroll() {
+        if (!_libraryScrollLock) return;
+        var saved = _libraryScrollLock;
+        _libraryScrollLock = null;
+        try {
+            document.documentElement.style.overflow = saved.html;
+            if (document.body) document.body.style.overflow = saved.body;
+        } catch (eScroll) { }
+    }
+
     function hideLibraryPanel() {
         var overlay = document.querySelector('.dtu-library-modal-overlay');
         if (overlay) overlay.remove();
@@ -311,13 +345,8 @@
         if (state.occupancyAutoTimer) {
             clearInterval(state.occupancyAutoTimer);
         }
-        if (state.scrollLock) {
-            try {
-                document.documentElement.style.overflow = state.scrollLock.html;
-                document.body.style.overflow = state.scrollLock.body;
-            } catch (eScroll) { }
-        }
-        writeState({ escHandler: null, occupancyAutoTimer: null, scrollLock: null });
+        unlockPageScroll();
+        writeState({ escHandler: null, occupancyAutoTimer: null });
 
         deepQueryAll('.dtu-library-nav-item .d2l-dropdown-opener[aria-expanded="true"]', document).forEach(function (btn) {
             btn.setAttribute('aria-expanded', 'false');
@@ -542,12 +571,8 @@
             }
         };
         document.addEventListener('keydown', escHandler, true);
-        writeState({
-            escHandler: escHandler,
-            scrollLock: { html: document.documentElement.style.overflow, body: document.body.style.overflow }
-        });
-        document.documentElement.style.overflow = 'hidden';
-        document.body.style.overflow = 'hidden';
+        writeState({ escHandler: escHandler });
+        lockPageScroll();
 
         var header = document.createElement('div');
         header.className = 'dtu-library-header';

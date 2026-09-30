@@ -76,3 +76,48 @@ test('the linker is disabled inside the Brightspace CDN frame', () => {
     });
     assert.equal(cdn.api.isSmartRoomLinkerAllowedOnHost(), false);
 });
+
+test('link text is the room itself: no trailing space, next word not swallowed', () => {
+    const m = plain(api.getSmartRoomMatches('We will be using auditorium B116-A081 and B116-A83 for the lecture.'));
+    assert.deepEqual(m.map((x) => x.text), ['B116-A081', 'B116-A83']);
+    const text = 'Meet in B116-A081 and then 306-031.';
+    for (const x of plain(api.getSmartRoomMatches(text))) assert.equal(text.slice(x.start, x.end), x.text);
+    assert.deepEqual(rooms('B116-A081 a room'), ['116/A081']);
+});
+
+function linkerIn(href) {
+    const deps = {
+        isFeatureFlagEnabled: () => true,
+        isTopWindow: () => true,
+        isDTULearnLegacyHeavyCourseToolPage: () => /\/d2l\/lms\/(dropbox|classlist|group|news)\//.test(new URL(href).pathname)
+    };
+    return loadModuleInternals('darkmode.smart-room-linker.js', ['shouldRunSmartRoomLinkerInThisWindow'], {
+        location: makeLocation(href), DTUAfterDarkSmartRoomLinkerDeps: deps
+    }).api.shouldRunSmartRoomLinkerInThisWindow();
+}
+
+test('runs on announcements, but not on class lists, groups or assignment folders', () => {
+    assert.equal(linkerIn('https://learn.inside.dtu.dk/d2l/lms/news/main.d2l?ou=296283'), true);
+    assert.equal(linkerIn('https://learn.inside.dtu.dk/d2l/lms/classlist/classlist.d2l?ou=1'), false);
+    assert.equal(linkerIn('https://learn.inside.dtu.dk/d2l/lms/dropbox/user/folders_list.d2l?ou=1'), false);
+    assert.equal(linkerIn('https://learn.inside.dtu.dk/d2l/home/296283'), true);
+});
+
+test('text inside another control is left alone', () => {
+    const { api: a } = loadModuleInternals('darkmode.smart-room-linker.js', ['isSmartRoomLinkerSkippableElement'], {
+        location: makeLocation('https://learn.inside.dtu.dk/d2l/home')
+    });
+    const el = (tag, closestHit) => ({ nodeType: 1, tagName: tag, isContentEditable: false, closest: (sel) => (closestHit && sel.includes(closestHit) ? {} : null) });
+    assert.equal(a.isSmartRoomLinkerSkippableElement(el('P', null)), false);
+    assert.equal(a.isSmartRoomLinkerSkippableElement(el('SPAN', '[role="button"]')), true);
+    assert.equal(a.isSmartRoomLinkerSkippableElement(el('SPAN', 'label')), true);
+    assert.equal(a.isSmartRoomLinkerSkippableElement(el('SPAN', '[onclick]')), true);
+    assert.equal(a.isSmartRoomLinkerSkippableElement({ ...el('P', null), isContentEditable: true }), true);
+});
+
+test('ISBN references stay intact for Textbook Links and are never room links', () => {
+    assert.deepEqual(rooms('ISBN 978-0-262-03561-3'), []);
+    assert.deepEqual(rooms('978-0-262-03561-3'), []);
+    assert.deepEqual(rooms('ISBN-10: 0-8044-2957-X'), []);
+    assert.deepEqual(rooms('ISBN 978-0-262-03561-3. Lecture in 306-127.'), ['306/127']);
+});

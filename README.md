@@ -17,15 +17,15 @@ Chrome Web Store: https://chromewebstore.google.com/detail/dtu-after-dark/hemonf
 - Two-tone dark theme across supported DTU sites using `rgb(26,26,26)` and `rgb(45,45,45)`.
 - Accent-color system with preset themes plus custom colors, applied across extension UI and key DTU navigation surfaces.
 - Central settings modal for feature toggles, accent selection, and per-feature edit flows.
-- `Paused URLs...` control for temporarily disabling the extension on specific pages without turning it off everywhere.
+- `Paused URLs...` control for temporarily disabling the extension on specific pages without turning it off everywhere. Its dialog supports Tab, Shift+Tab, Enter to save, and Escape to return to Settings.
 
 ### DTU Learn
 
-- Homepage widgets for live bus departures, upcoming DTU course/exam deadlines, and quick course search. The deadline widget shares Student Information's full-width homepage region above the course columns. Its bounded four-lane academic roadmap shows the current DTU teaching period and the one immediately ahead: January + Spring, Spring + Summer University, Summer University + Fall, or Fall + January. Text-only period headings, quiet month guides, and a DTU-red Today rule share one scale. Solid strokes show date ranges, while short vertical ticks show single-date deadlines; green identifies periods open now and blue identifies upcoming dates. Hovering or focusing a mark shows its deadline name, academic period, and exact date range in a structured tooltip. Narrow layouts show the active period pair and one compact next-date summary per lane.
+- Homepage widgets for live bus departures, upcoming DTU course/exam deadlines, and quick course search. The deadline widget shares Student Information's full-width homepage region above the course columns. It shows six months from the start of the current one, with one row per teaching or exam period (for example Fall 2026, Winter exam 2026, January 2027, Spring 2027). Each row shades when that period runs, as DTU's pages state it, and places its registration, supplementary registration and withdrawal dates on a shared month scale, labelled in place. Every mark is drawn in the selected accent colour, adjusted to at least 4.5:1 against the widget so pale accents stay visible. Supplementary windows are outlined, the open window is slightly thicker with a bold label, and a Today rule runs through every row. The right column says what happens next ("Closes tomorrow", "Opens in 15 days"). Hovering or focusing a mark shows its deadline name, explanation, academic period and exact dates. Narrow layouts list each period's dates as text.
 - Bus departures with multi-campus support (`DTU Lyngby`, `DTU Ballerup`, `DTU Risø`), per-line direction filters, caching, and automatic refresh.
 - Library panel with live occupancy, crowding trends, upcoming events, news, and quick-access links.
 - Course-card `Content` shortcut with optional custom destinations managed in a simple inline editor.
-- Course content download tools for Lessons pages, including section picking and optional single-ZIP bundling.
+- Course content download tools for Lessons pages, including section picking and optional single-ZIP bundling. Cancel also stops section preparation; switching the feature off or leaving the page prevents pending preparation from starting more requests.
 - Textbook Links that detect textbook references on Learn pages and link out to relevant sources (shared with the kurser.dtu.dk literature linker).
 - Smart Room Links that turn room mentions into click-to-resolve MazeMap links.
 
@@ -33,7 +33,7 @@ Chrome Web Store: https://chromewebstore.google.com/detail/dtu-after-dark/hemonf
 
 - GPA toolkit on the Grades page: weighted GPA, projected GPA simulation, and ignore/restore controls for official grade rows.
 - Participant intelligence features (opt-in): course composition, shared course history, and a visible Retention Radar summary on CampusNet participant pages.
-- Dark mode and accent cleanup across Grades, courses, groups, participant pages, and other student-facing CampusNet views.
+- Dark mode and accent cleanup across Grades, courses, groups, participant pages, and other student-facing CampusNet views. My courses and groups uses dark menu bodies with accent headings, matching Toolbox.
 
 ### Study Planner
 
@@ -42,8 +42,8 @@ Chrome Web Store: https://chromewebstore.google.com/detail/dtu-after-dark/hemonf
 ### kurser.dtu.dk and course info
 
 - Grades and student evaluation side by side on kurser.dtu.dk course pages. Grades open on the course's main exam, not a small re-exam sitting; buttons switch between the last four exams, and an info note explains small sittings and exams that mix grades with pass/fail. New courses show a single "nothing yet" line.
-- Student evaluation next to the grades: overall score, response rate, the five satisfaction questions, workload, and a link to the full evaluation.
-- Textbook Links that parse course literature sections and add direct library and book-source links (same module and toggle as the Learn book finder).
+- Student evaluation next to the grades: overall score, response rate, the five satisfaction questions, workload, and a link to the full evaluation. Failed requests show unavailable and wait 10 minutes before retrying; switching the feature off cancels retries.
+- Textbook Links that parse course literature sections and add direct library and book-source links (same module and toggle as the Learn book finder). A title and its following ISBN share one set of links, with searches using the ISBN.
 - Smart room linking for recognizable building/room mentions on supported pages.
 
 ### Integrations and data sources

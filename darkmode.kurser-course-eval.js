@@ -79,6 +79,8 @@
             pruneCourseWidgetsGrid();
             _courseEvalRequested = false;
             _courseEvalCourseCode = null;
+            if (_courseEvalRetryTimer) clearTimeout(_courseEvalRetryTimer);
+            _courseEvalRetryTimer = null;
             return;
         }
         if (!isKurserCoursePage()) return;
@@ -147,9 +149,17 @@
 
         status.textContent = 'Loading evaluation data...';
 
-        function scheduleCourseEvalRetry(ms) {
+        function isCurrentEvaluationRequest() {
+            return container.isConnected && isFeatureFlagEnabled(getFeatureKurserCourseEvalKey())
+                && getKurserCourseCode() === courseCode;
+        }
+
+        function scheduleCourseEvalRetry(ms, isCookieFallback) {
+            if (!isCurrentEvaluationRequest()) return;
             _courseEvalRequested = false;
-            var delay = ms || 5000;
+            // One short retry permits the existing cookie fallback after page load.
+            // Repeated network failures wait ten minutes while the page is open.
+            var delay = isCookieFallback ? Math.max(ms || 900, 900) : Math.max(ms || 600000, 600000);
             try { container.setAttribute('data-dtu-course-eval-nexttry', String(Date.now() + delay)); } catch (e) { }
 
             try {
@@ -163,6 +173,7 @@
         }
 
         function fetchAndRenderEvaluation(latestEvalUrl, latestEvalLabel) {
+            if (!isCurrentEvaluationRequest()) return;
             if (!latestEvalUrl) {
                 status = renderCourseEvalEmpty(container);
                 scheduleCourseEvalRetry(8000);
@@ -173,9 +184,10 @@
                 type: 'dtu-course-evaluation',
                 url: latestEvalUrl
             }, function (response) {
+                if (!isCurrentEvaluationRequest()) return;
                 if (!response || !response.ok || !response.data) {
                     var reason = (response && response.error) ? response.error : 'unknown';
-                    status.textContent = 'No evaluation data available';
+                    status.textContent = 'Evaluation data unavailable. Retrying in 10 minutes.';
                     console.log('[DTU After Dark] Course eval: background fetch failed', reason, response);
                     scheduleCourseEvalRetry(12000);
                     return;
@@ -238,7 +250,7 @@
 
         if (infoFetchCreds !== 'omit' && document.readyState !== 'complete') {
             status.textContent = 'Waiting for page to finish loading...';
-            scheduleCourseEvalRetry(900);
+            scheduleCourseEvalRetry(900, true);
             return;
         }
 
@@ -251,6 +263,7 @@
                 return res.text();
             })
             .then(function (infoHtml) {
+                if (!isCurrentEvaluationRequest()) return;
                 function normalizeEvalHref(href) {
                     href = String(href || '').trim();
                     if (!href) return null;
@@ -269,6 +282,8 @@
 
                 function pushEvalLink(url, text) {
                     if (!url) return;
+                    var match = String(url).match(/\/kursus\/(\d+)\//i);
+                    if (!match || match[1] !== courseCode) return;
                     var cleanText = String(text || '').replace(/\s+/g, ' ').trim();
                     if (!cleanText) cleanText = 'Evaluation results';
                     evalLinks.push({ url: url, text: cleanText });
@@ -335,18 +350,20 @@
 
                 if (!bestEval) {
                     var htmlLen = infoHtml ? infoHtml.length : 0;
-                    var looksSuspicious = htmlLen > 0 && htmlLen < 1500;
+                    var looksSuspicious = htmlLen < 1500;
 
                     if (infoFetchCreds === 'omit' && looksSuspicious && !container.getAttribute('data-dtu-course-eval-cookie-tried')) {
                         container.setAttribute('data-dtu-course-eval-cookie-tried', '1');
                         container.setAttribute('data-dtu-course-eval-info-cred', 'same-origin');
                         status.textContent = 'Loading evaluation data...';
                         console.log('[DTU After Dark] Course eval: /info response looked suspicious (len:', htmlLen, ') - retrying with cookies after load for', courseCode);
-                        scheduleCourseEvalRetry(document.readyState === 'complete' ? 1600 : 2600);
+                        scheduleCourseEvalRetry(document.readyState === 'complete' ? 1600 : 2600, true);
                         return;
                     }
 
-                    status = renderCourseEvalEmpty(container);
+                    status = looksSuspicious
+                        ? renderCourseEvalShell(container, 'Evaluation data unavailable. Retrying in 10 minutes.')
+                        : renderCourseEvalEmpty(container);
                     console.log('[DTU After Dark] Course eval: no eval links found in /info page for', courseCode, '(html length:', htmlLen, ', creds:', infoFetchCreds, ')');
                     if (looksSuspicious) scheduleCourseEvalRetry(8000);
                     return;
@@ -359,7 +376,8 @@
                 fetchAndRenderEvaluation(latestEvalUrl, latestEvalLabel);
             })
             .catch(function (err) {
-                status.textContent = 'Could not load evaluation data';
+                if (!isCurrentEvaluationRequest()) return;
+                status.textContent = 'Evaluation data unavailable. Retrying in 10 minutes.';
                 console.log('[DTU After Dark] Course eval error:', err && err.message || err);
                 scheduleCourseEvalRetry(8000);
             });

@@ -35,7 +35,7 @@ A static audit of `manifest.json`, `manifest_chrome.json`, `background.js`, `dar
 
 DTU After Dark does **not** sell personal data and does **not** send personal data to advertising, analytics, or telemetry vendors.
 
-The public extension operates locally in your browser and stores settings/caches needed for features. It does not send heartbeat or usage telemetry. Participant Intelligence is disabled by default. If you enable it in Settings, the extension stores participant metadata locally for overlap and history features; nothing is collected while it is off.
+The public extension operates locally in your browser and stores settings/caches needed for features. It does not send heartbeat or usage telemetry. Participant Intelligence is disabled by default. If you enable it in Settings, the extension stores participant metadata locally for overlap and history features; nothing is collected while it is off. Pending reads re-check the setting before collecting participant metadata or drawing panels. Switching Participant Intelligence or Shared Course History off stops archive scans; an already requested response is discarded. Pending archive-widget reads and scanner controls re-check both settings before writing course history.
 
 ## What Is Stored Locally
 
@@ -78,6 +78,10 @@ Note: origin-scoped `localStorage` keys can be readable by scripts running on th
   - `https://student.dtu.dk/*`
   - `https://www.dtu.dk/*`
   - `https://www.bibliotek.dtu.dk/*`
+
+Grade Statistics uses anonymous public DTU requests. A failed request is not cached as an empty course; while its course page remains open, the extension waits 10 minutes before retrying. Switching the feature off cancels that retry.
+
+Course Evaluation waits 10 minutes after repeated fetch failures while its course page remains open. Switching the feature off cancels pending retries and discards late responses before rendering or starting another lookup.
 
 Public builds do not contact any usage or heartbeat endpoint. Optional private live-data overrides are not part of the tracked public release.
 

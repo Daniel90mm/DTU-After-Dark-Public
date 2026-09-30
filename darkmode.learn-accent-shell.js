@@ -53,7 +53,7 @@
         el.style.setProperty('background', 'var(--dtu-ad-accent-deep)', 'important');
         el.style.setProperty('background-color', 'var(--dtu-ad-accent-deep)', 'important');
         el.style.setProperty('background-image', 'none', 'important');
-        el.style.setProperty('color', '#ffffff', 'important');
+        el.style.setProperty('color', 'var(--dtu-ad-accent-deep-on, #ffffff)', 'important');
     }
 
     function forceDTULearnNavigationBandAccentElements(root) {
@@ -159,6 +159,7 @@
 
         var darkModeEnabled = isDarkModeEnabled();
         var badgeBg = darkModeEnabled ? 'var(--dtu-ad-accent)' : 'var(--dtu-ad-accent-deep)';
+        var badgeText = darkModeEnabled ? 'var(--dtu-ad-accent-on, #ffffff)' : 'var(--dtu-ad-accent-deep-on, #ffffff)';
         var w2dBadgeBg = getResolvedAccent();
         var w2dBadgeText = getContrastTextForHex(w2dBadgeBg, '#ffffff', '#000000');
         var dark1 = '#1a1a1a';
@@ -238,7 +239,7 @@
                 el.style.setProperty('background', badgeBg, 'important');
                 el.style.setProperty('background-color', badgeBg, 'important');
                 el.style.setProperty('background-image', 'none', 'important');
-                el.style.setProperty('color', '#ffffff', 'important');
+                el.style.setProperty('color', badgeText, 'important');
                 el.style.setProperty('border-color', '#ffffff', 'important');
                 el.style.setProperty('border', '0', 'important');
                 el.style.setProperty('outline', '0', 'important');
@@ -248,7 +249,7 @@
                 if (!el || !el.style) return;
                 el.style.setProperty('background', 'transparent', 'important');
                 el.style.setProperty('background-color', 'transparent', 'important');
-                el.style.setProperty('color', '#ffffff', 'important');
+                el.style.setProperty('color', badgeText, 'important');
             });
             root.querySelectorAll('.d2l-labs-navigation-notification-icon-indicator').forEach(function (el) {
                 if (!el || !el.style) return;

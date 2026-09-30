@@ -51,6 +51,7 @@
     // their full shadow-DOM walks -- which is every mutation batch on pages that
     // have no lessons UI at all, such as /d2l/home.
     let _lessonsBulkUiInserted = false;
+    var _lessonsBulkBootstrapTimer = null;
 
     let _lessonsBulkUiState = {
         sections: [],
@@ -159,8 +160,8 @@
             + 'background:' + btnBg + ';color:' + mutedColor + ';border:1px solid rgba(var(--dtu-ad-accent-rgb),0.45);'
             + 'opacity:0.74;transition:opacity .12s ease,color .12s ease,border-color .12s ease;'
             + '}'
-            + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-toggle:hover{opacity:1;color:var(--dtu-ad-accent);border-color:var(--dtu-ad-accent);}'
-            + '#' + LESSONS_BULK_ROOT_ID + '.dtu-open .dtu-lbd-toggle{opacity:1;color:var(--dtu-ad-accent);border-color:var(--dtu-ad-accent);}'
+            + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-toggle:hover{opacity:1;color:var(--dtu-ad-accent-text, var(--dtu-ad-accent));border-color:var(--dtu-ad-accent);}'
+            + '#' + LESSONS_BULK_ROOT_ID + '.dtu-open .dtu-lbd-toggle{opacity:1;color:var(--dtu-ad-accent-text, var(--dtu-ad-accent));border-color:var(--dtu-ad-accent);}'
             + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-panel{display:none;'
             + 'min-width:0;max-width:100%;width:100%;'
             + 'padding:10px 10px 9px;border-radius:10px;'
@@ -192,8 +193,8 @@
             + 'font-size:11px;line-height:1;padding:5px 8px;border-radius:8px;cursor:pointer;'
             + 'border:1px solid ' + panelBorder + ';background:' + btnBg + ';color:' + textColor + ';'
             + '}'
-            + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-mini:hover{border-color:var(--dtu-ad-accent);color:var(--dtu-ad-accent);}'
-            + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-run{background:var(--dtu-ad-accent-deep);border-color:var(--dtu-ad-accent-deep);color:#fff;font-weight:700;}'
+            + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-mini:hover{border-color:var(--dtu-ad-accent);color:var(--dtu-ad-accent-text, var(--dtu-ad-accent));}'
+            + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-run{background:var(--dtu-ad-accent-deep);border-color:var(--dtu-ad-accent-deep);color:var(--dtu-ad-accent-deep-on, #ffffff);font-weight:700;}'
             + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-run:hover{background:var(--dtu-ad-accent-deep-hover);border-color:var(--dtu-ad-accent-deep-hover);}'
             + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-run:disabled,'
             + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-mini:disabled{opacity:0.55;cursor:not-allowed;}'
@@ -3075,7 +3076,7 @@
         var color = '';
         if (tone === 'error') color = isDarkModeEnabled() ? '#ff9fa4' : '#a8202a';
         else if (tone === 'ok') color = isDarkModeEnabled() ? '#79d39a' : '#0c7a39';
-        else if (tone === 'work') color = isDarkModeEnabled() ? 'var(--dtu-ad-accent-soft)' : 'var(--dtu-ad-accent-deep)';
+        else if (tone === 'work') color = isDarkModeEnabled() ? 'var(--dtu-ad-accent-soft)' : 'var(--dtu-ad-accent-deep-text, var(--dtu-ad-accent-deep))';
         status.style.color = color || '';
     }
 
@@ -3101,116 +3102,129 @@
     }
 
     async function runLessonsBulkDownload(rootEl) {
-        if (!rootEl || _lessonsBulkUiState.running) return;
+        if (!rootEl || _lessonsBulkUiState.running || _lessonsBulkRunAbort) return;
         if (!isLessonsBulkDownloadEnabled()) return;
         if (!isDTULearnLessonsPage()) return;
-        _lessonsBulkUiState.activeDoc = (rootEl && rootEl.ownerDocument) ? rootEl.ownerDocument : getLessonsWorkingDocument(document);
-        _lessonsBulkUrlNameHints = new Map();
-        if (isLegacyLessonsTreeDocument(_lessonsBulkUiState.activeDoc)) {
-            maybeStartLegacyApiSectionsHydration(_lessonsBulkUiState.activeDoc, rootEl);
-            var legacyOrgUnitId = getCurrentLessonsOrgUnitId(_lessonsBulkUiState.activeDoc);
-            if (legacyOrgUnitId && _lessonsLegacyApiSectionsCache.orgUnitId === legacyOrgUnitId && _lessonsLegacyApiSectionsCache.promise) {
-                setLessonsBulkStatus(rootEl, 'Scanning full content tree for section folders...', 'work');
-                try {
-                    await _lessonsLegacyApiSectionsCache.promise;
-                } catch (eLbdHyd0) { }
-                refreshLessonsBulkDownloadUi(rootEl, true);
-            }
-        }
-
-        var selectedKeys = [];
-        rootEl.querySelectorAll('.dtu-lbd-list input[type="checkbox"][data-section-key]').forEach(function (cb) {
-            if (cb.checked) selectedKeys.push(cb.getAttribute('data-section-key'));
-        });
-
-        if (!selectedKeys.length) {
-            setLessonsBulkStatus(rootEl, 'Select at least one section first.', 'error');
-            return;
-        }
-
-        var byKey = {};
-        (_lessonsBulkUiState.sections || []).forEach(function (section) {
-            byKey[section.key] = section;
-        });
-
-        if (isLegacyLessonsTreeDocument(_lessonsBulkUiState.activeDoc)) {
-            var legacyResolvedAny = false;
-            var hiddenSectionsFallback = null;
-            for (var sk = 0; sk < selectedKeys.length; sk++) {
-                var sectionToResolve = byKey[selectedKeys[sk]];
-                if (!sectionToResolve) continue;
-                var currentUrls = Array.isArray(sectionToResolve.unitUrls) ? sectionToResolve.unitUrls : [];
-                var looksCollapsedOnly = legacySectionHasOnlyUnitUrls(sectionToResolve);
-                if (!looksCollapsedOnly) continue;
-
-                setLessonsBulkStatus(
-                    rootEl,
-                    'Resolving nested topics for "' + (sectionToResolve.label || 'section') + '" (' + (sk + 1) + ' / ' + selectedKeys.length + ')...',
-                    'work'
-                );
-                var resolvedUrls = await resolveLegacySectionUnitUrlsViaHiddenFrame(sectionToResolve, _lessonsBulkUiState.activeDoc);
-                var resolvedOnlyUnits = legacySectionHasOnlyUnitUrls({ unitUrls: Array.isArray(resolvedUrls) ? resolvedUrls : [] });
-                if ((!resolvedUrls || !resolvedUrls.length || resolvedOnlyUnits) && looksCollapsedOnly) {
-                    if (!hiddenSectionsFallback) {
-                        hiddenSectionsFallback = await buildLegacySectionsViaHiddenFrame(_lessonsBulkUiState.activeDoc);
-                    }
-                    if (hiddenSectionsFallback && hiddenSectionsFallback.length) {
-                        var wantedId = parseLegacySectionObjectId(sectionToResolve);
-                        var matched = hiddenSectionsFallback.find(function (s) {
-                            return parseLegacySectionObjectId(s) === wantedId;
-                        });
-                        if (matched && Array.isArray(matched.unitUrls) && matched.unitUrls.length) {
-                            resolvedUrls = matched.unitUrls.slice();
-                        }
-                    }
-                }
-                if (resolvedUrls && resolvedUrls.length) {
-                    var beforeCount = currentUrls.length;
-                    applyResolvedUrlsToLegacySections(String(sectionToResolve.key || ''), resolvedUrls);
-                    _lessonsLegacyBackgroundResolveState.resolvedKeys.add(String(sectionToResolve.key || ''));
-                    if (resolvedUrls.length !== beforeCount || looksCollapsedOnly) legacyResolvedAny = true;
-                }
-            }
-            if (legacyResolvedAny) {
-                _lessonsBulkUiState.sig = '';
-                refreshLessonsBulkDownloadUi(rootEl, true);
-            }
-        }
-
-        var unitUrlSet = new Set();
-        selectedKeys.forEach(function (key) {
-            var section = byKey[key];
-            if (!section || !Array.isArray(section.unitUrls)) return;
-            sanitizeLessonsSectionUnitUrls(section.unitUrls).forEach(function (u) { unitUrlSet.add(u); });
-        });
-
-        var unitUrls = Array.from(unitUrlSet);
-        logLessonsBulkDebug('run_start', {
-            selectedKeys: selectedKeys,
-            selectedCount: selectedKeys.length,
-            unitCount: unitUrls.length,
-            unitUrls: unitUrls
-        });
-        if (!unitUrls.length) {
-            setLessonsBulkStatus(rootEl, 'No lesson pages found in selected sections.', 'error');
-            return;
-        }
-
-        if (unitUrls.length > 180) {
-            var proceed = window.confirm(
-                'This will scan ' + unitUrls.length
-                + ' lesson pages and may trigger many downloads. Continue?'
-            );
-            if (!proceed) return;
-        }
-
         _lessonsBulkUiState.running = true;
         _lessonsBulkRunAbort = new AbortController();
         _lessonsBulkZipPartsSaved = 0;
         setLessonsBulkControlsDisabled(rootEl, true);
-        setLessonsBulkStatus(rootEl, 'Reading course contents...', 'work');
+
+        function ensureCurrentRun() {
+            if (!isLessonsBulkDownloadEnabled() || !isDTULearnLessonsPage() || rootEl.isConnected === false) {
+                cancelLessonsBulkRun();
+            }
+            throwIfLessonsBulkAborted();
+        }
 
         try {
+            ensureCurrentRun();
+            _lessonsBulkUiState.activeDoc = (rootEl && rootEl.ownerDocument) ? rootEl.ownerDocument : getLessonsWorkingDocument(document);
+            _lessonsBulkUrlNameHints = new Map();
+            if (isLegacyLessonsTreeDocument(_lessonsBulkUiState.activeDoc)) {
+                maybeStartLegacyApiSectionsHydration(_lessonsBulkUiState.activeDoc, rootEl);
+                var legacyOrgUnitId = getCurrentLessonsOrgUnitId(_lessonsBulkUiState.activeDoc);
+                if (legacyOrgUnitId && _lessonsLegacyApiSectionsCache.orgUnitId === legacyOrgUnitId && _lessonsLegacyApiSectionsCache.promise) {
+                    setLessonsBulkStatus(rootEl, 'Scanning full content tree for section folders...', 'work');
+                    try {
+                        await _lessonsLegacyApiSectionsCache.promise;
+                    } catch (eLbdHyd0) { }
+                    ensureCurrentRun();
+                    refreshLessonsBulkDownloadUi(rootEl, true);
+                }
+            }
+
+            var selectedKeys = [];
+            rootEl.querySelectorAll('.dtu-lbd-list input[type="checkbox"][data-section-key]').forEach(function (cb) {
+                if (cb.checked) selectedKeys.push(cb.getAttribute('data-section-key'));
+            });
+
+            if (!selectedKeys.length) {
+                setLessonsBulkStatus(rootEl, 'Select at least one section first.', 'error');
+                return;
+            }
+
+            var byKey = {};
+            (_lessonsBulkUiState.sections || []).forEach(function (section) {
+                byKey[section.key] = section;
+            });
+
+            if (isLegacyLessonsTreeDocument(_lessonsBulkUiState.activeDoc)) {
+                var legacyResolvedAny = false;
+                var hiddenSectionsFallback = null;
+                for (var sk = 0; sk < selectedKeys.length; sk++) {
+                    var sectionToResolve = byKey[selectedKeys[sk]];
+                    if (!sectionToResolve) continue;
+                    var currentUrls = Array.isArray(sectionToResolve.unitUrls) ? sectionToResolve.unitUrls : [];
+                    var looksCollapsedOnly = legacySectionHasOnlyUnitUrls(sectionToResolve);
+                    if (!looksCollapsedOnly) continue;
+
+                    setLessonsBulkStatus(
+                        rootEl,
+                        'Resolving nested topics for "' + (sectionToResolve.label || 'section') + '" (' + (sk + 1) + ' / ' + selectedKeys.length + ')...',
+                        'work'
+                    );
+                    var resolvedUrls = await resolveLegacySectionUnitUrlsViaHiddenFrame(sectionToResolve, _lessonsBulkUiState.activeDoc);
+                    ensureCurrentRun();
+                    var resolvedOnlyUnits = legacySectionHasOnlyUnitUrls({ unitUrls: Array.isArray(resolvedUrls) ? resolvedUrls : [] });
+                    if ((!resolvedUrls || !resolvedUrls.length || resolvedOnlyUnits) && looksCollapsedOnly) {
+                        if (!hiddenSectionsFallback) {
+                            hiddenSectionsFallback = await buildLegacySectionsViaHiddenFrame(_lessonsBulkUiState.activeDoc);
+                            ensureCurrentRun();
+                        }
+                        if (hiddenSectionsFallback && hiddenSectionsFallback.length) {
+                            var wantedId = parseLegacySectionObjectId(sectionToResolve);
+                            var matched = hiddenSectionsFallback.find(function (s) {
+                                return parseLegacySectionObjectId(s) === wantedId;
+                            });
+                            if (matched && Array.isArray(matched.unitUrls) && matched.unitUrls.length) {
+                                resolvedUrls = matched.unitUrls.slice();
+                            }
+                        }
+                    }
+                    if (resolvedUrls && resolvedUrls.length) {
+                        var beforeCount = currentUrls.length;
+                        applyResolvedUrlsToLegacySections(String(sectionToResolve.key || ''), resolvedUrls);
+                        _lessonsLegacyBackgroundResolveState.resolvedKeys.add(String(sectionToResolve.key || ''));
+                        if (resolvedUrls.length !== beforeCount || looksCollapsedOnly) legacyResolvedAny = true;
+                    }
+                }
+                if (legacyResolvedAny) {
+                    _lessonsBulkUiState.sig = '';
+                    refreshLessonsBulkDownloadUi(rootEl, true);
+                }
+            }
+
+            var unitUrlSet = new Set();
+            selectedKeys.forEach(function (key) {
+                var section = byKey[key];
+                if (!section || !Array.isArray(section.unitUrls)) return;
+                sanitizeLessonsSectionUnitUrls(section.unitUrls).forEach(function (u) { unitUrlSet.add(u); });
+            });
+
+            var unitUrls = Array.from(unitUrlSet);
+            logLessonsBulkDebug('run_start', {
+                selectedKeys: selectedKeys,
+                selectedCount: selectedKeys.length,
+                unitCount: unitUrls.length,
+                unitUrls: unitUrls
+            });
+            if (!unitUrls.length) {
+                setLessonsBulkStatus(rootEl, 'No lesson pages found in selected sections.', 'error');
+                return;
+            }
+
+            if (unitUrls.length > 180) {
+                var proceed = window.confirm(
+                    'This will scan ' + unitUrls.length
+                    + ' lesson pages and may trigger many downloads. Continue?'
+                );
+                if (!proceed) return;
+            }
+
+            ensureCurrentRun();
+            setLessonsBulkStatus(rootEl, 'Reading course contents...', 'work');
+
             var tocOrgUnitId = getCurrentLessonsOrgUnitId(_lessonsBulkUiState.activeDoc);
             if (!tocOrgUnitId) {
                 var firstIds = parseLessonsTopicIds(unitUrls[0]);
@@ -3823,6 +3837,26 @@
         if (shouldRefresh) refreshLessonsBulkDownloadUi(root, false);
     }
 
+    // The Lessons iframe can mount its shadow TOC after the outer page becomes
+    // idle. Its mutations do not wake the top document's observer.
+    function scheduleLessonsBulkBootstrap() {
+        if (_lessonsBulkUiInserted || _lessonsBulkBootstrapTimer) return;
+        var attempts = 0;
+        _lessonsBulkBootstrapTimer = setInterval(function () {
+            if (!isLessonsBulkDownloadEnabled() || !isDTULearnLessonsPage()) {
+                clearInterval(_lessonsBulkBootstrapTimer);
+                _lessonsBulkBootstrapTimer = null;
+                return;
+            }
+            attempts++;
+            insertLessonsBulkDownloadControl();
+            if (_lessonsBulkUiInserted || attempts >= 60) {
+                clearInterval(_lessonsBulkBootstrapTimer);
+                _lessonsBulkBootstrapTimer = null;
+            }
+        }, 400);
+    }
+
     function runLessonsBulkDownloadChecks() {
         if (!isTopWindow()) return;
         if (window.location.hostname !== 'learn.inside.dtu.dk') return;
@@ -3830,8 +3864,10 @@
             removeLessonsBulkDownloadControl();
             return;
         }
-        if (isDTULearnLessonsPage()) insertLessonsBulkDownloadControl();
-        else removeLessonsBulkDownloadControl();
+        if (isDTULearnLessonsPage()) {
+            insertLessonsBulkDownloadControl();
+            scheduleLessonsBulkBootstrap();
+        } else removeLessonsBulkDownloadControl();
     }
 
     try {

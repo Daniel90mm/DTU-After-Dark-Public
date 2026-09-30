@@ -112,7 +112,7 @@
                 btn.style.setProperty('appearance', 'none', 'important');
                 btn.style.setProperty('-webkit-appearance', 'none', 'important');
                 btn.style.setProperty('color', selected
-                    ? (isDark ? 'var(--dtu-ad-accent-soft)' : 'var(--dtu-ad-accent-deep)')
+                    ? (isDark ? 'var(--dtu-ad-accent-soft)' : 'var(--dtu-ad-accent-deep-text, var(--dtu-ad-accent-deep))')
                     : (isDark ? '#f2f2f2' : '#2f2f2f'), 'important');
                 btn.title = option.entry.text || option.entry.dateLabel || '';
                 btn.addEventListener('click', function () {
@@ -579,7 +579,7 @@
             deps.markExt(state);
             state.textContent = entry && entry.id ? 'Custom' : 'New';
             state.style.cssText = 'font-size:11px;font-weight:700;';
-            state.style.setProperty('color', isDark ? 'var(--dtu-ad-accent-soft)' : 'var(--dtu-ad-accent-deep)', 'important');
+            state.style.setProperty('color', isDark ? 'var(--dtu-ad-accent-soft)' : 'var(--dtu-ad-accent-deep-text, var(--dtu-ad-accent-deep))', 'important');
             meta.appendChild(state);
             card.appendChild(meta);
 
@@ -1050,7 +1050,7 @@
                     + 'text-transform:uppercase;letter-spacing:0.08em;margin-bottom:1px;width:fit-content;';
                 heroBadge.style.setProperty('background', 'transparent', 'important');
                 heroBadge.style.setProperty('background-color', 'transparent', 'important');
-                heroBadge.style.setProperty('color', 'var(--dtu-ad-accent)', 'important');
+                heroBadge.style.setProperty('color', 'var(--dtu-ad-accent-text, var(--dtu-ad-accent))', 'important');
                 left.appendChild(heroBadge);
             }
 
@@ -1088,7 +1088,7 @@
                 var cdText = nextItem.daysUntil === 0 ? 'Today' : (nextItem.daysUntil + 'd');
                 countdown.textContent = cdText;
                 countdown.style.cssText = 'font-weight:800;font-size:22px;line-height:1;';
-                countdown.style.setProperty('color', 'var(--dtu-ad-accent)', 'important');
+                countdown.style.setProperty('color', 'var(--dtu-ad-accent-text, var(--dtu-ad-accent))', 'important');
                 right.appendChild(countdown);
 
                 var countdownLabel = document.createElement('div');
