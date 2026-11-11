@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { loadModuleInternals, plain } from './_harness.mjs';
+import { loadModuleInternals, plain, readSource } from './_harness.mjs';
+
+const BACKGROUND_FILES = JSON.parse(readSource('manifest.json')).background.scripts;
 
 function loadBackground({ fetchImpl } = {}) {
     const listeners = [];
@@ -21,18 +23,16 @@ function loadBackground({ fetchImpl } = {}) {
         if (fetchImpl) return fetchImpl(String(url), opts);
         return { ok: false, status: 404, text: async () => '' };
     };
-    const { api } = loadModuleInternals('background.js', [
+    const { api } = loadModuleInternals(BACKGROUND_FILES, [
         'getCourseCodeVariants',
         'parseGradeDistribution',
         'isAllowedFinditUrl',
         'parseDmyDate',
-        'extractExamTokens',
-        'extractCourseCodes',
-        'extractMonthTags',
         'parseStudentDeadlineLine',
         'parseStudentDeadlinesGroupsFromHtml',
-        'parseExamCalendarHtmlWithoutDom',
         'parseEvaluationHtml',
+        'latestEvaluationUrl',
+        'fetchCourseWorkload',
         'stripHtmlTags',
         'roomMatchesItem',
         'pickBestRoomResult',
@@ -41,6 +41,7 @@ function loadBackground({ fetchImpl } = {}) {
         'pickAuditoriumResult',
         'resolveMazemapPoi',
         'sanitizeLibraryTrendApiUrl',
+        'normalizeLibraryCrowdingPayload',
         'parseIntLoose',
         'parseGradePeriodLinks',
         'pickMainGradeIteration',
@@ -243,6 +244,63 @@ test('FindIt fetches are locked to the https catalog page', () => {
     }
 });
 
+function askFindit(bg, url) {
+    return new Promise((resolve) => {
+        bg.listeners[0]({ type: 'dtu-findit-availability', url }, { url: 'https://kurser.dtu.dk/course/02450' }, resolve);
+    });
+}
+
+test('FindIt: "No online access" is not read as online access', async () => {
+    for (const html of [
+        '<section>No online access is available for this title.</section>',
+        '<p>Ingen online adgang</p>',
+        '<p>Not available online</p>'
+    ]) {
+        const bg = loadBackground({ fetchImpl: async () => ({ ok: true, status: 200, text: async () => html }) });
+        const reply = await askFindit(bg, 'https://findit.dtu.dk/en/catalog?q=isbn:9780306406157');
+        assert.equal(reply.ok, true, html);
+        assert.equal(reply.onlineAccess, false, html);
+    }
+    const bg = loadBackground({ fetchImpl: async () => ({ ok: true, status: 200, text: async () => '<a>Online access</a>' }) });
+    assert.equal((await askFindit(bg, 'https://findit.dtu.dk/en/catalog?q=isbn:1')).onlineAccess, true);
+});
+
+test('FindIt: the "I am not a robot" page is unknown, not "no", and is not cached', async () => {
+    const verifyPage = '<title>Verification - DTU Findit</title><p>Please verify</p><p>I am not a robot</p>';
+    const bg = loadBackground({
+        fetchImpl: async () => ({ ok: true, status: 200, url: 'https://findit.dtu.dk/verify?locale=en', text: async () => verifyPage })
+    });
+    const url = 'https://findit.dtu.dk/en/catalog?q=isbn:9780262033848';
+    const reply = await askFindit(bg, url);
+    assert.equal(reply.ok, false);
+    assert.equal(reply.error, 'verification_required');
+    await askFindit(bg, url);
+    assert.equal(bg.fetchCalls.length, 2, 'a verify page is asked again next time');
+});
+
+test('FindIt: different searches never share a cache entry', async () => {
+    const bg = loadBackground({
+        fetchImpl: async (url) => ({ ok: true, status: 200, text: async () => (url.includes('a-b') ? 'Online access' : 'nothing') })
+    });
+    assert.equal((await askFindit(bg, 'https://findit.dtu.dk/en/catalog?q=a-b')).onlineAccess, true);
+    assert.equal((await askFindit(bg, 'https://findit.dtu.dk/en/catalog?q=a_b')).onlineAccess, false);
+    assert.equal(bg.fetchCalls.length, 2);
+});
+
+test('grade stats: a semester that is not Winter-YYYY or Summer-YYYY never reaches the URL', async () => {
+    const bg = loadBackground();
+    await new Promise((resolve) => {
+        bg.listeners[0](
+            { type: 'dtu-grade-stats', courseCode: '01001', semesters: ['Summer-2025/../../evil', 'Winter-2025'] },
+            { url: 'https://kurser.dtu.dk/course/01001' },
+            resolve
+        );
+    });
+    for (const call of bg.fetchCalls) {
+        assert.match(new URL(call.url).pathname, /^\/Histogram\/1\/01001(-1)?\/(Winter|Summer)-\d{4}$/, call.url);
+    }
+});
+
 test('day-month-year dates parse and reject impossible dates', () => {
     assert.deepEqual(plain(api.parseDmyDate('3/12 2026')), { ts: Date.UTC(2026, 11, 3), iso: '2026-12-03' });
     assert.equal(api.parseDmyDate('03.01.2027').iso, '2027-01-03');
@@ -250,12 +308,6 @@ test('day-month-year dates parse and reject impossible dates', () => {
     assert.equal(api.parseDmyDate('31/2 2026'), null);
     assert.equal(api.parseDmyDate('1/13 2026'), null);
     assert.equal(api.parseDmyDate('no date'), null);
-});
-
-test('exam tokens, course codes and month tags extract without duplicates', () => {
-    assert.deepEqual(plain(api.extractExamTokens('E3A, e3-a, F5B and F2')), ['E3-A', 'F5-B', 'F2']);
-    assert.deepEqual(plain(api.extractCourseCodes('02450, 01005 and 02450 again; 123456 is not one')), ['02450', '01005']);
-    assert.deepEqual(plain(api.extractMonthTags('Vintereksamen december, reeksamen')), ['december', 'winter_period', 'reexam']);
 });
 
 test('student deadline lines split label from start and end dates', () => {
@@ -284,30 +336,6 @@ test('student deadline page groups items under their h2 heading', () => {
     assert.equal(groups[0].items[0].endIso, '2026-05-15');
 });
 
-test('exam calendar HTML parses into sorted, de-duplicated entries', () => {
-    const html = `
-        <h2>Winter exam 2026</h2>
-        <table>
-          <tr><th>Date</th><th>Exam</th></tr>
-          <tr><td>14/12 2026</td><td>E1A, E1B</td></tr>
-          <tr><td>11/12 2026</td><td>F2A</td></tr>
-          <tr><td>11/12 2026</td><td>F2A</td></tr>
-          <tr><td>not a date</td><td>E3A</td></tr>
-        </table>`;
-    const result = plain(api.parseExamCalendarHtmlWithoutDom(html, 'https://example'));
-    assert.equal(result.ok, true);
-    assert.deepEqual(result.periodTitles, ['Winter exam 2026']);
-    assert.deepEqual(result.entries.map((e) => [e.dateIso, e.tokens]), [
-        ['2026-12-11', ['F2-A']],
-        ['2026-12-14', ['E1-A', 'E1-B']]
-    ]);
-});
-
-test('exam calendar: tables without a header or exam heading are ignored', () => {
-    const html = '<table><tr><td>14/12 2026</td><td>E1A</td></tr></table>';
-    assert.equal(api.parseExamCalendarHtmlWithoutDom(html, 'x'), null);
-});
-
 test('course evaluation HTML yields stats, Likert averages and workload', () => {
     const option = (label, count) => `<div class="RowWrapper"><div class="FinalEvaluation_Result_OptionColumn">${label}</div><div class="Answer_Result_Background"><span>${count}</span></div></div>`;
     const question = (num, text, options) => `<div class="ResultCourseModelWrapper"><div class="QuestionPositionColumn">${num}</div><div class="FinalEvaluation_QuestionText">${text}</div>${options}<div class="CourseSchemaResultFooter"><span>10</span></div></div>`;
@@ -331,6 +359,8 @@ test('course evaluation HTML yields stats, Likert averages and workload', () => 
     assert.equal(result.questions[0].number, '1.1');
     assert.deepEqual(result.questions[0].options, [{ label: 'Helt enig', count: 6 }, { label: 'Enig', count: 4 }]);
     assert.equal(result.workload.number, '2.1');
+    const later = plain(api.parseEvaluationHtml(html.replace(question('3.1', 'Comments', option('x', 1)), question('2.2', 'Other', option('Meget mere', 9)))));
+    assert.equal(later.workload.number, '2.1', 'a later 2.x question does not replace the workload question');
 });
 
 test('course evaluation: short or question-less pages return null', () => {
@@ -469,4 +499,150 @@ test('grade HTTP failures are not cached as a course with no exams',async()=>{
 test('grade network exceptions propagate as fetch failure',async()=>{
  const bg=loadBackground({fetchImpl:async()=>{throw new Error('offline');}});
  await assert.rejects(bg.api.fetchLatestIterations('34032',['Winter-2025'],4),/offline/);
+});
+
+test('library trends: per-weekday hours and day counts reach the panel, all-days kept as fallback', () => {
+    const row = (hour, avgNow) => ({ hour, avgNow, minNow: 0, maxNow: 99, samples: 12 });
+    const out = plain(api.normalizeLibraryCrowdingPayload({
+        ok: true,
+        trends: {
+            hourly: [row(10, 182)],
+            weekdayHourly: { saturday: [row(10, 27)], monday: [] },
+            weekdayDays: { saturday: 4, monday: 4 },
+            totalSamples: 9999
+        }
+    }));
+    assert.deepEqual(Object.keys(out.historical.weekday_averages).sort(), ['generic', 'saturday']);
+    assert.equal(out.historical.weekday_averages.saturday[0].avg_visitors, 27);
+    assert.equal(out.historical.weekday_averages.generic[0].avg_visitors, 182);
+    assert.deepEqual(out.historical.weekday_days, { saturday: 4, monday: 4 });
+    assert.equal(out.historical.days_collected, 8);
+});
+
+test('library trends from an older worker still give the all-days average', () => {
+    const out = plain(api.normalizeLibraryCrowdingPayload({
+        ok: true,
+        trends: { hourly: [{ hour: 9, avgNow: 93, samples: 60 }], totalSamples: 960 }
+    }));
+    assert.deepEqual(Object.keys(out.historical.weekday_averages), ['generic']);
+    assert.equal(out.historical.weekday_days, undefined);
+    assert.equal(out.historical.days_collected, null);
+});
+
+function sendMessage(listeners, message) {
+    return new Promise((resolve) => {
+        const timer = setTimeout(() => resolve('no_response'), 500);
+        const done = (value) => { clearTimeout(timer); resolve(value); };
+        const sender = { url: 'https://studieplan.dtu.dk/plan' };
+        for (const fn of listeners) fn(message, sender, done);
+    });
+}
+
+test('exam schedule: one canonical exam table URL, no guessing list', () => {
+    const source = readSource('background.exam.js');
+    assert.equal(source.split('https://student.dtu.dk/en/exam/exam-dates').length - 1, 1);
+    assert.equal(source.includes('EXAM_CALENDAR_URLS'), false);
+    assert.equal(source.includes('dtu-exam-calendar'), false);
+});
+
+test('exam schedule: course page requests reject anything but a course number', async () => {
+    const bg = loadBackground();
+    for (const code of ['../x', '0211', '02110/../a', '', null]) {
+        assert.deepEqual(plain(await sendMessage(bg.listeners, { type: 'dtu-course-page', code })), { ok: false, error: 'invalid_course' }, String(code));
+    }
+    assert.equal(bg.fetchCalls.length, 0);
+});
+
+test('exam schedule: table and course page are fetched once, then cached', async () => {
+    const bg = loadBackground({ fetchImpl: async () => ({ ok: true, status: 200, text: async () => '<html>ok</html>' }) });
+    const table = plain(await sendMessage(bg.listeners, { type: 'dtu-exam-table' }));
+    assert.equal(table.ok, true);
+    assert.equal(table.html, '<html>ok</html>');
+    assert.equal(typeof table.fetchedAt, 'number');
+    await sendMessage(bg.listeners, { type: 'dtu-exam-table' });
+    const page = plain(await sendMessage(bg.listeners, { type: 'dtu-course-page', code: '02110' }));
+    assert.equal(page.ok, true);
+    await sendMessage(bg.listeners, { type: 'dtu-course-page', code: '02110' });
+    assert.deepEqual(bg.fetchCalls.map((c) => c.url), ['https://student.dtu.dk/en/exam/exam-dates', 'https://kurser.dtu.dk/course/02110']);
+    assert.equal(bg.fetchCalls[1].opts.credentials, 'include');
+});
+
+test('exam schedule: a course page can be asked for a catalogue year', async () => {
+    const bg = loadBackground({ fetchImpl: async () => ({ ok: true, status: 200, text: async () => '<html>ok</html>' }) });
+    assert.equal(plain(await sendMessage(bg.listeners, { type: 'dtu-course-page', code: '02110', volume: '2027-2028' })).ok, true);
+    await sendMessage(bg.listeners, { type: 'dtu-course-page', code: '02110' });
+    assert.deepEqual(bg.fetchCalls.map((c) => c.url), ['https://kurser.dtu.dk/course/2027-2028/02110', 'https://kurser.dtu.dk/course/02110']);
+    for (const volume of ['2027', '2027-2029', '../x', 7]) {
+        assert.deepEqual(plain(await sendMessage(bg.listeners, { type: 'dtu-course-page', code: '02110', volume })), { ok: false, error: 'invalid_volume' }, String(volume));
+    }
+    assert.equal(bg.fetchCalls.length, 2);
+});
+
+// kurser.dtu.dk's answer when the login session needs renewing (HTTP 200).
+const KURSER_LOGIN_STUB = '<!DOCTYPE html><html><head><title>kurser.dtu.dk</title></head><body><script> setTimeout(function() { window.location.reload(); }, 500); </script><iframe style="display:none" id="loginFrame" src="?forceLogin=true"></iframe></body></html>';
+
+test('exam schedule: a kurser login stub renews the login, asks again, and is never cached', async () => {
+    let first = true;
+    const bg = loadBackground({
+        fetchImpl: async (url) => {
+            if (url.includes('forceLogin')) return { ok: true, status: 200, text: async () => '<html>signed in</html>' };
+            const html = first ? KURSER_LOGIN_STUB : '<html>Date of examination</html>';
+            first = false;
+            return { ok: true, status: 200, text: async () => html };
+        }
+    });
+    const page = plain(await sendMessage(bg.listeners, { type: 'dtu-course-page', code: '12106', volume: '2026-2027' }));
+    assert.equal(page.html, '<html>Date of examination</html>');
+    assert.deepEqual(bg.fetchCalls.map((c) => c.url), [
+        'https://kurser.dtu.dk/course/2026-2027/12106',
+        'https://kurser.dtu.dk/course/2026-2027/12106?forceLogin=true',
+        'https://kurser.dtu.dk/course/2026-2027/12106'
+    ]);
+    await sendMessage(bg.listeners, { type: 'dtu-course-page', code: '12106', volume: '2026-2027' });
+    assert.equal(bg.fetchCalls.length, 3, 'the real page is cached');
+});
+
+test('exam schedule: a login stub that stays is reported, not cached, and a cached stub is not served', async () => {
+    const bg = loadBackground({ fetchImpl: async () => ({ ok: true, status: 200, text: async () => KURSER_LOGIN_STUB }) });
+    assert.deepEqual(plain(await sendMessage(bg.listeners, { type: 'dtu-course-page', code: '12106' })), { ok: false, error: 'login_required' });
+    await sendMessage(bg.listeners, { type: 'dtu-course-page', code: '12106' });
+    assert.equal(bg.fetchCalls.length, 6);
+    // A stub cached by an earlier version is fetched again, not returned.
+    const planted = loadBackground({ fetchImpl: async () => ({ ok: true, status: 200, text: async () => '<html>Date of examination</html>' }) });
+    for (const key of ['cache_course_page_12106']) planted.storage.set(key, { ts: Date.now(), data: { ok: true, html: KURSER_LOGIN_STUB, fetchedAt: Date.now() } });
+    assert.equal(plain(await sendMessage(planted.listeners, { type: 'dtu-course-page', code: '12106' })).html, '<html>Date of examination</html>');
+    assert.equal(planted.fetchCalls.length, 1);
+});
+
+test('exam schedule: failed fetches are reported and not cached', async () => {
+    const bg = loadBackground({ fetchImpl: async () => ({ ok: false, status: 503, text: async () => '' }) });
+    assert.deepEqual(plain(await sendMessage(bg.listeners, { type: 'dtu-exam-table' })), { ok: false, error: 'http_503' });
+    await sendMessage(bg.listeners, { type: 'dtu-exam-table' });
+    assert.equal(bg.fetchCalls.length, 2);
+});
+
+test('grade distribution: a page with no result rows and no DTU marker is unreadable, not "no data"', () => {
+    assert.deepEqual(plain(api.parseGradeDistribution('<h2>01001</h2><div class="new-layout">12: 40</div>')), { unreadable: true });
+    // A registered count with no result rows is DTU hiding a small exam.
+    assert.equal(api.parseGradeDistribution(gradeTable([['Antal tilmeldte', 3]])), null);
+});
+
+test('grade history: pages that exist but cannot be parsed report parse_failed', async () => {
+    const bg = loadBackground({
+        fetchImpl: async (url) => url.endsWith('/Winter-2025')
+            ? { ok: true, status: 200, text: async () => '<h2>01001 Winter-2025</h2><div>redesigned</div>' }
+            : { ok: false, status: 404, text: async () => '' }
+    });
+    const result = plain(await bg.api.fetchLatestIterations('01001', ['Winter-2025', 'Summer-2025'], 4));
+    assert.deepEqual(result, { ok: false, error: 'parse_failed' });
+});
+
+test('the workload lookup picks the newest evaluation of the same course from the info page', async () => {
+    const info = '<a href="https://evaluering.dtu.dk/kursus/34034/318732">E24</a>'
+        + '<a href="//evaluering.dtu.dk/kursus/34034/347314">E25</a>'
+        + '<a href="https://evaluering.dtu.dk/kursus/34032/999999">another course</a>';
+    assert.equal(api.latestEvaluationUrl(info, '34034'), 'https://evaluering.dtu.dk/kursus/34034/347314');
+    assert.equal(api.latestEvaluationUrl('<p>No evaluations</p>', '34034'), null);
+    assert.deepEqual({ ...await api.fetchCourseWorkload('34034', async () => ({ ok: true, html: '<p>none</p>' })) }, { ok: true, none: true });
+    assert.deepEqual({ ...await api.fetchCourseWorkload('34034', async () => ({ ok: false, error: 'login_required' })) }, { ok: false, error: 'info_failed' });
 });

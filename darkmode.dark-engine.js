@@ -57,7 +57,7 @@
     function forceDtuRedBackgroundDark2(el) {
         if (deps.forceDtuRedBackgroundDark2) return deps.forceDtuRedBackgroundDark2(el);
         if (!el || !el.style) return;
-        var color = getResolvedAccentDeep();
+        var color = 'var(--dtu-ad-accent-deep, ' + getResolvedAccentDeep() + ')';
         el.style.setProperty('background', color, 'important');
         el.style.setProperty('background-color', color, 'important');
         el.style.setProperty('background-image', 'none', 'important');
@@ -487,21 +487,27 @@
         } catch (e0) {
             return;
         }
-        cells.forEach(function (cell) {
+        // All style reads first, then all attribute writes: a write between reads
+        // would make the browser recompute styles for every cell.
+        var decisions = cells.map(function (cell) {
             var match;
             try {
                 match = view.getComputedStyle(cell).backgroundColor.match(/^rgba?\(\s*(\d+)\D+(\d+)\D+(\d+)(?:\D+([\d.]+))?/i);
             } catch (e1) {
                 return;
             }
-            if (!match) return;
+            if (!match) return null;
             var alpha = match[4] == null ? 1 : Number(match[4]);
             var channels = [Number(match[1]), Number(match[2]), Number(match[3])].map(function (value) {
                 var channel = value / 255;
                 return channel <= 0.04045 ? channel / 12.92 : Math.pow((channel + 0.055) / 1.055, 2.4);
             });
             var luminance = (0.2126 * channels[0]) + (0.7152 * channels[1]) + (0.0722 * channels[2]);
-            var shouldUseDarkText = alpha >= 0.5 && luminance > 0.18;
+            return alpha >= 0.5 && luminance > 0.18;
+        });
+        cells.forEach(function (cell, i) {
+            var shouldUseDarkText = decisions[i];
+            if (shouldUseDarkText == null) return;
             if (shouldUseDarkText && !cell.hasAttribute('data-dtu-authored-light-bg')) {
                 cell.setAttribute('data-dtu-authored-light-bg', '');
             } else if (!shouldUseDarkText && cell.hasAttribute('data-dtu-authored-light-bg')) {
@@ -1062,6 +1068,9 @@
         .uw-text {
             color: var(--dtu-ad-accent-soft) !important;
         }
+        /* Repeats the light-text rule's :not() list so it outranks it on the
+           cell itself; a plain [marker] selector lost and left grey on white. */
+        div.d2l-html-block-rendered [data-dtu-authored-light-bg]:not(a):not(a *):not([style^="color"]):not([style*="; color"]):not([style*=";color"]),
         .d2l-html-block-rendered [data-dtu-authored-light-bg] {
             color: #202122 !important;
         }
@@ -2618,8 +2627,8 @@
         if (rootNode && rootNode.nodeType === 1) {
             markAuthoredLightTableCells(rootNode, 'td, th');
             if (useBrightspaceShadowDom) {
+                // processElement visits every element the shadow sweep would: one walk is enough.
                 processElement(rootNode);
-                sweepForLateShadowRoots(rootNode);
                 try { replaceLogoImage(rootNode); } catch (eLogoRc) { }
                 try { styleQuizSubmissionHistogram(rootNode); } catch (eQuizRc) { }
             } else {
@@ -2634,7 +2643,7 @@
             pollForMultiselects();
             pollOverrideDynamicStyles();
             if (document.body) processElement(document.body);
-            sweepForLateShadowRoots();
+            else sweepForLateShadowRoots();
             try { replaceLogoImage(); } catch (eLogoRf) { }
             try { styleQuizSubmissionHistogram(); } catch (eQuizRf) { }
         }

@@ -9,6 +9,10 @@ This repo is still centered around a large content script, but the runtime bound
 - `config.js`
   - Safe tracked defaults only.
   - Local-only overrides belong in untracked `config.local.js`.
+- `darkmode.dom.js`
+  - Loads right after `config.js` in every all-frames group. `DTUAfterDarkDom` holds the one copy of
+    `markExt`, `isTopWindow` and `normalizeWhitespace`; modules read them at the top of their IIFE.
+  - Tests get it through the harness (`makeSandbox`, or `loadDom(sandbox)` for a hand-built sandbox).
 - `background.js`
   - Cross-origin fetch broker, caching, and runtime message handlers.
   - Any network-backed feature usually has a message type here first.
@@ -58,18 +62,20 @@ This repo is still centered around a large content script, but the runtime bound
 - `darkmode.kurser-course-eval.js`
   - Extracted `kurser.dtu.dk` course-evaluation shell.
   - Owns evaluation discovery, retry logic, fetch/render flow, and the evaluation panel UI.
+- `darkmode.kurser-course-map.js`
+  - `kurser.dtu.dk` Course map: prerequisite parsing (also used by `scripts/build-course-map-data.mjs`), the map graph, the "Course map" row with its "Show map" button, and the popover.
+  - Reads `course-map-data.json` (built by `scripts/crawl-course-prerequisites.mjs` then `scripts/build-course-map-data.mjs`, once per semester). Courses a current course lists that are no longer in the catalogue are read from the newest older catalogue year that has them (back to 2016-2017) and carry `y`, the last year listed; they never count as courses that build on a current one.
 - `darkmode.textbooks.js`
   - Shared textbook-links module for `kurser.dtu.dk` and DTU Learn.
   - Owns kurser literature detection, citation parsing, FindIt/Google Books link injection, and the Learn course-page ISBN/title book-finder bars, behind one feature flag.
 - `darkmode.lessons-bulk.js`
   - Extracted DTU Learn Lessons bulk-download runtime module.
   - Owns the control lifecycle, section-tree parsing, legacy/API fallback resolution, file discovery, and bundled/native download flow.
-- `darkmode.studyplan-exams.js`
-  - Extracted Study Planner exam-cluster UI shell.
-  - Owns timeline rendering, exam-choice editor modal, and grade countdown badges.
-- `darkmode.studyplan-runtime.js`
-  - Study Planner exam parsing/timeline runtime module.
-  - Owns course extraction, exam-calendar matching, timeline overrides, and render scheduling/state.
+- `darkmode.studyplan-exam-schedule-core.js`
+  - Pure Study Planner exam-schedule logic, no DOM writes.
+  - Parses DTU's exam table, kurser.dtu.dk exam fields and planner periods; resolves one outcome per course (suggested, agreed with teacher, no exam, not confirmed); merges stored student entries; computes gaps between exams.
+- `darkmode.studyplan-exam-schedule.js`
+  - Study Planner exam-schedule UI: the period header button, the panel, the row editor, and storage of student entries (`dtuAfterDarkExamScheduleV1`).
 - `darkmode.participant-intel-ui.js`
   - Extracted CampusNet participant-intelligence UI shell.
   - Owns demographics, shared-history badges, profile history, and Retention Radar rendering.
@@ -146,9 +152,9 @@ This repo is still centered around a large content script, but the runtime bound
 - DTU Learn Lessons bulk-download runtime:
   - `darkmode.lessons-bulk.js`
   - Lessons-page mount logic, section discovery, legacy/API fallback resolution, and bundled/native download flow.
-- Study Planner exam-cluster UI shell:
-  - `darkmode.studyplan-exams.js`
-  - Timeline rendering, choice modal/editor, and grade-countdown decoration.
+- Study Planner exam schedule:
+  - `darkmode.studyplan-exam-schedule-core.js` (parsers, resolver, gaps)
+  - `darkmode.studyplan-exam-schedule.js` (button, panel, editor, storage)
 - Participant-intelligence UI shell:
   - `darkmode.participant-intel-ui.js`
   - CampusNet participant-page demographics, shared-history badges, profile history cards, and Retention Radar rendering.
@@ -245,6 +251,9 @@ When editing `darkmode.js`, start with `rg` on the feature entrypoint instead of
 - Kurser course evaluation:
   - `darkmode.kurser-course-eval.js`
   - `insertKurserCourseEvaluation`
+- Kurser course map:
+  - `darkmode.kurser-course-map.js`
+  - `insertKurserCourseMap`, `parseCoursePrerequisites`, `buildCourseMap`
 - Textbook links:
   - `darkmode.textbooks.js`
   - `insertKurserTextbookLinks`
@@ -265,7 +274,6 @@ When editing `darkmode.js`, start with `rg` on the feature entrypoint instead of
   - `darkmode.participant-intel-backfill.js`
   - `darkmode.participant-intel-core.js`
   - `darkmode.participant-intel-host.js`
-  - `darkmode.participant-intel-scoring.js`
   - `darkmode.participant-intel-ui.js`
   - `insertParticipantIntelligence`
   - `insertParticipantDemographics`
@@ -275,11 +283,11 @@ When editing `darkmode.js`, start with `rg` on the feature entrypoint instead of
   - `insertCampusnetArchiveBackfillWidget`
   - `collectParticipantData`
   - `loadParticipantIntel`
-- Study Planner exams:
-  - `darkmode.studyplan-runtime.js`
-  - Course parsing, exam-date matching, timeline state, and refresh scheduling.
-  - `darkmode.studyplan-exams.js`
-  - `renderStudyplanExamCluster`
+- Study Planner exam schedule:
+  - `darkmode.studyplan-exam-schedule-core.js`
+  - `resolveCourseExam`, `mergeStudentEntries`, `computeExamGaps`
+  - `darkmode.studyplan-exam-schedule.js`
+  - `insertStudyplanExamScheduleButtons`
 - Study Planner shell:
   - `darkmode.studyplanner-shell.js`
   - `styleStudyPlannerTabs`
@@ -316,13 +324,13 @@ For most feature work:
    - `node --check darkmode.kurser-course-eval.js` when touching the kurser course-evaluation shell
    - `node --check darkmode.textbooks.js` when touching the shared textbook-links module
    - `node --check darkmode.kurser-widgets.js` when touching the kurser course-widget shell
-   - `node --check darkmode.studyplan-runtime.js` when touching Study Planner exam parsing/timeline runtime
+   - `node --check darkmode.studyplan-exam-schedule-core.js` when touching Study Planner exam parsing or resolution
    - `node --check darkmode.lessons-bulk.js` when touching the Lessons bulk-download runtime
    - `node --check darkmode.participant-intel-backfill.js` when touching archive backfill/history-scanner code
    - `node --check darkmode.participant-intel-core.js` when touching participant-intelligence storage/parser code
    - `node --check darkmode.participant-intel-host.js` when touching CampusNet participant-intel page parsing/detection helpers
    - `node --check darkmode.participant-intel-ui.js` when touching participant-intelligence UI
-   - `node --check darkmode.studyplan-exams.js` when touching the Study Planner exam UI shell
+   - `node --check darkmode.studyplan-exam-schedule.js` when touching the Study Planner exam schedule UI
    - `node --check background.js`
    - browser build script if manifests/content-script lists changed
 

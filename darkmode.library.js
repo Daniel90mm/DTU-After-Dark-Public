@@ -1,5 +1,6 @@
 (function () {
     'use strict';
+    var markExt = globalThis.DTUAfterDarkDom.markExt;
 
     function getDeps() {
         try { return globalThis.DTUAfterDarkLibraryDeps || null; } catch (e0) { return null; }
@@ -17,11 +18,6 @@
         deps.setLibraryUiState(patch || {});
     }
 
-    function markExt(el) {
-        var deps = getDeps();
-        if (el && deps && typeof deps.markExt === 'function') deps.markExt(el);
-        return el;
-    }
 
     function deepQueryAll(selector, root) {
         var deps = getDeps();
@@ -39,201 +35,6 @@
     function queryFirstDeep(selector, root) {
         var hits = deepQueryAll(selector, root);
         return hits && hits.length ? hits[0] : null;
-    }
-
-    function normalizeWhitespace(text) {
-        return String(text || '').replace(/\s+/g, ' ').trim();
-    }
-
-    function findLearnMainNavWrappers() {
-        var wrappers = [];
-        var seen = new WeakSet();
-
-        function addWrapper(wrapper) {
-            if (!wrapper || seen.has(wrapper)) return;
-            seen.add(wrapper);
-            wrappers.push(wrapper);
-        }
-
-        try {
-            deepQueryAll('d2l-labs-navigation-main-footer', document).forEach(function (footer) {
-                if (!footer) return;
-                try {
-                    if (footer.shadowRoot) {
-                        footer.shadowRoot.querySelectorAll('.d2l-navigation-s-main-wrapper').forEach(addWrapper);
-                    }
-                } catch (e0) { }
-            });
-        } catch (e1) { }
-
-        try {
-            deepQueryAll('.d2l-navigation-s-main-wrapper', document).forEach(addWrapper);
-        } catch (e2) { }
-
-        wrappers.sort(function (a, b) {
-            function score(wrapper) {
-                var text = normalizeWhitespace(wrapper ? wrapper.textContent : '').toLowerCase();
-                var value = 0;
-                if (text.indexOf('atomic search') >= 0) value += 4;
-                if (text.indexOf('student resources') >= 0) value += 2;
-                if (text.indexOf('more') >= 0) value += 1;
-                return value;
-            }
-            return score(b) - score(a);
-        });
-        return wrappers;
-    }
-
-    function getMainNavWrapper() {
-        var wrappers = findLearnMainNavWrappers();
-        return wrappers.length ? wrappers[0] : null;
-    }
-
-    function isNavItemHidden(item) {
-        if (!item) return true;
-        try {
-            if (item.getAttribute('data-hidden') === '1') return true;
-            if (item.classList && item.classList.contains('d2l-hidden')) return true;
-            if (item.style && item.style.display === 'none') return true;
-        } catch (e0) { }
-        return false;
-    }
-
-    // Runs on every feature pass. Even no-op writes (classList.remove of an
-    // absent class, an identical setProperty) queue mutations and wake the
-    // page observer again, so only write what differs.
-    function setNavStyleIfChanged(el, prop, value) {
-        if (el.style.getPropertyValue(prop) !== value || el.style.getPropertyPriority(prop) !== 'important') {
-            el.style.setProperty(prop, value, 'important');
-        }
-    }
-
-    function applyLibraryNavItemVisibility(navItem) {
-        if (!navItem || !navItem.style) return;
-        try { if (navItem.hasAttribute('data-hidden')) navItem.removeAttribute('data-hidden'); } catch (e0) { }
-        try {
-            if (navItem.classList && navItem.classList.contains('d2l-hidden')) navItem.classList.remove('d2l-hidden');
-        } catch (e1) { }
-        setNavStyleIfChanged(navItem, 'display', 'block');
-        setNavStyleIfChanged(navItem, 'visibility', 'visible');
-        setNavStyleIfChanged(navItem, 'opacity', '1');
-        setNavStyleIfChanged(navItem, 'flex', '0 0 auto');
-        setNavStyleIfChanged(navItem, 'white-space', 'nowrap');
-
-        try {
-            navItem.querySelectorAll('a, button, span').forEach(function (el) {
-                if (!el || !el.style) return;
-                setNavStyleIfChanged(el, 'visibility', 'visible');
-                setNavStyleIfChanged(el, 'opacity', '1');
-                if (el.matches && el.matches('a, button')) {
-                    setNavStyleIfChanged(el, 'white-space', 'nowrap');
-                }
-            });
-        } catch (e2) { }
-    }
-
-    function createStableLibraryNavChevron() {
-        var chevron = document.createElement('span');
-        chevron.className = 'dtu-afterdark-nav-chevron';
-        chevron.setAttribute('aria-hidden', 'true');
-        chevron.style.cssText = [
-            'display:inline-block',
-            'width:7px',
-            'height:7px',
-            'box-sizing:border-box',
-            'border-right:2px solid currentColor',
-            'border-bottom:2px solid currentColor',
-            'transform:rotate(45deg) translateY(-2px)',
-            'transform-origin:center',
-            'margin-left:2px',
-            'opacity:.88',
-            'flex:0 0 auto',
-            'pointer-events:none'
-        ].join(';') + ';';
-        markExt(chevron);
-        return chevron;
-    }
-
-    function getNavItemByText(mainWrapper, label) {
-        if (!mainWrapper || !mainWrapper.querySelectorAll) return null;
-        var wanted = normalizeWhitespace(label).toLowerCase();
-        var items = [];
-        try {
-            items = Array.from(mainWrapper.children || []).filter(function (child) {
-                return child && child.classList && child.classList.contains('d2l-navigation-s-item');
-            });
-        } catch (e0) { items = []; }
-        if (!items.length) {
-            try { items = Array.from(mainWrapper.querySelectorAll('.d2l-navigation-s-item')); } catch (e1) { items = []; }
-        }
-        for (var i = 0; i < items.length; i++) {
-            var item = items[i];
-            if (isNavItemHidden(item)) continue;
-            var text = normalizeWhitespace(item ? item.textContent : '').toLowerCase();
-            if (text === wanted) return item;
-        }
-        return null;
-    }
-
-    function getAtomicSearchNavItem(mainWrapper) {
-        if (!mainWrapper || !mainWrapper.querySelectorAll) return null;
-        var atomic = getNavItemByText(mainWrapper, 'Atomic Search');
-        if (atomic) return atomic;
-        try {
-            var links = mainWrapper.querySelectorAll('a[href*="framedName=Atomic+Search"], a[href*="Atomic+Search"]');
-            if (links && links[0]) return links[0].closest('.d2l-navigation-s-item');
-        } catch (e0) { }
-        return null;
-    }
-
-    function placeLibraryNavItem(mainWrapper, navItem) {
-        if (!mainWrapper || !navItem) return;
-        applyLibraryNavItemVisibility(navItem);
-
-        // Anchor on the same item the Settings nav item anchors on, and let the
-        // shared ordering decide which of the two sits closer to it. Anchoring on
-        // the Settings item instead, as this did, meant the two chased each other
-        // around the nav on every feature pass.
-        var atomicItem = getAtomicSearchNavItem(mainWrapper);
-        var helpItem = getNavItemByText(mainWrapper, 'Help');
-        var anchor = null;
-        if (atomicItem && atomicItem.parentNode === mainWrapper && !isNavItemHidden(atomicItem)) {
-            anchor = atomicItem;
-        } else if (helpItem && helpItem.parentNode === mainWrapper) {
-            anchor = helpItem;
-        } else if (atomicItem && atomicItem.parentNode === mainWrapper) {
-            anchor = atomicItem;
-        }
-
-        if (anchor) {
-            var deps = getDeps();
-            if (deps && typeof deps.placeAfterDarkNavItemAt === 'function') {
-                deps.placeAfterDarkNavItemAt(mainWrapper, anchor, navItem);
-                return;
-            }
-            var settingsItem = getNavItemByText(mainWrapper, 'Settings');
-            var fallbackRef = (settingsItem && settingsItem.parentNode === mainWrapper)
-                ? settingsItem.nextSibling
-                : anchor.nextSibling;
-            if (fallbackRef !== navItem) {
-                mainWrapper.insertBefore(navItem, fallbackRef);
-            }
-            return;
-        }
-
-        var moreItem = mainWrapper.querySelector('.d2l-navigation-s-more') || queryFirstDeep('.d2l-navigation-s-more', mainWrapper);
-        var navDeps = getDeps();
-        if (navDeps && typeof navDeps.placeAfterDarkNavItemBefore === 'function') {
-            navDeps.placeAfterDarkNavItemBefore(mainWrapper, moreItem, navItem);
-            return;
-        }
-        if (moreItem && moreItem.parentNode === mainWrapper) {
-            if (navItem.nextSibling !== moreItem) {
-                mainWrapper.insertBefore(navItem, moreItem);
-            }
-        } else if (navItem.parentNode !== mainWrapper || navItem.nextSibling) {
-            mainWrapper.appendChild(navItem);
-        }
     }
 
     function formatLibraryOccupancyCount(value) {
@@ -351,131 +152,6 @@
         deepQueryAll('.dtu-library-nav-item .d2l-dropdown-opener[aria-expanded="true"]', document).forEach(function (btn) {
             btn.setAttribute('aria-expanded', 'false');
         });
-    }
-
-    function insertLibraryNavDropdown() {
-        var deps = getDeps();
-        if (!deps || typeof deps.isTopWindow !== 'function' || !deps.isTopWindow()) return;
-        if (window.location.hostname !== 'learn.inside.dtu.dk') return;
-        if (typeof deps.isLibraryEnabled !== 'function' || !deps.isLibraryEnabled()) {
-            removeLibraryNavDropdown();
-            return;
-        }
-
-        var mainWrapper = getMainNavWrapper();
-        if (!mainWrapper) return;
-
-        var navItem = null;
-        try { navItem = mainWrapper.querySelector('.dtu-library-nav-item'); } catch (e0) { navItem = null; }
-        if (!navItem) {
-            try { navItem = queryFirstDeep('.dtu-library-nav-item', document); } catch (e1) { navItem = null; }
-        }
-        if (!navItem) {
-            navItem = document.createElement('div');
-        }
-
-        // Already wired: only re-place it. Rebuilding would replace the opener
-        // on every feature pass and drop keyboard focus from it.
-        var wiredOpener = navItem._dtuLibraryOpener;
-        if (wiredOpener && wiredOpener.isConnected && navItem.contains(wiredOpener)) {
-            placeLibraryNavItem(mainWrapper, navItem);
-            applyLibraryNavItemVisibility(navItem);
-            return;
-        }
-
-        navItem.className = 'd2l-navigation-s-item dtu-library-nav-item';
-        navItem.setAttribute('role', 'listitem');
-        markExt(navItem);
-
-        while (navItem.firstChild) {
-            try { navItem.removeChild(navItem.firstChild); } catch (e2) { break; }
-        }
-
-        var dropdown = document.createElement('d2l-dropdown');
-        markExt(dropdown);
-
-        var openerBtn = document.createElement('button');
-        openerBtn.className = 'd2l-navigation-s-group d2l-dropdown-opener';
-        openerBtn.setAttribute('aria-expanded', 'false');
-        openerBtn.setAttribute('aria-haspopup', 'true');
-        markExt(openerBtn);
-
-        var wrapper = document.createElement('span');
-        wrapper.className = 'd2l-navigation-s-group-wrapper';
-        var textSpan = document.createElement('span');
-        textSpan.className = 'd2l-navigation-s-group-text';
-        textSpan.textContent = 'Library';
-        var chevron = createStableLibraryNavChevron();
-
-        wrapper.appendChild(textSpan);
-        wrapper.appendChild(chevron);
-        openerBtn.appendChild(wrapper);
-        dropdown.appendChild(openerBtn);
-        navItem.appendChild(dropdown);
-
-        placeLibraryNavItem(mainWrapper, navItem);
-        navItem._dtuLibraryOpener = openerBtn;
-
-        function blockD2LDropdown(event) {
-            try { event.stopPropagation(); } catch (e3) { }
-            try { if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation(); } catch (e4) { }
-        }
-
-        function openLibraryFromNav(e) {
-            try { e.preventDefault(); } catch (e5) { }
-            try { e.stopPropagation(); } catch (e6) { }
-            try { if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation(); } catch (e7) { }
-            if (document.querySelector('.dtu-library-panel')) {
-                hideLibraryPanel();
-                openerBtn.setAttribute('aria-expanded', 'false');
-            } else {
-                showLibraryPanel(openerBtn);
-                openerBtn.setAttribute('aria-expanded', 'true');
-            }
-            return false;
-        }
-
-        openerBtn.addEventListener('pointerdown', blockD2LDropdown, true);
-        openerBtn.addEventListener('mousedown', blockD2LDropdown, true);
-        openerBtn.addEventListener('click', openLibraryFromNav, true);
-        openerBtn.addEventListener('keydown', function (event) {
-            if (!event) return;
-            if (event.key === 'Enter' || event.key === ' ') {
-                return openLibraryFromNav(event);
-            }
-        }, true);
-
-        applyLibraryNavItemVisibility(navItem);
-    }
-
-    var _libraryNavBootstrapTimer = null;
-    var _libraryNavBootstrapAttempts = 0;
-
-    function runLibraryNavBootstrapPass() {
-        var deps = getDeps();
-        if (!deps || typeof deps.isTopWindow !== 'function' || !deps.isTopWindow()) return false;
-        if (window.location.hostname !== 'learn.inside.dtu.dk') return false;
-
-        try { insertLibraryNavDropdown(); } catch (e0) { }
-        return !!queryFirstDeep('.dtu-library-nav-item', document);
-    }
-
-    function scheduleLibraryNavBootstrap() {
-        var deps = getDeps();
-        if (!deps || typeof deps.isTopWindow !== 'function' || !deps.isTopWindow()) return;
-        if (window.location.hostname !== 'learn.inside.dtu.dk') return;
-        if (_libraryNavBootstrapTimer) return;
-
-        _libraryNavBootstrapAttempts = 0;
-        _libraryNavBootstrapTimer = setInterval(function () {
-            _libraryNavBootstrapAttempts++;
-            var done = false;
-            try { done = runLibraryNavBootstrapPass(); } catch (e0) { done = false; }
-            if ((done && _libraryNavBootstrapAttempts >= 10) || _libraryNavBootstrapAttempts >= 60) {
-                clearInterval(_libraryNavBootstrapTimer);
-                _libraryNavBootstrapTimer = null;
-            }
-        }, 400);
     }
 
     function getLibraryQuickLinkIconSvg(iconName) {
@@ -956,6 +632,20 @@
         return { container: container, body: body, refreshBtn: refreshBtn, itemEls: [] };
     }
 
+    // DTU posts library news a few times a term, so its latest ten reach back many
+    // months and read as stale. Only the last three months are shown; when nothing
+    // is that recent, the newest item stays so the section is never blank.
+    var LIBRARY_NEWS_MAX_AGE_MS = 92 * 86400000;
+
+    function selectRecentLibraryNews(news, nowTs) {
+        var list = Array.isArray(news) ? news : [];
+        var recent = list.filter(function (item) {
+            var ts = Date.parse(item && (item.dateIso || item.date) || '');
+            return !isFinite(ts) || (nowTs - ts) <= LIBRARY_NEWS_MAX_AGE_MS;
+        });
+        return recent.length ? recent : list.slice(0, 1);
+    }
+
     function renderLibraryFeedItems(section, resp, type) {
         renderLibraryFeedItemsInto(section, resp, type);
         if (section) markLibrarySubtree(section.container || section.body);
@@ -993,7 +683,7 @@
 
         var items = null;
         if (resp && resp.ok) {
-            items = type === 'events' ? resp.events : resp.news;
+            items = type === 'events' ? resp.events : selectRecentLibraryNews(resp.news, Date.now());
         }
 
         if (resp && resp.ok === false) {
@@ -1027,7 +717,10 @@
         items.forEach(function (item) {
             var row = document.createElement('a');
             row.className = 'dtu-library-feed-item';
-            row.href = item.url;
+            // The feed is remote data: only an https link is followed, anything else shows as plain text.
+            var safeUrl = '';
+            try { safeUrl = new URL(String(item.url || '')).protocol === 'https:' ? String(item.url) : ''; } catch (e) { safeUrl = ''; }
+            if (safeUrl) row.href = safeUrl;
             row.target = '_blank';
             row.rel = 'noopener noreferrer';
 
@@ -1090,67 +783,9 @@
 
     try {
         globalThis.DTUAfterDarkLibraryUi = {
-            insertLibraryNavDropdown: insertLibraryNavDropdown,
             removeLibraryNavDropdown: removeLibraryNavDropdown,
             hideLibraryPanel: hideLibraryPanel,
             showLibraryPanel: showLibraryPanel
         };
     } catch (eExpose) { }
-
-    function findLibraryNavButtonFromEvent(event) {
-        var path = [];
-        try { path = event && typeof event.composedPath === 'function' ? event.composedPath() : []; } catch (e0) { path = []; }
-        for (var i = 0; i < path.length; i++) {
-            var node = path[i];
-            if (!node || !node.classList) continue;
-            if (node.classList.contains('dtu-library-nav-item')) {
-                return node.querySelector && node.querySelector('button.d2l-dropdown-opener, button');
-            }
-            if (node.matches && node.matches('.dtu-library-nav-item button, .dtu-library-nav-item .d2l-dropdown-opener')) {
-                return node;
-            }
-        }
-
-        var target = event && event.target;
-        if (target && target.closest) {
-            var item = target.closest('.dtu-library-nav-item');
-            if (item) return item.querySelector('button.d2l-dropdown-opener, button') || target;
-        }
-        return null;
-    }
-
-    document.addEventListener('click', function (event) {
-        var button = findLibraryNavButtonFromEvent(event);
-        if (!button) return;
-        try { event.preventDefault(); } catch (e0) { }
-        try { event.stopPropagation(); } catch (e1) { }
-        try { if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation(); } catch (e2) { }
-
-        if (document.querySelector('.dtu-library-panel')) {
-            hideLibraryPanel();
-            try { button.setAttribute('aria-expanded', 'false'); } catch (e3) { }
-        } else {
-            showLibraryPanel(button);
-            try {
-                if (document.querySelector('.dtu-library-panel')) button.setAttribute('aria-expanded', 'true');
-            } catch (e4) { }
-        }
-    }, true);
-
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', scheduleLibraryNavBootstrap, { once: true });
-    } else {
-        scheduleLibraryNavBootstrap();
-    }
-    window.addEventListener('load', scheduleLibraryNavBootstrap);
-    window.addEventListener('pageshow', function () {
-        setTimeout(function () { try { runLibraryNavBootstrapPass(); } catch (e0) { } }, 60);
-    });
-    window.addEventListener('focus', function () {
-        setTimeout(function () { try { runLibraryNavBootstrapPass(); } catch (e0) { } }, 80);
-    });
-    document.addEventListener('visibilitychange', function () {
-        if (document.hidden) return;
-        setTimeout(function () { try { runLibraryNavBootstrapPass(); } catch (e0) { } }, 100);
-    });
 })();

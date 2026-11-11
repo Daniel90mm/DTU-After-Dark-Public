@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
+import { loadDom } from './_harness.mjs';
 import vm from 'node:vm';
 
 const ROOT = new URL('../', import.meta.url);
@@ -80,17 +81,17 @@ function loadDeadlineUi({ dark = false, messages = null, storage = null, today =
             renderDeadlinesHomepageWidget,
             buildTopDeadlines,
             buildUpcomingDeadlineRows,
-            createDeadlinesHomeRow,
             createDeadlinesTimeline,
             buildDeadlineTimelineAxis,
             selectDeadlineTimelineRows,
             parseDeadlinePeriodHeading,
             buildDeadlinePeriodGroups,
+            selectDeadlinePeriodGroups,
             layoutDeadlinePeriodMarks,
             formatDeadlinePeriodStatus,
             placeDeadlinesHomepageWidget,
             setDeadlinesWidgetExpandedState,
-            formatDeadlineChip,
+            getDeadlinePeriodLabels,
             getDeadlineState,
             scheduleDailyDeadlinesCheck
         };})();`
@@ -122,17 +123,13 @@ function loadDeadlineUi({ dark = false, messages = null, storage = null, today =
     };
     if (today) sandbox.DTUAfterDarkDeadlinesDeps.startOfTodayUtcTs = () => today.value;
     sandbox.globalThis = sandbox;
+    loadDom(sandbox);
     vm.runInNewContext(source, sandbox, { filename: fileUrl.pathname });
     return sandbox.__deadlineTestApi;
 }
 
 function loadBackgroundParser() {
-    const fileUrl = new URL('background.js', ROOT);
-    let source = fs.readFileSync(fileUrl, 'utf8');
-    source = source.replace(
-        /\}\)\(\);\s*$/,
-        'globalThis.__deadlineParserTestApi = { parseStudentDeadlinesGroupsFromHtml };})();'
-    );
+    const files = JSON.parse(fs.readFileSync(new URL('manifest.json', ROOT), 'utf8')).background.scripts;
 
     const storage = {
         get(key, callback) { callback({}); },
@@ -151,7 +148,18 @@ function loadBackgroundParser() {
         URL
     };
     sandbox.globalThis = sandbox;
-    vm.runInNewContext(source, sandbox, { filename: fileUrl.pathname });
+    const context = vm.createContext(loadDom(sandbox));
+    for (const file of files) {
+        const fileUrl = new URL(file, ROOT);
+        let source = fs.readFileSync(fileUrl, 'utf8');
+        if (file === 'background.deadlines.js') {
+            source = source.replace(
+                /\}\)\(\);\s*$/,
+                'globalThis.__deadlineParserTestApi = { parseStudentDeadlinesGroupsFromHtml };})();'
+            );
+        }
+        vm.runInContext(source, context, { filename: fileUrl.pathname });
+    }
     return sandbox.__deadlineParserTestApi;
 }
 
@@ -178,28 +186,6 @@ function responseWith({ course = [], exam = [] }) {
 
 function flattenText(element) {
     return [element.textContent, ...element.children.flatMap(flattenText)].filter(Boolean);
-}
-
-function findElementByText(element, text) {
-    if (element.textContent === text) return element;
-    for (const child of element.children) {
-        const found = findElementByText(child, text);
-        if (found) return found;
-    }
-    return null;
-}
-
-function contrastRatio(foregroundHex, backgroundHex) {
-    function luminance(hex) {
-        const channels = hex.match(/[0-9a-f]{2}/gi).map(value => parseInt(value, 16) / 255);
-        const linear = channels.map(value => value <= 0.04045
-            ? value / 12.92
-            : Math.pow((value + 0.055) / 1.055, 2.4));
-        return (0.2126 * linear[0]) + (0.7152 * linear[1]) + (0.0722 * linear[2]);
-    }
-    const lighter = Math.max(luminance(foregroundHex), luminance(backgroundHex));
-    const darker = Math.min(luminance(foregroundHex), luminance(backgroundHex));
-    return (lighter + 0.05) / (darker + 0.05);
 }
 
 test('folding the deadlines widget compacts its shell and restores expanded spacing', () => {
@@ -296,30 +282,7 @@ test('the deadlines widget has no manual refresh button', () => {
     assert.doesNotMatch(source, /data-dtu-deadlines-refresh/);
 });
 
-function colorFromStyle(element) {
-    return element.style.cssText.match(/color:\s*(#[0-9a-f]{6})/i)?.[1] || '';
-}
-
-test('future registration windows say when they open and name the actual closing deadline', () => {
-    const api = loadDeadlineUi();
-    const item = deadlineItem({
-        label: 'Registration period',
-        start: '2026-10-15',
-        end: '2026-11-01'
-    });
-    const [row] = api.buildUpcomingDeadlineRows([
-        { heading: 'Ordinary winter exam 2026: 6 December &amp;ndash; 22 December', items: [item] }
-    ], utc('2026-08-27'), 8);
-
-    const chip = api.formatDeadlineChip(row, utc('2026-08-27'));
-    const cardText = flattenText(api.createDeadlinesHomeRow({ ...row, kind: 'exam' }, utc('2026-08-27')));
-
-    assert.equal(chip.text, 'Opens in 49d');
-    assert.ok(cardText.includes('Registration opens 15 Oct; deadline 1 Nov.'));
-    assert.ok(cardText.includes('Ordinary winter exam 2026: 6 December – 22 December'));
-});
-
-test('an active registration window counts down to and names its closing deadline', () => {
+test('a registration window stays listed through its closing day and drops out the day after', () => {
     const api = loadDeadlineUi();
     const item = deadlineItem({
         label: 'Registration period',
@@ -330,17 +293,13 @@ test('an active registration window counts down to and names its closing deadlin
     const activeRows = api.buildUpcomingDeadlineRows([
         { heading: 'Ordinary winter exam 2026', items: [item] }
     ], utc('2026-10-15'), 8);
-    assert.equal(api.formatDeadlineChip(activeRows[0], utc('2026-10-15')).text, '17d left');
-    const activeCardText = flattenText(api.createDeadlinesHomeRow(
-        { ...activeRows[0], kind: 'exam' },
-        utc('2026-10-15')
-    ));
-    assert.ok(activeCardText.includes('Registration deadline: 1 Nov.'));
+    assert.equal(activeRows.length, 1);
+    assert.equal(activeRows[0].state, 'active');
 
     const finalDayRows = api.buildUpcomingDeadlineRows([
         { heading: 'Ordinary winter exam 2026', items: [item] }
     ], utc('2026-11-01'), 8);
-    assert.equal(api.formatDeadlineChip(finalDayRows[0], utc('2026-11-01')).text, 'Ends today');
+    assert.equal(finalDayRows.length, 1);
 
     const pastRows = api.buildUpcomingDeadlineRows([
         { heading: 'Ordinary winter exam 2026', items: [item] }
@@ -379,18 +338,10 @@ test('the row limit includes every deadline tied at the cutoff', () => {
     ]);
     assert.equal(rows[0].state, 'active');
     assert.equal(rows[0].nextTs, utc('2026-10-01'));
-    assert.equal(api.formatDeadlineChip(rows[0], utc('2026-08-27')).text, '35d left');
-    assert.ok(flattenText(api.createDeadlinesHomeRow(rows[0], utc('2026-08-27')))
-        .includes('Supplementary registration deadline: 1 Oct.'));
     assert.equal(rows[1].nextTs, utc('2026-10-01'));
-    assert.equal(api.formatDeadlineChip(rows[1], utc('2026-08-27')).text, 'Due in 35d');
-    assert.ok(flattenText(api.createDeadlinesHomeRow(rows[1], utc('2026-08-27')))
-        .includes('Withdrawal deadline: 1 Oct.'));
-    assert.equal(api.formatDeadlineChip(rows[2], utc('2026-08-27')).text, 'Opens in 49d');
-    assert.equal(api.formatDeadlineChip(rows[3], utc('2026-08-27')).text, 'Opens in 49d');
 });
 
-test('a merged deadline renders every DTU period that shares it', () => {
+test('a merged deadline names every DTU period that shares it', () => {
     const api = loadDeadlineUi();
     const sharedItem = deadlineItem({
         label: 'Registration period',
@@ -405,42 +356,10 @@ test('a merged deadline renders every DTU period that shares it', () => {
     });
 
     const [row] = api.buildTopDeadlines(resp, utc('2027-04-01'), 3);
-    const cardText = flattenText(api.createDeadlinesHomeRow(row, utc('2027-04-01')));
+    const periods = Array.from(api.getDeadlinePeriodLabels(row), String);
 
-    assert.ok(cardText.includes('June 2027: 4 June - 24 June'));
-    assert.ok(cardText.includes('July 2027: 5 July - 23 July'));
-});
-
-test('deadline dates, explanations, and period context meet text contrast in both modes', () => {
-    const item = deadlineItem({
-        label: 'Registration period',
-        start: '2026-10-15',
-        end: '2026-11-01'
-    });
-
-    for (const mode of [
-        { dark: true, background: '#2d2d2d' },
-        { dark: false, background: '#ffffff' }
-    ]) {
-        const api = loadDeadlineUi({ dark: mode.dark });
-        const [row] = api.buildUpcomingDeadlineRows([
-            { heading: 'Ordinary winter exam 2026', items: [item] }
-        ], utc('2026-08-27'), 8);
-        const card = api.createDeadlinesHomeRow({ ...row, kind: 'exam' }, utc('2026-08-27'));
-
-        for (const text of [
-            '15 Oct - 1 Nov 2026',
-            'Registration opens 15 Oct; deadline 1 Nov.',
-            'Ordinary winter exam 2026'
-        ]) {
-            const element = findElementByText(card, text);
-            assert.ok(element, `expected metadata element: ${text}`);
-            assert.ok(
-                contrastRatio(colorFromStyle(element), mode.background) >= 4.5,
-                `${text} should meet 4.5:1 contrast in ${mode.dark ? 'dark' : 'light'} mode`
-            );
-        }
-    }
+    assert.ok(periods.includes('June 2027: 4 June - 24 June'));
+    assert.ok(periods.includes('July 2027: 5 July - 23 July'));
 });
 
 test('DTU period headings decode the nested en dash used by the live exam response', () => {
@@ -618,6 +537,15 @@ function findAll(element, pattern) {
     return own.concat(element.children.flatMap(child => findAll(child, pattern)));
 }
 
+test('the drawn axis stops ten days after the last mark, never under three months or over six', () => {
+    const api = loadDeadlineUi();
+    const fitted = api.buildDeadlineTimelineAxis(TODAY_SEP_30, utc('2027-01-08'));
+    assert.equal(fitted.endTs, utc('2027-01-18'));
+    assert.deepEqual(Array.from(fitted.ticks, tick => tick.label), ['Sep', 'Oct', 'Nov', 'Dec', 'Jan 2027']);
+    assert.equal(api.buildDeadlineTimelineAxis(TODAY_SEP_30, utc('2026-10-01')).endTs, utc('2026-12-01'));
+    assert.equal(api.buildDeadlineTimelineAxis(TODAY_SEP_30, utc('2027-02-27')).endTs, utc('2027-03-01'));
+});
+
 test('the timeline axis spans six months from the current one and names the year where it turns', () => {
     const api = loadDeadlineUi();
     const axis = api.buildDeadlineTimelineAxis(TODAY_SEP_30);
@@ -646,6 +574,49 @@ test('deadlines are grouped into one row per period in the order the periods run
     assert.deepEqual(Array.from(groups[2].rows, row => String(row.label)), [
         'Registration period', 'Supplementary registration period', 'Deadline for withdrawal from courses'
     ]);
+});
+
+// DTU's published dates as they stood on 7 Nov 2026, with the three summer courses
+// that share the 1 May registration round.
+function dtuNovemberResponse() {
+    const base = dtuFallResponse();
+    ['July 2027 (3-weeks period): 5 July - 23 July', 'August 2027 (3-weeks period): 2 August - 20 August'].forEach(heading => {
+        base.course.groups.push({ heading, items: [deadlineItem({ label: 'Registration period', start: '2027-05-01', end: '2027-05-15' })] });
+    });
+    return base;
+}
+
+test('only periods with a deadline in the next 60 days get a row', () => {
+    const api = loadDeadlineUi();
+    const today = utc('2026-11-07');
+    const rows = api.buildTopDeadlines(dtuNovemberResponse(), today, Infinity);
+    const timeline = api.createDeadlinesTimeline(rows, today);
+    const desktop = timeline.children.find(element => element.className === 'dtu-deadline-timeline-desktop');
+    const names = findAll(desktop, /\bdtu-deadline-period-name\b/).map(el => el.textContent);
+    assert.deepEqual(names, ['Winter exam 2026', 'January 2027', 'Spring 2027']);
+    const all = api.buildDeadlinePeriodGroups(api.selectDeadlineTimelineRows(rows, today));
+    assert.ok(all.some(group => group.name === 'August 2027'), 'August 2027 exists but is held back');
+});
+
+test('the summer courses return once their registration is within 60 days', () => {
+    const api = loadDeadlineUi();
+    const today = utc('2027-03-02');
+    const rows = api.selectDeadlineTimelineRows(api.buildTopDeadlines(dtuNovemberResponse(), today, Infinity), today);
+    const groups = api.selectDeadlinePeriodGroups(api.buildDeadlinePeriodGroups(rows), today);
+    assert.deepEqual(Array.from(groups, group => group.name),
+        ['Summer exam and reexam 2027', 'June 2027', 'July 2027', 'August 2027']);
+});
+
+test('the soonest period stays when nothing falls within 60 days', () => {
+    const api = loadDeadlineUi();
+    const today = utc('2027-03-02');
+    const rows = api.selectDeadlineTimelineRows(api.buildTopDeadlines(responseWith({
+        course: [{ heading: 'Fall 2027 (13-weeks period): 30 August - 3 December', items: [
+            deadlineItem({ label: 'Registration period', start: '2027-07-08', end: '2027-08-05' })
+        ] }]
+    }), today, Infinity), today);
+    const groups = api.selectDeadlinePeriodGroups(api.buildDeadlinePeriodGroups(rows), today);
+    assert.deepEqual(Array.from(groups, group => group.name), ['Fall 2027']);
 });
 
 test('each period row says what happens next and highlights only what is open or close', () => {
@@ -679,20 +650,20 @@ test('overlapping windows stack on two lanes and a same-day date lines up with a
     assert.equal(withdrawal.startPercent, supplementary.endPercent);
 });
 
-test('a label that would collide is dropped while its mark keeps the tooltip', () => {
+test('a colliding label moves to the lower lane, and is dropped only when neither lane has room', () => {
     const api = loadDeadlineUi();
-    const rows = ['2026-11-02', '2026-11-03'].map(day => ({
+    const rows = ['2026-11-02', '2026-11-03', '2026-11-08'].map(day => ({
         kind: 'course', label: 'Deadline for withdrawal from courses', period: 'Fall 2026',
         startIso: day, startTs: utc(day), endIso: null, endTs: null, nextTs: utc(day), state: 'upcoming'
     }));
     const axis = api.buildDeadlineTimelineAxis(TODAY_SEP_30);
     const marks = api.layoutDeadlinePeriodMarks(api.buildDeadlinePeriodGroups(rows)[0], axis);
-    assert.deepEqual(Array.from(marks, mark => mark.showLabel), [true, false]);
+    assert.deepEqual(Array.from(marks, mark => [mark.lane, mark.showLabel]), [[0, true], [1, true], [0, false]]);
     const timeline = api.createDeadlinesTimeline(rows, TODAY_SEP_30);
     const dates = findAll(timeline, /\bdtu-deadline-timeline-date-mark\b/);
-    assert.equal(dates.length, 2);
+    assert.equal(dates.length, 3);
     assert.ok(dates.every(mark => /Deadline for withdrawal from courses/.test(mark.getAttribute('aria-label'))));
-    assert.equal(findAll(timeline, /\bdtu-deadline-mark-label\b/).length, 1);
+    assert.equal(findAll(timeline, /\bdtu-deadline-mark-label\b/).length, 2);
 });
 
 test('a window running past the six months fades out at the right edge', () => {
@@ -725,14 +696,16 @@ test('the timeline renders labelled period rows with no legend, and a text list 
     const timeline = api.createDeadlinesTimeline(rows, TODAY_SEP_30);
     const text = flattenText(timeline);
     for (const expected of ['Fall 2026', 'Teaching 31 Aug to 4 Dec', 'Winter exam 2026', 'Exam period 6 to 22 Dec',
-        'Today', 'Jan 2027', 'Supplementary', 'Withdrawal 1 Oct', 'Closes tomorrow', 'Shaded: teaching or exam period']) {
+        'Today 30 Sep', 'Dec', 'Supplementary', 'until 1 Oct', 'Withdrawal', '1 Oct', 'Supplementary closes tomorrow',
+        'Registration', '15 Oct to 1 Nov', 'Registration opens in 15 days']) {
         assert.ok(text.includes(expected), 'expected ' + expected);
     }
-    for (const gone of ['Open now', 'Upcoming', 'Single date', 'Academic periods']) {
+    for (const gone of ['Open now', 'Upcoming', 'Single date', 'Academic periods', 'Shaded: teaching or exam period', 'Today']) {
         assert.ok(!text.includes(gone), 'legend text should be gone: ' + gone);
     }
     assert.equal(timeline.getAttribute('data-theme'), 'dark');
-    assert.equal(findAll(timeline, /^dtu-deadline-period$/).length, 4);
+    // Spring 2027 registration opens 66 days out, past the 60-day lookahead.
+    assert.equal(findAll(timeline, /^dtu-deadline-period$/).length, 3);
     const activeBar = findAll(timeline, /\bdtu-deadline-timeline-bar\b/)[0];
     assert.match(activeBar.className, /\bis-active\b/);
     assert.match(activeBar.className, /\bis-clipped-start\b/);
@@ -740,9 +713,10 @@ test('the timeline renders labelled period rows with no legend, and a text list 
     assert.match(findAll(timeline, /\bdtu-deadline-timeline-status-text\b/)[0].className, /\bis-accent\b/);
 
     const mobile = timeline.children.find(element => element.className === 'dtu-deadline-mobile-list');
-    assert.equal(mobile.children.length, 4);
+    assert.equal(mobile.children.length, 3);
     assert.ok(flattenText(mobile.children[2]).includes('Registration 15 Nov to 1 Dec, Supplementary 13 Dec to 5 Jan, Withdrawal 8 Jan'));
-    assert.equal(timeline.children.find(element => element.className === 'dtu-deadline-a11y-list').children.length, rows.length);
+    assert.equal(timeline.children.find(element => element.className === 'dtu-deadline-a11y-list').children.length,
+        rows.filter(row => !/Spring 2027/.test(row.periods.join(' '))).length);
 });
 
 test('a timeline mark names the deadline, the explainer, its period and dates', () => {
@@ -770,5 +744,5 @@ test('timeline marks use the contrast-checked accent in both modes, not a fixed 
     assert.ok(rules[1].includes('--deadline-accent:var(--dtu-ad-accent-mark-dark,'), rules[1]);
     assert.doesNotMatch(source, /--deadline-bar(?:-soft)?:/);
     assert.match(source, /'\.dtu-deadline-timeline-bar\{[^']*background:var\(--deadline-accent\)/);
-    assert.match(source, /'\.dtu-deadline-timeline-date-mark\{[^']*background:var\(--deadline-accent\)/);
+    assert.match(source, /'\.dtu-deadline-timeline-date-mark::before\{[^']*background:var\(--deadline-accent\)/);
 });

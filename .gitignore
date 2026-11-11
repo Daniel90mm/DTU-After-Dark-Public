@@ -7,12 +7,28 @@
 !/.gitattributes
 !/LICENSE
 !/README.md
+!/background.cache.js
+!/background.shared.js
+!/background.grades.js
+!/background.findit.js
+!/background.deadlines.js
+!/background.exam.js
+!/background.evaluation.js
+!/background.mazemap.js
+!/background.library.js
 !/background.js
 !/changes.md
 !/config.js
 !/darkmode.css
 !/darkmode.js
+!/darkmode.dom.js
+!/darkmode.url-pause.js
+!/darkmode.feature-flags.js
+!/darkmode.accent-theme.js
+!/darkmode.participant-intel-bridge.js
 !/darkmode.bus.js
+!/darkmode.library-data.js
+!/darkmode.library-trend.js
 !/darkmode.campusnet-gpa.js
 !/darkmode.content-shortcut.js
 !/darkmode.deadlines.js
@@ -21,20 +37,32 @@
 !/darkmode.learn-accent-shell.js
 !/darkmode.learn-nav.js
 !/darkmode.learn-shell.js
+!/darkmode.settings.bridge.js
+!/darkmode.settings.pause.js
+!/darkmode.settings.footer.js
 !/darkmode.settings.js
 !/darkmode.smart-room-linker.js
 !/darkmode.studyplanner-shell.js
 !/darkmode.kurser-course-eval.js
+!/darkmode.kurser-course-map.js
+!/darkmode.kurser-exam-date.js
+!/course-map-data.json
+!/darkmode.studyplan-exam-schedule-core.js
+!/darkmode.studyplan-exam-schedule.js
+!/darkmode.textbooks.core.js
+!/darkmode.textbooks.kurser.js
 !/darkmode.textbooks.js
 !/darkmode.library.js
 !/darkmode.kurser-widgets.js
+!/darkmode.lessons-bulk.zip.js
+!/darkmode.lessons-bulk.tree.js
+!/darkmode.lessons-bulk.fetch.js
 !/darkmode.lessons-bulk.js
 !/darkmode.participant-intel-backfill.js
 !/darkmode.participant-intel-core.js
 !/darkmode.participant-intel-host.js
 !/darkmode.participant-intel-ui.js
-!/darkmode.studyplan-exams.js
-!/darkmode.studyplan-runtime.js
+!/darkmode.skeleton.js
 !/manifest.json
 !/manifest_chrome.json
 
@@ -68,6 +96,8 @@
 !/scripts/build-chrome.ps1
 !/scripts/build-firefox.ps1
 !/scripts/build.mjs
+!/scripts/crawl-course-prerequisites.mjs
+!/scripts/build-course-map-data.mjs
 
 # Public tests
 !/tests/
@@ -85,6 +115,12 @@
 !/tests/_harness.mjs
 !/tests/background.test.mjs
 !/tests/lessons-bulk.test.mjs
+!/tests/lessons-bulk-bundle.test.mjs
+!/tests/course-map-stress.test.mjs
+!/tests/page-work-stress.test.mjs
+!/tests/security-data-stress.test.mjs
+!/tests/bus-stress.test.mjs
+!/tests/settings-toggles.test.mjs
 !/tests/packaging.test.mjs
 !/tests/smart-room-linker.test.mjs
 !/tests/stylesheet.test.mjs
@@ -99,6 +135,12 @@
 !/tests/nav-item-visibility.test.mjs
 !/tests/bus-widget.test.mjs
 !/tests/ui-rules.test.mjs
+!/tests/course-map.test.mjs
+!/tests/exam-schedule.test.mjs
+!/tests/fixtures/
+/tests/fixtures/*
+!/tests/fixtures/exam-dates-2026-11-07.html
+!/tests/fixtures/kurser-exam-fields.json
 
 # Local-only/private items stay ignored by default:
 # AGENTS.md

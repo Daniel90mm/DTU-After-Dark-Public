@@ -30,7 +30,6 @@ function makeEl({ hidden = false, children = [] } = {}) {
 }
 
 for (const [file, fn] of [
-    ['darkmode.library.js', 'applyLibraryNavItemVisibility'],
     ['darkmode.learn-nav.js', 'applyAfterDarkNavItemVisibility']
 ]) {
     test(`${fn}: unhides once, then writes nothing on later passes`, () => {

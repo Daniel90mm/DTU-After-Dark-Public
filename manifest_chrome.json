@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "DTU After Dark",
-  "version": "9.0.0",
+  "version": "9.1.0",
   "description": "Dark mode, live bus departures, and GPA tools for DTU Learn, CampusNet, and other DTU sites.",
   "permissions": ["storage"],
   "icons": {
@@ -15,6 +15,7 @@
     "https://findit.dtu.dk/*",
     "https://evaluering.dtu.dk/*",
     "https://student.dtu.dk/*",
+    "https://kurser.dtu.dk/*",
     "https://eksamensplan.dtu.dk/*",
     "https://sts.ait.dtu.dk/*",
     "https://www.dtu.dk/*",
@@ -45,92 +46,102 @@
         "*://campusnet.dtu.dk/*",
         "*://eksamensplan.dtu.dk/*"
       ]
+    },
+    {
+      "resources": ["course-map-data.json"],
+      "matches": ["*://kurser.dtu.dk/*"]
     }
   ],
   "content_scripts": [
     {
       "matches": ["*://learn.inside.dtu.dk/*"],
-      "js": ["config.js", "darkmode.js", "darkmode.dark-engine.js", "darkmode.learn-accent-shell.js", "darkmode.smart-room-linker.js"],
+      "js": ["config.js", "darkmode.dom.js", "darkmode.url-pause.js", "darkmode.feature-flags.js", "darkmode.accent-theme.js", "darkmode.participant-intel-bridge.js", "darkmode.js", "darkmode.dark-engine.js", "darkmode.learn-accent-shell.js", "darkmode.smart-room-linker.js"],
       "run_at": "document_start",
       "all_frames": true,
       "match_about_blank": true
     },
     {
       "matches": ["*://learn.inside.dtu.dk/*"],
-      "js": ["darkmode.textbooks.js", "darkmode.learn-nav.js", "darkmode.learn-shell.js", "darkmode.settings.js", "darkmode.bus.js", "darkmode.content-shortcut.js", "darkmode.participant-intel-host.js", "darkmode.participant-intel-core.js", "darkmode.library.js", "darkmode.deadlines.js", "darkmode.lessons-bulk.js"],
+      "js": ["darkmode.textbooks.core.js", "darkmode.textbooks.kurser.js", "darkmode.textbooks.js", "darkmode.learn-nav.js", "darkmode.learn-shell.js", "darkmode.settings.bridge.js", "darkmode.settings.pause.js", "darkmode.settings.footer.js", "darkmode.settings.js", "darkmode.bus.js", "darkmode.library-data.js", "darkmode.library-trend.js", "darkmode.content-shortcut.js", "darkmode.participant-intel-host.js", "darkmode.participant-intel-core.js", "darkmode.library.js", "darkmode.deadlines.js"],
+      "run_at": "document_start",
+      "all_frames": false
+    },
+    {
+      "matches": ["*://learn.inside.dtu.dk/d2l/le/*"],
+      "js": ["darkmode.lessons-bulk.zip.js", "darkmode.lessons-bulk.tree.js", "darkmode.lessons-bulk.fetch.js", "darkmode.lessons-bulk.js"],
       "run_at": "document_start",
       "all_frames": false
     },
     {
       "matches": ["*://s.brightspace.com/*"],
-      "js": ["config.js", "darkmode.js", "darkmode.dark-engine.js", "darkmode.smart-room-linker.js", "darkmode.host-shells.js"],
+      "js": ["config.js", "darkmode.dom.js", "darkmode.url-pause.js", "darkmode.feature-flags.js", "darkmode.accent-theme.js", "darkmode.participant-intel-bridge.js", "darkmode.js", "darkmode.dark-engine.js", "darkmode.smart-room-linker.js", "darkmode.host-shells.js"],
       "run_at": "document_start",
       "all_frames": true,
       "match_about_blank": true
     },
     {
       "matches": ["*://sts.ait.dtu.dk/*"],
-      "js": ["config.js", "darkmode.js", "darkmode.dark-engine.js", "darkmode.smart-room-linker.js"],
+      "js": ["config.js", "darkmode.dom.js", "darkmode.url-pause.js", "darkmode.feature-flags.js", "darkmode.accent-theme.js", "darkmode.participant-intel-bridge.js", "darkmode.js", "darkmode.dark-engine.js", "darkmode.smart-room-linker.js"],
       "run_at": "document_start",
       "all_frames": true
     },
     {
       "matches": ["*://evaluering.dtu.dk/*"],
-      "js": ["config.js", "darkmode.js", "darkmode.dark-engine.js", "darkmode.smart-room-linker.js", "darkmode.host-shells.js"],
+      "js": ["config.js", "darkmode.dom.js", "darkmode.url-pause.js", "darkmode.feature-flags.js", "darkmode.accent-theme.js", "darkmode.participant-intel-bridge.js", "darkmode.js", "darkmode.dark-engine.js", "darkmode.smart-room-linker.js", "darkmode.host-shells.js"],
       "run_at": "document_start",
       "all_frames": true
     },
     {
       "matches": ["*://studieplan.dtu.dk/*"],
-      "js": ["config.js", "darkmode.js", "darkmode.dark-engine.js", "darkmode.smart-room-linker.js"],
+      "js": ["config.js", "darkmode.dom.js", "darkmode.url-pause.js", "darkmode.feature-flags.js", "darkmode.accent-theme.js", "darkmode.participant-intel-bridge.js", "darkmode.js", "darkmode.dark-engine.js", "darkmode.smart-room-linker.js"],
       "run_at": "document_start",
       "all_frames": true
     },
     {
       "matches": ["*://studieplan.dtu.dk/*"],
-      "js": ["darkmode.studyplanner-shell.js", "darkmode.studyplan-runtime.js", "darkmode.studyplan-exams.js"],
+      "js": ["darkmode.studyplanner-shell.js", "darkmode.studyplan-exam-schedule-core.js", "darkmode.skeleton.js", "darkmode.studyplan-exam-schedule.js"],
       "run_at": "document_start",
       "all_frames": false
     },
     {
       "matches": ["*://kurser.dtu.dk/*"],
-      "js": ["config.js", "darkmode.js", "darkmode.dark-engine.js", "darkmode.smart-room-linker.js"],
+      "js": ["config.js", "darkmode.dom.js", "darkmode.url-pause.js", "darkmode.feature-flags.js", "darkmode.accent-theme.js", "darkmode.participant-intel-bridge.js", "darkmode.js", "darkmode.dark-engine.js", "darkmode.smart-room-linker.js"],
       "run_at": "document_start",
       "all_frames": true
     },
     {
       "matches": ["*://kurser.dtu.dk/*"],
-      "js": ["darkmode.studyplanner-shell.js", "darkmode.kurser-widgets.js", "darkmode.kurser-course-eval.js", "darkmode.textbooks.js"],
+      "js": ["darkmode.studyplanner-shell.js", "darkmode.kurser-widgets.js", "darkmode.kurser-course-eval.js", "darkmode.kurser-course-map.js", "darkmode.studyplan-exam-schedule-core.js", "darkmode.kurser-exam-date.js", "darkmode.textbooks.core.js", "darkmode.textbooks.kurser.js", "darkmode.textbooks.js"],
       "run_at": "document_start",
       "all_frames": false
     },
     {
       "matches": ["*://karakterer.dtu.dk/*"],
-      "js": ["config.js", "darkmode.js", "darkmode.dark-engine.js", "darkmode.smart-room-linker.js"],
+      "js": ["config.js", "darkmode.dom.js", "darkmode.url-pause.js", "darkmode.feature-flags.js", "darkmode.accent-theme.js", "darkmode.participant-intel-bridge.js", "darkmode.js", "darkmode.dark-engine.js", "darkmode.smart-room-linker.js"],
       "run_at": "document_start",
       "all_frames": true
     },
     {
       "matches": ["*://sites.dtu.dk/*"],
-      "js": ["config.js", "darkmode.js", "darkmode.dark-engine.js", "darkmode.smart-room-linker.js"],
+      "js": ["config.js", "darkmode.dom.js", "darkmode.url-pause.js", "darkmode.feature-flags.js", "darkmode.accent-theme.js", "darkmode.participant-intel-bridge.js", "darkmode.js", "darkmode.dark-engine.js", "darkmode.smart-room-linker.js"],
       "run_at": "document_start",
       "all_frames": true
     },
     {
       "matches": ["*://campusnet.dtu.dk/*"],
-      "js": ["config.js", "darkmode.js", "darkmode.dark-engine.js", "darkmode.smart-room-linker.js"],
+      "js": ["config.js", "darkmode.dom.js", "darkmode.url-pause.js", "darkmode.feature-flags.js", "darkmode.accent-theme.js", "darkmode.participant-intel-bridge.js", "darkmode.js", "darkmode.dark-engine.js", "darkmode.smart-room-linker.js"],
       "run_at": "document_start",
       "all_frames": true
     },
     {
       "matches": ["*://campusnet.dtu.dk/*"],
-      "js": ["darkmode.host-shells.js", "darkmode.participant-intel-host.js", "darkmode.participant-intel-core.js", "darkmode.campusnet-gpa.js", "darkmode.participant-intel-ui.js", "darkmode.participant-intel-backfill.js"],
+      "js": ["darkmode.host-shells.js", "darkmode.participant-intel-host.js", "darkmode.participant-intel-core.js", "darkmode.campusnet-gpa.js", "darkmode.skeleton.js", "darkmode.participant-intel-ui.js", "darkmode.participant-intel-backfill.js"],
       "run_at": "document_start",
       "all_frames": false
     },
     {
       "matches": ["*://eksamensplan.dtu.dk/*"],
-      "js": ["config.js", "darkmode.js", "darkmode.dark-engine.js", "darkmode.smart-room-linker.js"],
+      "js": ["config.js", "darkmode.dom.js", "darkmode.url-pause.js", "darkmode.feature-flags.js", "darkmode.accent-theme.js", "darkmode.participant-intel-bridge.js", "darkmode.js", "darkmode.dark-engine.js", "darkmode.smart-room-linker.js"],
       "run_at": "document_start",
       "all_frames": true
     }

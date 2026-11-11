@@ -1,15 +1,12 @@
 (function () {
     'use strict';
+    var markExt = globalThis.DTUAfterDarkDom.markExt;
+    var isTopWindow = globalThis.DTUAfterDarkDom.isTopWindow;
 
     function getDeps() {
         try { return globalThis.DTUAfterDarkKurserWidgetsDeps || null; } catch (e0) { return null; }
     }
 
-    function markExt(el) {
-        var deps = getDeps();
-        if (el && deps && typeof deps.markExt === 'function') deps.markExt(el);
-        return el;
-    }
 
     function sendRuntimeMessage(msg, cb) {
         var deps = getDeps();
@@ -20,10 +17,6 @@
         if (cb) cb(null);
     }
 
-    function isTopWindow() {
-        var deps = getDeps();
-        return !!(deps && typeof deps.isTopWindow === 'function' && deps.isTopWindow());
-    }
 
     function isDarkModeEnabled() {
         var deps = getDeps();
@@ -184,16 +177,13 @@
         (document.head || document.documentElement).appendChild(style);
     }
 
+    // A var() over the root accent, so a theme picked in another tab repaints
+    // the widget. The base accent is too dark to read as text on the dark
+    // surface, and the soft one too light on white.
     function readAccent(isDark) {
-        var accent = '#1f7ae0';
-        try {
-            var styles = getComputedStyle(document.documentElement);
-            // The base accent is too dark to read as text on the dark surface,
-            // and the soft one too light on white.
-            var primary = isDark ? '--dtu-ad-accent-soft' : '--dtu-ad-accent-deep';
-            accent = (styles.getPropertyValue(primary) || styles.getPropertyValue('--dtu-ad-accent') || accent).trim() || accent;
-        } catch (e0) { }
-        return accent;
+        return isDark
+            ? 'var(--dtu-ad-accent-soft, var(--dtu-ad-accent, #1f7ae0))'
+            : 'var(--dtu-ad-accent-deep, var(--dtu-ad-accent, #1f7ae0))';
     }
 
     function applyCourseWidgetsTheme(grid) {
@@ -320,7 +310,7 @@
         if (iter.small && main && main !== iter) {
             var mainSize = (main.data && (main.data.registered || main.data.total)) || 0;
             var size = data.registered || data.total || 0;
-            notes.push('Only ' + size + ' students signed up for this exam, against ' + mainSize + ' in ' + formatGradePeriod(main.semester) + '. It is probably a re-exam.');
+            notes.push('Only ' + size + ' students signed up for this exam, against ' + mainSize + ' in ' + formatGradePeriod(main.semester) + '. It may be a re-exam, so its results may not match the regular exam.');
         }
         var pf = data.passFailCounts || {};
         var pfCount = (pf.passed || 0) + (pf.failed || 0);
@@ -629,7 +619,8 @@
             refresh: refreshCourseWidgetsLayout,
             makeEl: makeEl,
             makeColumnHead: makeColumnHead,
-            makeInfoTip: makeInfoTip
+            makeInfoTip: makeInfoTip,
+            applyTheme: applyCourseWidgetsTheme
         };
     } catch (eKurserWidgetsUi) { }
 })();

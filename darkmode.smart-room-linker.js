@@ -1,11 +1,17 @@
 (function () {
     'use strict';
+    var markExt = globalThis.DTUAfterDarkDom.markExt;
+    var isTopWindow = globalThis.DTUAfterDarkDom.isTopWindow;
 
     var MAZEMAP_CAMPUS_ID = 89; // DTU Lyngby
     var MAZEMAP_RESOLVE_CACHE_TTL_MS = 12 * 60 * 60 * 1000;
 
     var smartRoomLinkerTimer = null;
-    var smartRoomLinkerPendingRoot = null;
+    // Roots asked for before the timer fires; all are scanned (one root used to win).
+    var smartRoomLinkerPendingRoots = [];
+    var smartRoomLinkerPendingFull = false;
+    // Text nodes already read that hold no room: skipped on later scans.
+    var smartRoomLinkerSeenTextNodes = new WeakSet();
     var smartRoomLinkerLastScanTs = 0;
     var smartRoomLinkerDidFullScan = false;
     var smartRoomLinkerTooltipEl = null;
@@ -37,14 +43,7 @@
         return callDep('sendRuntimeMessage', [msg, cb], null);
     }
 
-    function markExt(el) {
-        callDep('markExt', [el], null);
-        return el;
-    }
 
-    function isTopWindow() {
-        return !!callDep('isTopWindow', [], false);
-    }
 
     function isFeatureFlagEnabled(key) {
         return !!callDep('isFeatureFlagEnabled', [key], false);
@@ -316,9 +315,9 @@
         tip.textContent = String(text || '');
         var isDark = isDarkModeEnabled();
         var bg = isDark ? '#1a1a1a' : '#ffffff';
-        var border = isDark ? '#404040' : '#d1d5db';
+        // State shows as the colour of the full 1px border, never a one-edge stripe.
+        var border = (tone === 'error') ? 'var(--dtu-ad-status-danger)' : (isDark ? '#404040' : '#d1d5db');
         var fg = isDark ? '#e0e0e0' : '#111827';
-        var accent = (tone === 'error') ? 'var(--dtu-ad-status-danger)' : 'var(--dtu-ad-status-info)';
         tip.style.cssText = 'position:fixed;z-index:999999;max-width:280px;'
             + 'padding:6px 10px;border-radius:8px;font-size:12px;'
             + 'box-shadow:' + (isDark ? '0 10px 28px rgba(0,0,0,0.45)' : '0 10px 28px rgba(15,23,42,0.16)') + ';'
@@ -327,7 +326,6 @@
         tip.style.setProperty('background-color', bg, 'important');
         tip.style.setProperty('border', '1px solid ' + border, 'important');
         tip.style.setProperty('color', fg, 'important');
-        tip.style.setProperty('border-left', '3px solid ' + accent, 'important');
         tip.style.top = Math.round(Math.max(8, rect.top - 34)) + 'px';
         tip.style.left = Math.round(Math.min(Math.max(8, rect.left), window.innerWidth - 300)) + 'px';
         (document.body || document.documentElement).appendChild(tip);
@@ -805,10 +803,13 @@
                     if (!node || node.nodeType !== 3) return NodeFilter.FILTER_REJECT;
                     var p = node.parentElement;
                     if (!p || isSmartRoomLinkerSkippableElement(p)) return NodeFilter.FILTER_REJECT;
+                    if (smartRoomLinkerSeenTextNodes.has(node)) return NodeFilter.FILTER_REJECT;
                     var v = node.nodeValue || '';
-                    if (!v || v.length < 6) return NodeFilter.FILTER_REJECT;
-                    if (!/\d{3}/.test(v)) return NodeFilter.FILTER_REJECT;
-                    if (!/(bygning|building|auditorium|\baud\b|\bB\s*[.\s]*\d{3}|\b\d{3}\s*[.\-]\s*\d)/i.test(v)) return NodeFilter.FILTER_REJECT;
+                    if (!v || v.length < 6 || !/\d{3}/.test(v)
+                        || !/(bygning|building|auditorium|\baud\b|\bB\s*[.\s]*\d{3}|\b\d{3}\s*[.\-]\s*\d)/i.test(v)) {
+                        smartRoomLinkerSeenTextNodes.add(node);
+                        return NodeFilter.FILTER_REJECT;
+                    }
                     return NodeFilter.FILTER_ACCEPT;
                 } catch (e0) {
                     return NodeFilter.FILTER_REJECT;
@@ -827,16 +828,25 @@
 
     function scheduleSmartRoomLinkerScan(rootNode, delayMs) {
         if (!shouldRunSmartRoomLinkerInThisWindow()) return;
-        if (smartRoomLinkerTimer) {
-            if (smartRoomLinkerPendingRoot == null && rootNode) smartRoomLinkerPendingRoot = rootNode;
-            return;
-        }
-        smartRoomLinkerPendingRoot = rootNode || null;
+        if (!rootNode) smartRoomLinkerPendingFull = true;
+        else if (smartRoomLinkerPendingRoots.indexOf(rootNode) < 0) smartRoomLinkerPendingRoots.push(rootNode);
+        if (smartRoomLinkerTimer) return;
         smartRoomLinkerTimer = setTimeout(function () {
             smartRoomLinkerTimer = null;
-            var pending = smartRoomLinkerPendingRoot;
-            smartRoomLinkerPendingRoot = null;
-            try { runSmartRoomLinkerScan(pending); } catch (e0) { }
+            var roots = smartRoomLinkerPendingRoots;
+            var full = smartRoomLinkerPendingFull;
+            smartRoomLinkerPendingRoots = [];
+            smartRoomLinkerPendingFull = false;
+            var start = Date.now();
+            if (full) { try { runSmartRoomLinkerScan(null); } catch (eFull) { } }
+            for (var i = 0; i < roots.length; i++) {
+                // Each scan has its own small budget; past 120 ms the rest waits for the next timer.
+                if (Date.now() - start > 120) {
+                    roots.slice(i).forEach(function (r) { scheduleSmartRoomLinkerScan(r, 200); });
+                    break;
+                }
+                try { runSmartRoomLinkerScan(roots[i]); } catch (e0) { }
+            }
         }, delayMs || 420);
     }
 
@@ -916,6 +926,7 @@
         if (smartRoomLinkerHtmlBlockProbeTimer) return;
         smartRoomLinkerHtmlBlockProbeTimer = setTimeout(function () {
             smartRoomLinkerHtmlBlockProbeTimer = null;
+            if (!shouldRunSmartRoomLinkerInThisWindow()) return;
             try {
                 var blocks = document.querySelectorAll('d2l-html-block');
                 for (var i = 0; i < blocks.length && i < 80; i++) {

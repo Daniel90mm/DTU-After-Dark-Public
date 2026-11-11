@@ -1,5 +1,8 @@
 (function () {
     'use strict';
+    var markExt = globalThis.DTUAfterDarkDom.markExt;
+    var isTopWindow = globalThis.DTUAfterDarkDom.isTopWindow;
+    var normalizeWhitespace = globalThis.DTUAfterDarkDom.normalizeWhitespace;
 
     var CONTENT_SHORTCUT_OVERRIDES_KEY = 'dtuAfterDarkContentShortcutOverridesV1';
     var contentShortcutOverrides = readContentShortcutOverridesFromLocalStorage();
@@ -11,13 +14,6 @@
         try { return globalThis.DTUAfterDarkContentShortcutDeps || null; } catch (e0) { return null; }
     }
 
-    function normalizeWhitespace(value) {
-        var deps = getDeps();
-        if (deps && typeof deps.normalizeWhitespace === 'function') {
-            return deps.normalizeWhitespace(value);
-        }
-        return String(value || '').replace(/\s+/g, ' ').trim();
-    }
 
     function storageLocalGet(defaults, cb) {
         var deps = getDeps();
@@ -35,10 +31,6 @@
         }
     }
 
-    function isTopWindow() {
-        var deps = getDeps();
-        return !!(deps && typeof deps.isTopWindow === 'function' && deps.isTopWindow());
-    }
 
     function isDTULearnHomepage() {
         var deps = getDeps();
@@ -55,11 +47,6 @@
         return !!(deps && typeof deps.isDarkModeEnabled === 'function' && deps.isDarkModeEnabled());
     }
 
-    function markExt(el) {
-        var deps = getDeps();
-        if (el && deps && typeof deps.markExt === 'function') deps.markExt(el);
-        return el;
-    }
 
     function deepQueryAll(selector, root) {
         var deps = getDeps();
@@ -108,6 +95,9 @@
         try {
             var parsed = new URL(value, location.origin);
             if (parsed.origin !== location.origin) return null;
+            // "https://learn.../\evil.com" parses to the path "//evil.com", which
+            // an href reads as another host.
+            if (/^\/\//.test(parsed.pathname)) return null;
             return (parsed.pathname || '/') + (parsed.search || '') + (parsed.hash || '');
         } catch (e) {
             return null;

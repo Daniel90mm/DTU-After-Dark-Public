@@ -35,16 +35,18 @@ A static audit of `manifest.json`, `manifest_chrome.json`, `background.js`, `dar
 
 DTU After Dark does **not** sell personal data and does **not** send personal data to advertising, analytics, or telemetry vendors.
 
-The public extension operates locally in your browser and stores settings/caches needed for features. It does not send heartbeat or usage telemetry. Participant Intelligence is disabled by default. If you enable it in Settings, the extension stores participant metadata locally for overlap and history features; nothing is collected while it is off. Pending reads re-check the setting before collecting participant metadata or drawing panels. Switching Participant Intelligence or Shared Course History off stops archive scans; an already requested response is discarded. Pending archive-widget reads and scanner controls re-check both settings before writing course history.
+The public extension operates locally in your browser and stores settings/caches needed for features. It does not send heartbeat or usage telemetry. A new install starts with Participant Intelligence, Course Composition and Retention on: Course Composition reads the participant page you open without storing names, and Retention stores only each course's participant count. Shared Course History, the part that stores participant names, s-numbers and shared courses, is off by default; if you enable it in Settings, that metadata is stored locally for overlap and history features. Nothing is collected while it is off. Updating the extension does not change settings you already have. Pending reads re-check the setting before collecting participant metadata or drawing panels. Switching Participant Intelligence or Shared Course History off stops archive scans; an already requested response is discarded. Pending archive-widget reads and scanner controls re-check both settings before writing course history.
 
 ## What Is Stored Locally
 
 ### Extension storage (`browser.storage.local` / `chrome.storage.local`)
 
 - Theme and feature preferences (dark mode mirror, accent theme, toggle states).
+- Study Planner exam schedule entries you save (course code, format, dates, and the DTU date they were based on), under `dtuAfterDarkExamScheduleV1`. They stay until you reset them.
 - Feature caches:
   - Grade stats cache (24h)
   - Course evaluation cache (24h)
+  - Course workload rating cache for the Study Planner exam schedule (7 days): the average and number of answers to the workload question of a course's latest public evaluation
   - FindIt availability cache (7d)
   - Library events/news cache (6h)
   - Shared library crowding cache (1m) when a shared library trends endpoint is configured
@@ -58,6 +60,7 @@ The public extension operates locally in your browser and stores settings/caches
 
 - Dark mode preference (`localStorage`) plus extension storage. Older `.dtu.dk` dark-mode cookies are cleared best-effort by current builds.
 - Bus widget preferences and quota counters.
+- Course map depth (how many steps back and forward) on `kurser.dtu.dk`.
 - Deadlines widget cache/state.
 - GPA simulator entries and some UI state flags.
 
@@ -76,10 +79,13 @@ Note: origin-scoped `localStorage` keys can be readable by scripts running on th
   - `https://findit.dtu.dk/*`
   - `https://evaluering.dtu.dk/*`
   - `https://student.dtu.dk/*`
+  - `https://kurser.dtu.dk/*`
   - `https://www.dtu.dk/*`
   - `https://www.bibliotek.dtu.dk/*`
 
 Grade Statistics uses anonymous public DTU requests. A failed request is not cached as an empty course; while its course page remains open, the extension waits 10 minutes before retrying. Switching the feature off cancels that retry.
+
+The Study Planner exam schedule reads DTU's public exam table (`student.dtu.dk/en/exam/exam-dates`, no cookies, cached 12 h) and the kurser.dtu.dk page of each course in the periods being shown (with your browser's DTU cookies, cached 24 h) when you open the panel. The courses in your planner basket are read from the page itself, and their kurser.dtu.dk pages are fetched the same way. Only course codes are sent; failed reads are not cached. "Add to calendar (.ics)" builds the calendar file in your browser and saves it as a download; nothing is uploaded. kurser.dtu.dk course pages read the same exam table (same 12 h cache) for their Exam date row; the course's own exam fields are read from the open page, so no course page is fetched.
 
 Course Evaluation waits 10 minutes after repeated fetch failures while its course page remains open. Switching the feature off cancels pending retries and discards late responses before rendering or starting another lookup.
 

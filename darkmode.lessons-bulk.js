@@ -1,46 +1,106 @@
 (function () {
     'use strict';
 
-    function getDeps() {
-        try { return globalThis.DTUAfterDarkLessonsBulkDeps || null; } catch (e0) { return null; }
-    }
+    var _lessonsBulkCore = globalThis.DTUAfterDarkLessonsBulkCore;
+    var getDeps = _lessonsBulkCore.getDeps;
+    var isTopWindow = _lessonsBulkCore.isTopWindow;
+    var isFeatureFlagEnabled = _lessonsBulkCore.isFeatureFlagEnabled;
+    var isDarkModeEnabled = _lessonsBulkCore.isDarkModeEnabled;
+    var deepQueryAll = _lessonsBulkCore.deepQueryAll;
+    var normalizeWhitespace = _lessonsBulkCore.normalizeWhitespace;
+    var markExt = _lessonsBulkCore.markExt;
+    var isLessonsBulkDebugEnabled = _lessonsBulkCore.isLessonsBulkDebugEnabled;
+    var logLessonsBulkDebug = _lessonsBulkCore.logLessonsBulkDebug;
 
-    function isTopWindow() {
-        var deps = getDeps();
-        return !!(deps && typeof deps.isTopWindow === 'function' && deps.isTopWindow());
-    }
+    var _lessonsBulkState = globalThis.DTUAfterDarkLessonsBulkState;
+    var _lessonsBulkUiState = _lessonsBulkState.uiState;
+    var _lessonsBulkUrlNameHints = _lessonsBulkState.urlNameHints;
+    var _lessonsLegacyApiSectionsCache = _lessonsBulkState.legacyApiSectionsCache;
+    var _lessonsLegacyModuleStructureCache = _lessonsBulkState.legacyModuleStructureCache;
+    var _lessonsLegacyBackgroundResolveState = _lessonsBulkState.legacyBackgroundResolveState;
 
-    function isFeatureFlagEnabled(key) {
-        var deps = getDeps();
-        return !!(deps && typeof deps.isFeatureFlagEnabled === 'function' && deps.isFeatureFlagEnabled(key));
-    }
+    var downloadSingleBundledZipFromUrls = globalThis.DTUAfterDarkLessonsBulkZip.downloadSingleBundledZipFromUrls;
 
-    function isDarkModeEnabled() {
-        var deps = getDeps();
-        return !!(deps && typeof deps.isDarkModeEnabled === 'function' && deps.isDarkModeEnabled());
-    }
+    var _lessonsBulkTree = globalThis.DTUAfterDarkLessonsBulkTree;
+    var getLessonsTreeLabel = _lessonsBulkTree.getLessonsTreeLabel;
+    var getLessonsSameOriginIframeDocuments = _lessonsBulkTree.getLessonsSameOriginIframeDocuments;
+    var getLessonsCandidateDocuments = _lessonsBulkTree.getLessonsCandidateDocuments;
+    var scoreLessonsDocument = _lessonsBulkTree.scoreLessonsDocument;
+    var getLessonsWorkingDocument = _lessonsBulkTree.getLessonsWorkingDocument;
+    var getLessonsRuntimeDocument = _lessonsBulkTree.getLessonsRuntimeDocument;
+    var getLessonsTocHost = _lessonsBulkTree.getLessonsTocHost;
+    var hasModernLessonsTocStructure = _lessonsBulkTree.hasModernLessonsTocStructure;
+    var getCurrentLessonsOrgUnitId = _lessonsBulkTree.getCurrentLessonsOrgUnitId;
+    var getLegacyLessonsTreeLabel = _lessonsBulkTree.getLegacyLessonsTreeLabel;
+    var isLegacyLessonsTreeDocument = _lessonsBulkTree.isLegacyLessonsTreeDocument;
+    var expandLegacyLessonsTreeAll = _lessonsBulkTree.expandLegacyLessonsTreeAll;
+    var getLegacyTopSectionSeeds = _lessonsBulkTree.getLegacyTopSectionSeeds;
+    var parseLegacySectionObjectId = _lessonsBulkTree.parseLegacySectionObjectId;
+    var legacySectionHasOnlyUnitUrls = _lessonsBulkTree.legacySectionHasOnlyUnitUrls;
+    var getLegacyItemObjectId = _lessonsBulkTree.getLegacyItemObjectId;
+    var isLegacyUnitItem = _lessonsBulkTree.isLegacyUnitItem;
+    var getLegacyItemTreeBox = _lessonsBulkTree.getLegacyItemTreeBox;
+    var getLegacyDirectChildItems = _lessonsBulkTree.getLegacyDirectChildItems;
+    var clickLegacyExpandBox = _lessonsBulkTree.clickLegacyExpandBox;
+    var resolveLegacySectionUnitUrlsViaDomExpansion = _lessonsBulkTree.resolveLegacySectionUnitUrlsViaDomExpansion;
+    var applyResolvedUrlsToLegacySections = _lessonsBulkTree.applyResolvedUrlsToLegacySections;
+    var resolveLegacySectionUnitUrlsViaHiddenFrame = _lessonsBulkTree.resolveLegacySectionUnitUrlsViaHiddenFrame;
+    var getNumericIdString = _lessonsBulkTree.getNumericIdString;
+    var isValidLessonsContentId = _lessonsBulkTree.isValidLessonsContentId;
+    var getValidLessonsContentId = _lessonsBulkTree.getValidLessonsContentId;
+    var parseLessonsTopicIdFromUrl = _lessonsBulkTree.parseLessonsTopicIdFromUrl;
+    var parseLessonsUnitIdFromUrl = _lessonsBulkTree.parseLessonsUnitIdFromUrl;
+    var sanitizeLessonsSectionUnitUrls = _lessonsBulkTree.sanitizeLessonsSectionUnitUrls;
+    var buildLegacyModuleTreeViaApi = _lessonsBulkTree.buildLegacyModuleTreeViaApi;
+    var flattenLegacyModuleTreeToSections = _lessonsBulkTree.flattenLegacyModuleTreeToSections;
+    var buildLegacyApiSectionsDeep = _lessonsBulkTree.buildLegacyApiSectionsDeep;
+    var getLegacySectionsQuality = _lessonsBulkTree.getLegacySectionsQuality;
+    var normalizeLessonsBulkSections = _lessonsBulkTree.normalizeLessonsBulkSections;
+    var shouldAttemptLegacyHiddenSectionBuild = _lessonsBulkTree.shouldAttemptLegacyHiddenSectionBuild;
+    var isLegacyQualityBetter = _lessonsBulkTree.isLegacyQualityBetter;
+    var buildLegacySectionsViaHiddenFrame = _lessonsBulkTree.buildLegacySectionsViaHiddenFrame;
+    var maybeStartLegacyApiSectionsHydration = _lessonsBulkTree.maybeStartLegacyApiSectionsHydration;
+    var buildLessonsTreeSectionsLegacy = _lessonsBulkTree.buildLessonsTreeSectionsLegacy;
+    var buildLessonsTreeSections = _lessonsBulkTree.buildLessonsTreeSections;
 
-    function deepQueryAll(selector, root) {
-        var deps = getDeps();
-        if (deps && typeof deps.deepQueryAll === 'function') {
-            return deps.deepQueryAll(selector, root);
-        }
-        return [];
-    }
-
-    function normalizeWhitespace(value) {
-        var deps = getDeps();
-        if (deps && typeof deps.normalizeWhitespace === 'function') {
-            return deps.normalizeWhitespace(value);
-        }
-        return String(value == null ? '' : value).replace(/\s+/g, ' ').trim();
-    }
-
-    function markExt(el) {
-        var deps = getDeps();
-        if (el && deps && typeof deps.markExt === 'function') deps.markExt(el);
-        return el;
-    }
+    var _lessonsBulkFetch = globalThis.DTUAfterDarkLessonsBulkFetch;
+    var toAbsoluteSamePageUrl = _lessonsBulkFetch.toAbsoluteSamePageUrl;
+    var decodeEscapedUrlText = _lessonsBulkFetch.decodeEscapedUrlText;
+    var isLikelyDownloadUrl = _lessonsBulkFetch.isLikelyDownloadUrl;
+    var isStrictFileDownloadUrl = _lessonsBulkFetch.isStrictFileDownloadUrl;
+    var getApiObjectId = _lessonsBulkFetch.getApiObjectId;
+    var getApiTopicId = _lessonsBulkFetch.getApiTopicId;
+    var getApiObjectTitle = _lessonsBulkFetch.getApiObjectTitle;
+    var getApiObjectArraysByKeyRegex = _lessonsBulkFetch.getApiObjectArraysByKeyRegex;
+    var getDirectModuleChildrenFromStructure = _lessonsBulkFetch.getDirectModuleChildrenFromStructure;
+    var getDirectTopicIdsFromStructure = _lessonsBulkFetch.getDirectTopicIdsFromStructure;
+    var fetchLegacyModuleStructureApi = _lessonsBulkFetch.fetchLegacyModuleStructureApi;
+    var collectTopicIdsFromJsonValue = _lessonsBulkFetch.collectTopicIdsFromJsonValue;
+    var collectModuleIdsFromJsonValue = _lessonsBulkFetch.collectModuleIdsFromJsonValue;
+    var fetchUnitTopicUrlsViaApi = _lessonsBulkFetch.fetchUnitTopicUrlsViaApi;
+    var fetchUnitTopicUrlsFromUnitPage = _lessonsBulkFetch.fetchUnitTopicUrlsFromUnitPage;
+    var collectDownloadUrlsFromJsonValue = _lessonsBulkFetch.collectDownloadUrlsFromJsonValue;
+    var isHtmlLikeResponse = _lessonsBulkFetch.isHtmlLikeResponse;
+    var fetchTopicApiDownloadUrls = _lessonsBulkFetch.fetchTopicApiDownloadUrls;
+    var buildLessonsTocIndex = _lessonsBulkFetch.buildLessonsTocIndex;
+    var classifyTopicFromTocIndex = _lessonsBulkFetch.classifyTopicFromTocIndex;
+    var loadLessonsTocIndex = _lessonsBulkFetch.loadLessonsTocIndex;
+    var fetchTopicViewContentDownloadUrls = _lessonsBulkFetch.fetchTopicViewContentDownloadUrls;
+    var probeTopicDownloadViaIframe = _lessonsBulkFetch.probeTopicDownloadViaIframe;
+    var fetchLessonsUnitDownloadResult = _lessonsBulkFetch.fetchLessonsUnitDownloadResult;
+    var extractDownloadUrlsFromLessonsHtml = _lessonsBulkFetch.extractDownloadUrlsFromLessonsHtml;
+    var fetchLessonsUnitDownloadUrls = _lessonsBulkFetch.fetchLessonsUnitDownloadUrls;
+    var parseLessonsTopicIds = _lessonsBulkFetch.parseLessonsTopicIds;
+    var getTopicLabelHintFromTopicUrl = _lessonsBulkFetch.getTopicLabelHintFromTopicUrl;
+    var parseLessonsUnitIds = _lessonsBulkFetch.parseLessonsUnitIds;
+    var isTopicKeyHint = _lessonsBulkFetch.isTopicKeyHint;
+    var isModuleKeyHint = _lessonsBulkFetch.isModuleKeyHint;
+    var isLessonsBulkHeavyFallbackEnabled = _lessonsBulkFetch.isLessonsBulkHeavyFallbackEnabled;
+    var normalizeTopicCompareUrl = _lessonsBulkFetch.normalizeTopicCompareUrl;
+    var findTopicNavItem = _lessonsBulkFetch.findTopicNavItem;
+    var collectTopicFileUrlsInCurrentPage = _lessonsBulkFetch.collectTopicFileUrlsInCurrentPage;
+    var lessonsBulkFetch = _lessonsBulkFetch.lessonsBulkFetch;
+    var lessonsBulkDelay = _lessonsBulkFetch.lessonsBulkDelay;
 
     var FEATURE_LEARN_LESSONS_BULK_DOWNLOAD_KEY = 'dtuAfterDarkFeatureLearnLessonsBulkDownload';
     const LESSONS_BULK_ROOT_ID = 'dtu-lessons-bulk-download-root';
@@ -53,55 +113,7 @@
     let _lessonsBulkUiInserted = false;
     var _lessonsBulkBootstrapTimer = null;
 
-    let _lessonsBulkUiState = {
-        sections: [],
-        selectedKeys: new Set(),
-        sig: '',
-        running: false,
-        lastRefreshAt: 0,
-        activeDoc: null,
-        lastLegacyExpandAt: 0
-    };
-    let _lessonsBulkUrlNameHints = new Map();
-    let _lessonsLegacyApiSectionsCache = {
-        orgUnitId: '',
-        sections: [],
-        loading: false,
-        promise: null,
-        ts: 0,
-        lastAttemptTs: 0,
-        source: ''
-    };
-    let _lessonsLegacyModuleStructureCache = new Map();
-    let _lessonsLegacyBackgroundResolveState = {
-        orgUnitId: '',
-        running: false,
-        token: 0,
-        resolvedKeys: new Set()
-    };
-
-    function isLessonsBulkDebugEnabled() {
-        try {
-            return localStorage.getItem('dtu_after_dark_bulk_debug') === '1';
-        } catch (e0) {
-            return false;
-        }
-    }
-
-    function logLessonsBulkDebug(eventName, payload) {
-        if (!isLessonsBulkDebugEnabled()) return;
-        try {
-            console.log('[DTU After Dark][LessonsBulk]', eventName, payload || {});
-        } catch (e0) { }
-    }
-
-    function isLessonsBulkHeavyFallbackEnabled() {
-        try {
-            return localStorage.getItem('dtu_after_dark_bulk_heavy_fallback') === '1';
-        } catch (e0) {
-            return false;
-        }
-    }
+    var LESSONS_BULK_SCAN_CONCURRENCY = 4;
 
     function isLessonsBulkDownloadEnabled() {
         return isFeatureFlagEnabled(FEATURE_LEARN_LESSONS_BULK_DOWNLOAD_KEY);
@@ -149,19 +161,33 @@
         var textColor = isDarkModeEnabled() ? '#e0e0e0' : '#222222';
         var mutedColor = isDarkModeEnabled() ? '#b5b5b5' : '#666666';
         var btnBg = isDarkModeEnabled() ? '#242424' : '#f7f7f7';
+        var toggleBg = isDarkModeEnabled() ? '#2d2d2d' : '#ffffff';
 
         style.textContent = ''
-            + '#' + LESSONS_BULK_ROOT_ID + '{margin-top:24px;padding-top:6px;position:relative;z-index:2;width:100%;max-width:100%;display:flex;flex-direction:column;align-items:stretch;gap:6px;clear:both;}'
+            + '#' + LESSONS_BULK_ROOT_ID + '{color-scheme:' + (isDarkModeEnabled() ? 'dark' : 'light') + ';margin-top:24px;padding-top:6px;position:relative;z-index:2;width:100%;max-width:100%;display:flex;flex-direction:column;align-items:stretch;gap:6px;clear:both;}'
+            // A full-width row in the week list's column, like the search box
+            // above it. !important beats the global dark `button` repaint.
             + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-toggle{'
-            + 'all:unset;box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;'
+            + 'all:unset;box-sizing:border-box;display:flex;align-items:center;gap:8px;'
             + 'position:relative;inset:auto;transform:none;'
-            + 'align-self:flex-start;margin:0;'
-            + 'font-size:13px;line-height:1;padding:8px 14px;border-radius:8px;cursor:pointer;font-weight:600;'
-            + 'background:' + btnBg + ';color:' + mutedColor + ';border:1px solid rgba(var(--dtu-ad-accent-rgb),0.45);'
-            + 'opacity:0.74;transition:opacity .12s ease,color .12s ease,border-color .12s ease;'
+            + 'width:100%;min-height:36px;margin:0;padding:8px 12px;border-radius:8px;cursor:pointer;'
+            + 'font-size:13px;line-height:1.25;font-weight:600;'
+            + 'background:' + toggleBg + ' !important;color:' + textColor + ' !important;border:1px solid ' + panelBorder + ' !important;'
+            + 'transition:border-color .12s cubic-bezier(0.2,0,0,1);'
             + '}'
-            + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-toggle:hover{opacity:1;color:var(--dtu-ad-accent-text, var(--dtu-ad-accent));border-color:var(--dtu-ad-accent);}'
-            + '#' + LESSONS_BULK_ROOT_ID + '.dtu-open .dtu-lbd-toggle{opacity:1;color:var(--dtu-ad-accent-text, var(--dtu-ad-accent));border-color:var(--dtu-ad-accent);}'
+            + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-toggle:hover,'
+            + '#' + LESSONS_BULK_ROOT_ID + '.dtu-open .dtu-lbd-toggle{border-color:var(--dtu-ad-accent) !important;}'
+            + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-toggle:active{background:' + panelBg + ' !important;}'
+            + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-toggle svg,#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-toggle svg path{flex:0 0 auto;width:16px;height:16px;fill:none !important;stroke:currentColor !important;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;}'
+            + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-toggle .dtu-lbd-icon{color:var(--dtu-ad-accent-text, var(--dtu-ad-accent));}'
+            + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-toggle-label{flex:1 1 auto;min-width:0;}'
+            + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-chevron{color:' + mutedColor + ';transition:transform .15s cubic-bezier(0.2,0,0,1);}'
+            + '#' + LESSONS_BULK_ROOT_ID + '.dtu-open .dtu-lbd-chevron{transform:rotate(180deg);}'
+            + '@media (prefers-reduced-motion: reduce){#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-chevron,#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-toggle{transition:none;}}'
+            // D2L draws its own 1.2rem checkboxes (appearance:none), which the
+            // dark input repaint turns into empty squares; use the native box.
+            + '#app #root-wrapper #' + LESSONS_BULK_ROOT_ID + ' input[type="checkbox"],#' + LESSONS_BULK_ROOT_ID + ' input[type="checkbox"]'
+            + '{appearance:auto !important;-webkit-appearance:checkbox !important;width:14px !important;height:14px !important;margin:2px 0 0 !important;flex:0 0 auto;}'
             + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-panel{display:none;'
             + 'min-width:0;max-width:100%;width:100%;'
             + 'padding:10px 10px 9px;border-radius:10px;'
@@ -204,2844 +230,16 @@
             + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-empty{font-size:11px;color:' + mutedColor + ';padding:4px 2px 6px;}';
     }
 
-    function toAbsoluteSamePageUrl(rawUrl, baseUrl) {
-        if (!rawUrl) return '';
-        var v = String(rawUrl).trim();
-        if (!v || /^javascript:/i.test(v) || /^mailto:/i.test(v)) return '';
-        try {
-            return new URL(v, baseUrl || window.location.href).toString();
-        } catch (e0) {
-            return '';
-        }
+    function describeLessonsBulkEmptyResult(scanResults) {
+        var results = scanResults || [];
+        var unread = results.filter(function (r) { return r && r.unread; }).length;
+        if (!unread) return 'No downloadable files found in selected sections.';
+        return 'Could not read ' + unread + ' of ' + results.length + ' lesson page'
+            + (results.length === 1 ? '' : 's') + '. Try again.';
     }
-
-    function decodeEscapedUrlText(rawUrl) {
-        if (!rawUrl) return '';
-        return String(rawUrl)
-            .replace(/&amp;/gi, '&')
-            .replace(/&quot;|&#34;|&#x22;/gi, '"')
-            .replace(/&apos;|&#39;|&#x27;/gi, "'")
-            .replace(/&lt;|&#60;|&#x3c;/gi, '<')
-            .replace(/&gt;|&#62;|&#x3e;/gi, '>')
-            .replace(/\\u002f/gi, '/')
-            .replace(/\\u003a/gi, ':')
-            .replace(/\\u003f/gi, '?')
-            .replace(/\\u003d/gi, '=')
-            .replace(/\\u0026/gi, '&')
-            .replace(/\\\//g, '/')
-            .replace(/[\u0000-\u001f]/g, '')
-            .replace(/^["']+|["')\],;]+$/g, '')
-            .trim();
-    }
-
-    function isLikelyDownloadUrl(absUrl) {
-        if (!absUrl || !/^https?:/i.test(absUrl)) return false;
-        try {
-            var parsed = new URL(absUrl, window.location.href);
-            var host = (parsed.hostname || '').toLowerCase();
-            var path = (parsed.pathname || '').toLowerCase();
-            var sameHost = host === String(window.location.hostname || '').toLowerCase();
-
-            // Keep downloader scoped to DTU Learn content and avoid Brightspace UI assets.
-            if (!sameHost) return false;
-            if (/\/d2l\/le\/lessons\//i.test(path)) return false;
-            if (/\/d2l\/error\//i.test(path)) return false;
-            if (/\/lib\/bsi\//i.test(path)) return false;
-            if (/\.(?:svg|css|js|woff2?|ttf|eot)(?:$|[?#])/i.test(path)) return false;
-
-            // Primary DTU Learn file storage path.
-            if (/\/content\/enforced\//i.test(path)) return true;
-
-            // Secondary: explicit file URLs only (avoid generic "/download" endpoints that often redirect to 404).
-            if (/\.(?:pdf|doc|docx|ppt|pptx|xls|xlsx|zip|rar|7z|txt|csv|md|m|mlx|ipynb|py|java|c|cpp|h|json|xml|jpg|jpeg|png|gif|mp4|mov|webm|avi)(?:$|[?#])/i.test(path)) return true;
-        } catch (e0) {
-            return false;
-        }
-        return false;
-    }
-
-    function isStrictFileDownloadUrl(absUrl) {
-        if (!isLikelyDownloadUrl(absUrl)) return false;
-        try {
-            var u = new URL(absUrl, window.location.href);
-            var p = (u.pathname || '').toLowerCase();
-            if (/\/d2l\/error\//i.test(p)) return false;
-            if (/\/content\/enforced\//i.test(p)) return true;
-            if (/\.(?:pdf|doc|docx|ppt|pptx|xls|xlsx|zip|rar|7z|txt|csv|md|m|mlx|ipynb|py|java|c|cpp|h|json|xml|jpg|jpeg|png|gif|mp4|mov|webm|avi)(?:$|[?#])/i.test(p)) return true;
-        } catch (e0) {
-            return false;
-        }
-        return false;
-    }
-
-    function getLessonsTreeLabel(itemEl) {
-        if (!itemEl) return '';
-        var lbl = '';
-        try { lbl = normalizeWhitespace(itemEl.getAttribute('label') || ''); } catch (e0) { lbl = ''; }
-        if (lbl) return lbl;
-
-        try {
-            var sr = itemEl.shadowRoot;
-            if (sr) {
-                var txtEl = sr.querySelector('#text, .d2l-skelitize, d2l-lessons-restricted-text');
-                if (txtEl) lbl = normalizeWhitespace(txtEl.textContent || '');
-            }
-        } catch (e1) { }
-        return lbl || 'Untitled';
-    }
-
-    function getLessonsSameOriginIframeDocuments() {
-        var out = [];
-        var iframes = [];
-        try { iframes = Array.from(document.querySelectorAll('iframe')); } catch (e0) { iframes = []; }
-        for (var i = 0; i < iframes.length; i++) {
-            var d = null;
-            try { d = iframes[i].contentDocument || (iframes[i].contentWindow && iframes[i].contentWindow.document); } catch (e1) { d = null; }
-            if (!d) continue;
-            try {
-                if (d.location && d.location.hostname === window.location.hostname) out.push(d);
-            } catch (e2) { }
-        }
-        return out;
-    }
-
-    function getLessonsCandidateDocuments(preferredDoc) {
-        var out = [];
-        if (preferredDoc && out.indexOf(preferredDoc) === -1) out.push(preferredDoc);
-        if (document && out.indexOf(document) === -1) out.push(document);
-        var iframeDocs = getLessonsSameOriginIframeDocuments();
-        iframeDocs.forEach(function (d) {
-            if (d && out.indexOf(d) === -1) out.push(d);
-        });
-        return out;
-    }
-
-    function scoreLessonsDocument(doc) {
-        if (!doc || !doc.querySelector) return -1;
-        var score = 0;
-        try { if (doc.querySelector('.navigation-menu > .navigation-search')) score += 120; } catch (e0) { }
-        try { if (doc.querySelector('.navigation-search')) score += 70; } catch (e1) { }
-        try { if (doc.querySelector('d2l-lessons-toc')) score += 90; } catch (e2) { }
-        try { if (doc.querySelector('.navigation-tree .navigation-item[data-objectid]')) score += 110; } catch (e3) { }
-        try { if (doc.querySelector('.navigation-menu')) score += 25; } catch (e4) { }
-        try {
-            var href = String(doc.location && doc.location.href ? doc.location.href : '');
-            if (/\/d2l\/ui\/apps\/smart-curriculum\//i.test(href)) score += 40;
-            if (/\/d2l\/le\/(?:lessons|content)\//i.test(href)) score += 25;
-        } catch (e5) { }
-        return score;
-    }
-
-    function getLessonsWorkingDocument(preferredDoc) {
-        var docs = getLessonsCandidateDocuments(preferredDoc);
-        var best = null;
-        var bestScore = -1;
-        docs.forEach(function (d) {
-            var s = scoreLessonsDocument(d);
-            if (s > bestScore) {
-                bestScore = s;
-                best = d;
-            }
-        });
-        return best || document;
-    }
-
-    function getLessonsRuntimeDocument(fallbackDoc) {
-        if (_lessonsBulkUiState && _lessonsBulkUiState.activeDoc) return _lessonsBulkUiState.activeDoc;
-        return getLessonsWorkingDocument(fallbackDoc || document);
-    }
-
-    function getLessonsTocHost(scopeDoc) {
-        var doc = scopeDoc || getLessonsRuntimeDocument(document);
-        var hosts = [];
-        try {
-            hosts = deepQueryAll('d2l-lessons-toc.can-search-content, d2l-lessons-toc', doc);
-        } catch (e0) {
-            hosts = [];
-        }
-        for (var i = 0; i < hosts.length; i++) {
-            var host = hosts[i];
-            if (!host || !host.shadowRoot) continue;
-            try {
-                if (deepQueryAll('d2l-list-item-nav', host.shadowRoot).length > 0) return host;
-            } catch (e1) { }
-        }
-        return hosts.length ? hosts[0] : null;
-    }
-
-    function hasModernLessonsTocStructure(scopeDoc) {
-        var host = getLessonsTocHost(scopeDoc);
-        if (!host || !host.shadowRoot) return false;
-        try {
-            return deepQueryAll('d2l-list-item-nav', host.shadowRoot).length > 0;
-        } catch (e0) {
-            return false;
-        }
-    }
-
-    function getCurrentLessonsOrgUnitId(scopeDoc) {
-        var doc = scopeDoc || getLessonsRuntimeDocument(document);
-        var hrefs = [];
-        try { if (doc && doc.location && doc.location.href) hrefs.push(String(doc.location.href)); } catch (e0) { }
-        try { if (window && window.location && window.location.href) hrefs.push(String(window.location.href)); } catch (e1) { }
-        for (var i = 0; i < hrefs.length; i++) {
-            try {
-                var u = new URL(hrefs[i], window.location.href);
-                var m = (u.pathname || '').match(/\/d2l\/le\/lessons\/(\d+)\//i);
-                if (m && m[1]) return m[1];
-                var c = (u.pathname || '').match(/\/d2l\/le\/content\/(\d+)(?:\/|$)/i);
-                if (c && c[1]) return c[1];
-            } catch (e2) { }
-        }
-        return '';
-    }
-
-    function getLegacyLessonsTreeLabel(itemEl) {
-        if (!itemEl) return 'Untitled';
-        var lbl = '';
-        try {
-            var span = itemEl.querySelector('.title-text span');
-            if (span) lbl = normalizeWhitespace(span.textContent || '');
-        } catch (e0) { lbl = ''; }
-        if (!lbl) {
-            try {
-                var box = itemEl.querySelector('[role="treeitem"]');
-                if (box) lbl = normalizeWhitespace(box.getAttribute('aria-label') || '');
-            } catch (e1) { lbl = ''; }
-        }
-        if (lbl) lbl = lbl.replace(/^selected\s+unit\.?\s*/i, '').trim();
-        return lbl || 'Untitled';
-    }
-
-    function isLegacyLessonsTreeDocument(scopeDoc) {
-        var doc = scopeDoc || getLessonsRuntimeDocument(document);
-        try {
-            return !!(doc && doc.querySelector && doc.querySelector('.navigation-tree .navigation-item[data-objectid]'));
-        } catch (e0) {
-            return false;
-        }
-    }
-
-    async function expandLegacyLessonsTreeAll(scopeDoc) {
-        var doc = scopeDoc || getLessonsRuntimeDocument(document);
-        if (!doc || !doc.querySelector) return;
-        var tree = null;
-        try { tree = doc.querySelector('.navigation-tree'); } catch (e0) { tree = null; }
-        if (!tree) return;
-
-        for (var round = 0; round < 14; round++) {
-            var collapsed = [];
-            try {
-                collapsed = Array.from(tree.querySelectorAll(
-                    '.navigation-item .unit-box[aria-expanded="false"],'
-                    + '.navigation-item .lesson-box[aria-expanded="false"],'
-                    + '.navigation-item [role="treeitem"][aria-expanded="false"]'
-                ));
-            } catch (e1) { collapsed = []; }
-            if (!collapsed.length) break;
-
-            for (var i = 0; i < collapsed.length; i++) {
-                var box = collapsed[i];
-                try {
-                    var triangle = box.querySelector('.module-triangle');
-                    if (triangle && triangle.dispatchEvent) {
-                        triangle.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: box.ownerDocument.defaultView || window }));
-                    } else if (box.dispatchEvent) {
-                        box.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: box.ownerDocument.defaultView || window }));
-                    }
-                } catch (e2) { }
-            }
-            await lessonsBulkDelay(180);
-        }
-    }
-
-    function getLegacyTopSectionSeeds(scopeDoc) {
-        var doc = scopeDoc || getLessonsRuntimeDocument(document);
-        var treeRoot = null;
-        try { treeRoot = doc.querySelector('.navigation-tree'); } catch (e0) { treeRoot = null; }
-        if (!treeRoot) return [];
-
-        var direct = [];
-        try {
-            Array.from(treeRoot.children || []).forEach(function (ch) {
-                if (ch && ch.classList && ch.classList.contains('navigation-item') && ch.hasAttribute('data-objectid')) {
-                    direct.push(ch);
-                }
-            });
-        } catch (e1) { direct = []; }
-        if (!direct.length) {
-            try { direct = Array.from(treeRoot.querySelectorAll(':scope > .navigation-item[data-objectid]')); } catch (e2) { direct = []; }
-        }
-
-        var seeds = [];
-        direct.forEach(function (itemEl) {
-            var objectId = '';
-            try { objectId = String(itemEl.getAttribute('data-objectid') || '').trim(); } catch (e3) { objectId = ''; }
-            if (!objectId || !/^\d+$/.test(objectId)) return;
-            var isUnit = false;
-            try { isUnit = !!itemEl.querySelector('.unit-box[aria-expanded], .lesson-box[aria-expanded], [role="treeitem"][aria-expanded]'); } catch (e4) { isUnit = false; }
-            if (!isUnit) return;
-            seeds.push({
-                id: objectId,
-                label: getLegacyLessonsTreeLabel(itemEl),
-                depth: 0
-            });
-        });
-        return seeds;
-    }
-
-    function parseLegacySectionObjectId(section) {
-        if (!section) return '';
-        var direct = String(section.objectId || '').trim();
-        if (/^\d+$/.test(direct)) return direct;
-        var key = String(section.key || '').trim();
-        var m = key.match(/^legacy\|(\d+)\|/i);
-        if (m && m[1]) return m[1];
-        return '';
-    }
-
-    function legacySectionHasOnlyUnitUrls(section) {
-        if (!section || !Array.isArray(section.unitUrls) || !section.unitUrls.length) return false;
-        var hasTopic = section.unitUrls.some(function (u) { return /\/topics\//i.test(String(u || '')); });
-        if (hasTopic) return false;
-        return section.unitUrls.every(function (u) { return /\/units\//i.test(String(u || '')); });
-    }
-
-    function getLegacyItemObjectId(itemEl) {
-        if (!itemEl || !itemEl.getAttribute) return '';
-        var id = String(itemEl.getAttribute('data-objectid') || '').trim();
-        return /^\d+$/.test(id) ? id : '';
-    }
-
-    function isLegacyUnitItem(itemEl) {
-        if (!itemEl || !itemEl.querySelector) return false;
-        try {
-            return !!itemEl.querySelector('.unit-box[aria-expanded], .lesson-box[aria-expanded], [role="treeitem"][aria-expanded]');
-        } catch (e0) {
-            return false;
-        }
-    }
-
-    function getLegacyItemTreeBox(itemEl) {
-        if (!itemEl || !itemEl.querySelector) return null;
-        try {
-            return itemEl.querySelector('.unit-box[aria-expanded], .lesson-box[aria-expanded], [role="treeitem"][aria-expanded]');
-        } catch (e0) {
-            return null;
-        }
-    }
-
-    function getLegacyDirectChildItems(itemEl) {
-        if (!itemEl || !itemEl.querySelectorAll) return [];
-        var out = [];
-        try {
-            var all = Array.from(itemEl.querySelectorAll('.navigation-item[data-objectid]'));
-            all.forEach(function (child) {
-                if (!child || child === itemEl) return;
-                var p = child.parentElement;
-                var nearestItem = null;
-                while (p) {
-                    if (p.classList && p.classList.contains('navigation-item') && p.hasAttribute('data-objectid')) {
-                        nearestItem = p;
-                        break;
-                    }
-                    p = p.parentElement;
-                }
-                if (nearestItem === itemEl) out.push(child);
-            });
-        } catch (e0) { out = []; }
-        return out;
-    }
-
-    function clickLegacyExpandBox(box) {
-        if (!box) return false;
-        try {
-            var triangle = box.querySelector('.module-triangle');
-            var target = triangle;
-            if (!target || !target.dispatchEvent) return false;
-            target.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: box.ownerDocument.defaultView || window }));
-            return true;
-        } catch (e0) {
-            return false;
-        }
-    }
-
-    async function resolveLegacySectionUnitUrlsViaDomExpansion(section, scopeDoc) {
-        var doc = scopeDoc || getLessonsRuntimeDocument(document);
-        if (!doc || !doc.querySelector) return [];
-        var orgUnitId = getCurrentLessonsOrgUnitId(doc);
-        if (!orgUnitId) return [];
-        var sectionObjectId = parseLegacySectionObjectId(section);
-        if (!sectionObjectId) return [];
-
-        var rootItem = null;
-        try { rootItem = doc.querySelector('.navigation-tree .navigation-item[data-objectid="' + sectionObjectId + '"]'); } catch (e0) { rootItem = null; }
-        if (!rootItem) {
-            var sampleIds = [];
-            try {
-                sampleIds = Array.from(doc.querySelectorAll('.navigation-tree .navigation-item[data-objectid]'))
-                    .slice(0, 10)
-                    .map(function (el) { return String(el.getAttribute('data-objectid') || '').trim(); })
-                    .filter(Boolean);
-            } catch (eMiss0) { sampleIds = []; }
-            logLessonsBulkDebug('legacy_dom_expand_root_missing', {
-                sectionKey: section && section.key ? section.key : '',
-                sectionObjectId: sectionObjectId,
-                docUrl: (function () { try { return String(doc.location && doc.location.href ? doc.location.href : ''); } catch (eMiss1) { return ''; } })(),
-                sampleObjectIds: sampleIds
-            });
-            return [];
-        }
-
-        var focusBefore = null;
-        try { focusBefore = doc.activeElement || null; } catch (eFocus0) { focusBefore = null; }
-        var scrollTargets = [];
-        try {
-            var se = doc.scrollingElement || doc.documentElement || doc.body;
-            if (se) scrollTargets.push(se);
-        } catch (eScr0) { }
-        try {
-            ['.navigation-container', '.navigation-menu', '.navigation-tree'].forEach(function (sel) {
-                var el = doc.querySelector(sel);
-                if (el) scrollTargets.push(el);
-            });
-        } catch (eScr1) { }
-        var seenScrollTargets = new Set();
-        scrollTargets = scrollTargets.filter(function (el) {
-            if (!el || seenScrollTargets.has(el)) return false;
-            seenScrollTargets.add(el);
-            return true;
-        });
-        var scrollSnapshot = new Map();
-        scrollTargets.forEach(function (el) {
-            try {
-                scrollSnapshot.set(el, {
-                    top: Number(el.scrollTop || 0),
-                    left: Number(el.scrollLeft || 0)
-                });
-            } catch (eScr2) { }
-        });
-        function restoreScrollSnapshot() {
-            scrollSnapshot.forEach(function (pos, el) {
-                try {
-                    if (el && el.isConnected) {
-                        el.scrollTop = pos.top;
-                        el.scrollLeft = pos.left;
-                    }
-                } catch (eScr3) { }
-            });
-        }
-
-        var queue = [rootItem];
-        var seenUnits = new Set();
-        var topicUrls = new Set();
-        var unitUrls = new Set();
-
-        for (var qi = 0; qi < queue.length; qi++) {
-            var item = queue[qi];
-            if (!item) continue;
-            var itemId = getLegacyItemObjectId(item);
-            if (!itemId) continue;
-            if (isLegacyUnitItem(item)) {
-                if (seenUnits.has(itemId)) continue;
-                seenUnits.add(itemId);
-                var unitUrl = toAbsoluteSamePageUrl('/d2l/le/lessons/' + orgUnitId + '/units/' + itemId, window.location.origin);
-                if (unitUrl) unitUrls.add(unitUrl);
-
-                var box = getLegacyItemTreeBox(item);
-                if (box) {
-                    var expanded = String(box.getAttribute('aria-expanded') || '').toLowerCase() === 'true';
-                    if (!expanded) {
-                        var childBefore = getLegacyDirectChildItems(item).length;
-                        var clicked = clickLegacyExpandBox(box);
-                        if (clicked) {
-                            for (var w = 0; w < 12; w++) {
-                                await lessonsBulkDelay(120);
-                                var nowExpanded = String(box.getAttribute('aria-expanded') || '').toLowerCase() === 'true';
-                                var childNow = getLegacyDirectChildItems(item).length;
-                                if (nowExpanded || childNow > childBefore) break;
-                            }
-                            restoreScrollSnapshot();
-                        }
-                    }
-                }
-
-                var children = getLegacyDirectChildItems(item);
-                for (var ci = 0; ci < children.length; ci++) {
-                    var child = children[ci];
-                    var childId = getLegacyItemObjectId(child);
-                    if (!childId) continue;
-                    if (isLegacyUnitItem(child)) {
-                        queue.push(child);
-                    } else {
-                        var topicUrl = toAbsoluteSamePageUrl('/d2l/le/lessons/' + orgUnitId + '/topics/' + childId, window.location.origin);
-                        if (topicUrl) topicUrls.add(topicUrl);
-                    }
-                }
-            } else {
-                var topUrl = toAbsoluteSamePageUrl('/d2l/le/lessons/' + orgUnitId + '/topics/' + itemId, window.location.origin);
-                if (topUrl) topicUrls.add(topUrl);
-            }
-            if (qi % 6 === 5) await lessonsBulkDelay(40);
-        }
-        restoreScrollSnapshot();
-        try {
-            if (focusBefore && focusBefore.isConnected && focusBefore.focus) {
-                focusBefore.focus({ preventScroll: true });
-            }
-        } catch (eFocus1) { }
-
-        var resolved = topicUrls.size ? Array.from(topicUrls) : Array.from(unitUrls);
-        logLessonsBulkDebug('legacy_dom_expand_resolve', {
-            sectionKey: section.key,
-            sectionObjectId: sectionObjectId,
-            resolvedTopics: topicUrls.size,
-            resolvedUnits: unitUrls.size,
-            resolvedCount: resolved.length
-        });
-        return resolved;
-    }
-
-    function applyResolvedUrlsToLegacySections(sectionKey, resolvedUrls) {
-        if (!sectionKey || !Array.isArray(resolvedUrls) || !resolvedUrls.length) return false;
-        var sanitized = sanitizeLessonsSectionUnitUrls(resolvedUrls);
-        if (!sanitized.length) return false;
-        var changed = false;
-        function apply(list) {
-            if (!Array.isArray(list) || !list.length) return false;
-            var localChanged = false;
-            for (var i = 0; i < list.length; i++) {
-                var s = list[i];
-                if (!s || s.key !== sectionKey) continue;
-                var prevCount = Number(s.unitCount || 0);
-                s.unitUrls = sanitized.slice();
-                s.unitCount = sanitized.length;
-                if (prevCount !== s.unitCount) localChanged = true;
-            }
-            return localChanged;
-        }
-        changed = apply(_lessonsBulkUiState.sections) || changed;
-        changed = apply(_lessonsLegacyApiSectionsCache.sections) || changed;
-        if (changed) _lessonsLegacyApiSectionsCache.ts = Date.now();
-        return changed;
-    }
-
-    async function resolveLegacySectionUnitUrlsViaHiddenFrame(section, scopeDoc) {
-        var hostDoc = scopeDoc || getLessonsRuntimeDocument(document);
-        if (!hostDoc || !hostDoc.createElement || !hostDoc.body) return [];
-        var orgUnitId = getCurrentLessonsOrgUnitId(hostDoc);
-        var sectionObjectId = parseLegacySectionObjectId(section);
-        if (!orgUnitId || !sectionObjectId) return [];
-        var startUrl = toAbsoluteSamePageUrl('/d2l/le/lessons/' + orgUnitId + '/units/' + sectionObjectId, window.location.origin);
-        if (!startUrl) return [];
-        var scannerUrls = [startUrl];
-        var fallbackScannerUrl = toAbsoluteSamePageUrl('/d2l/le/lessons/' + orgUnitId + '/', window.location.origin);
-        if (fallbackScannerUrl && scannerUrls.indexOf(fallbackScannerUrl) === -1) scannerUrls.push(fallbackScannerUrl);
-
-        function findLegacyTreeDocFromRoot(rootDoc, depth, visited) {
-            if (!rootDoc || !rootDoc.querySelector) return null;
-            var marker = null;
-            try { marker = rootDoc.querySelector('.navigation-tree .navigation-item[data-objectid]'); } catch (eMk0) { marker = null; }
-            if (marker) return rootDoc;
-            if ((depth || 0) <= 0) return null;
-            var frames = [];
-            try { frames = Array.from(rootDoc.querySelectorAll('iframe')); } catch (eFr0) { frames = []; }
-            for (var i = 0; i < frames.length; i++) {
-                var fd = null;
-                try { fd = frames[i].contentDocument || (frames[i].contentWindow && frames[i].contentWindow.document) || null; } catch (eFr1) { fd = null; }
-                if (!fd) continue;
-                try {
-                    if (visited.has(fd)) continue;
-                    visited.add(fd);
-                } catch (eVs0) { }
-                var nested = findLegacyTreeDocFromRoot(fd, (depth || 0) - 1, visited);
-                if (nested) return nested;
-            }
-            return null;
-        }
-
-        return await new Promise(function (resolve) {
-            var done = false;
-            var iframe = hostDoc.createElement('iframe');
-            var scannerIdx = -1;
-            var activeScannerUrl = '';
-            var pollToken = 0;
-            var scanStartedAt = 0;
-            markExt(iframe);
-            iframe.setAttribute('aria-hidden', 'true');
-            iframe.setAttribute('tabindex', '-1');
-            iframe.style.cssText = 'position:fixed !important;left:-20000px !important;top:0 !important;'
-                + 'width:1600px !important;height:2400px !important;opacity:0 !important;pointer-events:none !important;'
-                + 'z-index:-2147483647 !important;border:0 !important;';
-
-            function loadNextScanner() {
-                scannerIdx += 1;
-                if (scannerIdx >= scannerUrls.length) return false;
-                activeScannerUrl = scannerUrls[scannerIdx];
-                pollToken += 1;
-                scanStartedAt = Date.now();
-                try {
-                    iframe.src = activeScannerUrl;
-                    return true;
-                } catch (eNav0) {
-                    return loadNextScanner();
-                }
-            }
-
-            function finish(urls) {
-                if (done) return;
-                done = true;
-                try { iframe.remove(); } catch (eRm0) { }
-                var arr = Array.isArray(urls) ? urls : [];
-                logLessonsBulkDebug('legacy_hidden_resolve_done', {
-                    sectionKey: section && section.key ? section.key : '',
-                    sectionObjectId: sectionObjectId,
-                    scannerUrl: activeScannerUrl,
-                    scannerAttempts: scannerIdx + 1,
-                    resolvedCount: arr.length
-                });
-                resolve(arr);
-            }
-
-            var timeoutId = setTimeout(function () {
-                finish([]);
-            }, 20000);
-
-            iframe.onload = function () {
-                var thisPollToken = pollToken;
-                (async function pollReady() {
-                    if (done) return;
-                    if (thisPollToken !== pollToken) return;
-                    var scanDoc = null;
-                    try { scanDoc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document) || null; } catch (eDoc0) { scanDoc = null; }
-                    var treeDoc = null;
-                    try {
-                        treeDoc = findLegacyTreeDocFromRoot(scanDoc, 3, new Set());
-                    } catch (eReady0) { treeDoc = null; }
-                    if (!treeDoc) {
-                        if ((Date.now() - scanStartedAt) > 9000 && (scannerIdx + 1) < scannerUrls.length) {
-                            if (!loadNextScanner()) {
-                                clearTimeout(timeoutId);
-                                finish([]);
-                            }
-                            return;
-                        }
-                        await lessonsBulkDelay(120);
-                        if (!done) pollReady();
-                        return;
-                    }
-                    try {
-                        var urls = await resolveLegacySectionUnitUrlsViaDomExpansion(section, treeDoc);
-                        logLessonsBulkDebug('legacy_hidden_tree_doc', {
-                            sectionKey: section && section.key ? section.key : '',
-                            treeDocUrl: (function () { try { return String(treeDoc.location && treeDoc.location.href ? treeDoc.location.href : ''); } catch (eTD0) { return ''; } })(),
-                            scannerUrl: activeScannerUrl,
-                            sectionObjectId: sectionObjectId
-                        });
-                        if ((!urls || !urls.length) && (scannerIdx + 1) < scannerUrls.length) {
-                            if (!loadNextScanner()) {
-                                clearTimeout(timeoutId);
-                                finish([]);
-                            }
-                            return;
-                        }
-                        clearTimeout(timeoutId);
-                        finish(urls);
-                    } catch (eRun0) {
-                        if ((scannerIdx + 1) < scannerUrls.length) {
-                            if (!loadNextScanner()) {
-                                clearTimeout(timeoutId);
-                                finish([]);
-                            }
-                            return;
-                        }
-                        clearTimeout(timeoutId);
-                        finish([]);
-                    }
-                })();
-            };
-
-            try {
-                hostDoc.body.appendChild(iframe);
-                if (!loadNextScanner()) {
-                    clearTimeout(timeoutId);
-                    finish([]);
-                }
-            } catch (eApp0) {
-                clearTimeout(timeoutId);
-                finish([]);
-            }
-        });
-    }
-
-    function getNumericIdString(value) {
-        if (value == null) return '';
-        var t = typeof value;
-        if (t === 'number') {
-            if (!isFinite(value)) return '';
-            var n = Math.floor(value);
-            return n > 0 ? String(n) : '';
-        }
-        var s = String(value).trim();
-        return /^\d+$/.test(s) ? s : '';
-    }
-
-    function isValidLessonsContentId(idText) {
-        var id = getNumericIdString(idText);
-        if (!id) return false;
-        var n = Number(id);
-        return isFinite(n) && n >= 1000;
-    }
-
-    function getValidLessonsContentId(value) {
-        var id = getNumericIdString(value);
-        if (!id) return '';
-        return isValidLessonsContentId(id) ? id : '';
-    }
-
-    function parseLessonsTopicIdFromUrl(url) {
-        try {
-            var u = new URL(String(url || ''), window.location.href);
-            var m = (u.pathname || '').match(/\/d2l\/le\/lessons\/\d+\/topics\/(\d+)/i);
-            return (m && m[1]) ? String(m[1]) : '';
-        } catch (e0) {
-            return '';
-        }
-    }
-
-    function parseLessonsUnitIdFromUrl(url) {
-        try {
-            var u = new URL(String(url || ''), window.location.href);
-            var m = (u.pathname || '').match(/\/d2l\/le\/lessons\/\d+\/units\/(\d+)/i);
-            return (m && m[1]) ? String(m[1]) : '';
-        } catch (e0) {
-            return '';
-        }
-    }
-
-    function sanitizeLessonsSectionUnitUrls(urls) {
-        var out = new Set();
-        var dropped = 0;
-        (Array.isArray(urls) ? urls : []).forEach(function (raw) {
-            var abs = toAbsoluteSamePageUrl(raw, window.location.origin);
-            if (!abs) return;
-            var topicId = parseLessonsTopicIdFromUrl(abs);
-            if (topicId) {
-                if (isValidLessonsContentId(topicId)) out.add(abs);
-                else dropped++;
-                return;
-            }
-            var unitId = parseLessonsUnitIdFromUrl(abs);
-            if (unitId) {
-                if (isValidLessonsContentId(unitId)) out.add(abs);
-                else dropped++;
-                return;
-            }
-        });
-        if (dropped) {
-            logLessonsBulkDebug('sanitize_section_urls_drop', {
-                inputCount: Array.isArray(urls) ? urls.length : 0,
-                outputCount: out.size,
-                dropped: dropped
-            });
-        }
-        return Array.from(out);
-    }
-
-    function getApiObjectId(obj) {
-        if (!obj || typeof obj !== 'object') return '';
-        var candidates = [
-            obj.Id, obj.id, obj.ID,
-            obj.ModuleId, obj.moduleId, obj.ModuleID, obj.moduleID, obj.Module_id, obj.module_id,
-            obj.UnitId, obj.unitId, obj.UnitID, obj.unitID,
-            obj.LessonId, obj.lessonId, obj.LessonID, obj.lessonID,
-            obj.FolderId, obj.folderId, obj.FolderID, obj.folderID,
-            obj.ObjectId, obj.objectId, obj.ObjectID, obj.objectID,
-            obj.ContentObjectId, obj.contentObjectId, obj.ContentObjectID, obj.contentObjectID,
-            obj.Identifier, obj.identifier,
-            obj.ItemId, obj.itemId, obj.ItemID, obj.itemID
-        ];
-        for (var i = 0; i < candidates.length; i++) {
-            var id = getValidLessonsContentId(candidates[i]);
-            if (id) return id;
-        }
-        return '';
-    }
-
-    function getApiTopicId(obj) {
-        if (!obj || typeof obj !== 'object') return '';
-        var topicCandidates = [
-            obj.TopicId, obj.topicId, obj.TopicID, obj.topicID, obj.topic_id,
-            obj.TopicIdentifier, obj.topicIdentifier, obj.topic_identifier
-        ];
-        for (var i = 0; i < topicCandidates.length; i++) {
-            var tid = getValidLessonsContentId(topicCandidates[i]);
-            if (tid) return tid;
-        }
-
-        var typeVal = String(obj.Type || obj.type || obj.ContentObjectType || obj.contentObjectType || obj.ObjectType || '').toLowerCase();
-        var id = getApiObjectId(obj);
-        if (id && /(topic|file|activity|document)/.test(typeVal) && !/(module|lesson|unit|folder)/.test(typeVal)) return id;
-        return '';
-    }
-
-    function getApiObjectTitle(obj, fallback) {
-        if (!obj || typeof obj !== 'object') return fallback || '';
-        var title = obj.Title;
-        if (title == null) title = obj.title;
-        if (title == null) title = obj.Name;
-        if (title == null) title = obj.name;
-        if (title == null) title = obj.ShortTitle;
-        if (title == null) title = obj.shortTitle;
-        if (title == null) title = obj.Label;
-        if (title == null) title = obj.label;
-        var txt = normalizeWhitespace(String(title == null ? '' : title));
-        return txt || (fallback || '');
-    }
-
-    function getApiObjectArraysByKeyRegex(obj, re) {
-        var out = [];
-        if (!obj || typeof obj !== 'object') return out;
-        Object.keys(obj).forEach(function (k) {
-            var v = obj[k];
-            if (!Array.isArray(v)) return;
-            if (!re.test(String(k || ''))) return;
-            v.forEach(function (item) {
-                if (item && typeof item === 'object') {
-                    out.push(item);
-                    return;
-                }
-                var id = getValidLessonsContentId(item);
-                if (id) {
-                    out.push({
-                        Id: id,
-                        Type: String(k || ''),
-                        __fromPrimitiveId: true
-                    });
-                }
-            });
-        });
-        return out;
-    }
-
-    function getDirectModuleChildrenFromStructure(structureObj, currentModuleId) {
-        var out = [];
-        var seen = new Set();
-        var candidates = getApiObjectArraysByKeyRegex(structureObj, /(modules?|lessons?|units?|folders?)/i);
-        candidates.forEach(function (obj) {
-            var id = getApiObjectId(obj);
-            if (!id) return;
-            if (currentModuleId && id === String(currentModuleId)) return;
-            if (seen.has(id)) return;
-            var topicId = getApiTopicId(obj);
-            if (topicId && topicId === id) return;
-            seen.add(id);
-            out.push({ id: id, title: getApiObjectTitle(obj, 'Section ' + id) });
-        });
-        return out;
-    }
-
-    function getDirectTopicIdsFromStructure(structureObj) {
-        var out = new Set();
-        var candidates = getApiObjectArraysByKeyRegex(structureObj, /(topics?|activities?|objects?)/i);
-        candidates.forEach(function (obj) {
-            var tid = getApiTopicId(obj);
-            if (tid) out.add(tid);
-        });
-        return out;
-    }
-
-    async function fetchLegacyModuleStructureApi(orgUnitId, moduleId) {
-        var key = String(orgUnitId) + ':' + String(moduleId);
-        var existing = _lessonsLegacyModuleStructureCache.get(key);
-        if (existing && existing.json && (Date.now() - existing.ts) < 1000 * 60 * 20) return existing.json;
-        if (existing && existing.promise) return existing.promise;
-
-        var entry = existing || { json: null, ts: 0, promise: null };
-        entry.promise = (async function () {
-            var versions = ['1.75', '1.74', '1.73', '1.72', '1.71', '1.70', '1.69', '1.68', '1.67'];
-            for (var i = 0; i < versions.length; i++) {
-                var endpoint = '/d2l/api/le/' + versions[i] + '/' + orgUnitId + '/content/modules/' + moduleId + '/structure/';
-                try {
-                    var abs = toAbsoluteSamePageUrl(endpoint, window.location.origin);
-                    if (!abs) continue;
-                    var resp = await fetch(abs, { credentials: 'include', cache: 'no-store', headers: { 'Accept': 'application/json' } });
-                    if (!resp || !resp.ok) continue;
-                    var json = null;
-                    try { json = await resp.json(); } catch (e0) { json = null; }
-                    if (!json) continue;
-                    entry.json = json;
-                    entry.ts = Date.now();
-                    _lessonsLegacyModuleStructureCache.set(key, entry);
-                    return json;
-                } catch (e1) { }
-            }
-            return null;
-        })();
-        _lessonsLegacyModuleStructureCache.set(key, entry);
-        var result = await entry.promise;
-        entry.promise = null;
-        _lessonsLegacyModuleStructureCache.set(key, entry);
-        return result;
-    }
-
-    async function buildLegacyModuleTreeViaApi(orgUnitId, moduleId, titleHint, depth, visited) {
-        var id = String(moduleId || '').trim();
-        if (!id || !/^\d+$/.test(id)) return null;
-        if (visited.has(id)) return null;
-        visited.add(id);
-
-        var structure = await fetchLegacyModuleStructureApi(orgUnitId, id);
-        var nodeTitle = getApiObjectTitle(structure || {}, titleHint || ('Section ' + id));
-        var topicIds = getDirectTopicIdsFromStructure(structure || {});
-        if (!topicIds.size) {
-            collectTopicIdsFromJsonValue(structure || {}, topicIds, new WeakSet());
-        }
-        var childDefs = getDirectModuleChildrenFromStructure(structure || {}, id);
-        if (!childDefs.length) {
-            var fallbackChildIds = new Set();
-            collectModuleIdsFromJsonValue(structure || {}, id, fallbackChildIds, new WeakSet());
-            childDefs = Array.from(fallbackChildIds).map(function (cid) {
-                return { id: String(cid), title: 'Section ' + String(cid) };
-            });
-        }
-        var children = [];
-        for (var i = 0; i < childDefs.length; i++) {
-            var childNode = await buildLegacyModuleTreeViaApi(orgUnitId, childDefs[i].id, childDefs[i].title, depth + 1, visited);
-            if (childNode) children.push(childNode);
-        }
-        return {
-            id: id,
-            title: nodeTitle || ('Section ' + id),
-            depth: depth || 0,
-            topicIds: topicIds,
-            children: children
-        };
-    }
-
-    function flattenLegacyModuleTreeToSections(node, orgUnitId, outSections) {
-        if (!node) return new Set();
-        var totalTopicIds = new Set(Array.from(node.topicIds || []));
-        (node.children || []).forEach(function (child) {
-            var childTopics = flattenLegacyModuleTreeToSections(child, orgUnitId, outSections);
-            childTopics.forEach(function (tid) { totalTopicIds.add(tid); });
-        });
-
-        var unitUrls = Array.from(totalTopicIds).map(function (tid) {
-            return toAbsoluteSamePageUrl('/d2l/le/lessons/' + orgUnitId + '/topics/' + tid, window.location.origin);
-        }).filter(Boolean);
-        if (!unitUrls.length) {
-            var ownUnit = toAbsoluteSamePageUrl('/d2l/le/lessons/' + orgUnitId + '/units/' + node.id, window.location.origin);
-            if (ownUnit) unitUrls = [ownUnit];
-        }
-        unitUrls = sanitizeLessonsSectionUnitUrls(unitUrls);
-
-        if (unitUrls.length) {
-            outSections.push({
-                key: 'legacy|' + node.id + '|' + (node.title || ('Section ' + node.id)),
-                label: node.title || ('Section ' + node.id),
-                depth: node.depth || 0,
-                objectId: String(node.id || ''),
-                unitUrls: unitUrls,
-                unitCount: unitUrls.length
-            });
-        }
-        return totalTopicIds;
-    }
-
-    async function buildLegacyApiSectionsDeep(scopeDoc) {
-        var doc = scopeDoc || getLessonsRuntimeDocument(document);
-        var orgUnitId = getCurrentLessonsOrgUnitId(doc);
-        if (!orgUnitId) return [];
-
-        var seeds = getLegacyTopSectionSeeds(doc);
-        if (!seeds.length) return [];
-
-        var visited = new Set();
-        var sections = [];
-        for (var i = 0; i < seeds.length; i++) {
-            var tree = await buildLegacyModuleTreeViaApi(orgUnitId, seeds[i].id, seeds[i].label, 0, visited);
-            if (!tree) continue;
-            flattenLegacyModuleTreeToSections(tree, orgUnitId, sections);
-        }
-        sections = normalizeLessonsBulkSections(sections);
-        logLessonsBulkDebug('legacy_api_sections_built', {
-            orgUnitId: orgUnitId,
-            count: sections.length,
-            sample: sections.slice(0, 20).map(function (s) { return { label: s.label, depth: s.depth, unitCount: s.unitCount }; })
-        });
-        return sections;
-    }
-
-    function getLegacySectionsQuality(sections) {
-        var list = Array.isArray(sections) ? sections : [];
-        var q = { count: list.length, topicUrls: 0, unitUrls: 0, maxDepth: 0 };
-        for (var i = 0; i < list.length; i++) {
-            var s = list[i];
-            if (!s) continue;
-            var d = Number(s.depth || 0);
-            if (d > q.maxDepth) q.maxDepth = d;
-            var urls = Array.isArray(s.unitUrls) ? s.unitUrls : [];
-            for (var j = 0; j < urls.length; j++) {
-                var u = String(urls[j] || '');
-                if (/\/topics\//i.test(u)) q.topicUrls++;
-                else if (/\/units\//i.test(u)) q.unitUrls++;
-            }
-        }
-        return q;
-    }
-
-    function normalizeLessonsBulkSections(sections) {
-        var out = [];
-        var seen = new Set();
-        (Array.isArray(sections) ? sections : []).forEach(function (s, idx) {
-            if (!s) return;
-            var key = String(s.key || '').trim() || ('section-' + idx);
-            if (seen.has(key)) return;
-            var unitUrls = sanitizeLessonsSectionUnitUrls(Array.isArray(s.unitUrls) ? s.unitUrls : []);
-            if (!unitUrls.length) return;
-            out.push({
-                key: key,
-                label: normalizeWhitespace(String(s.label || 'Untitled')) || 'Untitled',
-                depth: Number(s.depth || 0) || 0,
-                objectId: String(s.objectId || '').trim(),
-                unitUrls: unitUrls,
-                unitCount: unitUrls.length
-            });
-            seen.add(key);
-        });
-        return out;
-    }
-
-    function shouldAttemptLegacyHiddenSectionBuild(sections) {
-        var q = getLegacySectionsQuality(sections);
-        if (!q.count) return true;
-        if (!q.topicUrls) return true;
-        if (q.maxDepth <= 0) return true;
-        return false;
-    }
-
-    function isLegacyQualityBetter(candidate, baseline) {
-        var c = getLegacySectionsQuality(candidate);
-        var b = getLegacySectionsQuality(baseline);
-        if (c.topicUrls !== b.topicUrls) return c.topicUrls > b.topicUrls;
-        if (c.maxDepth !== b.maxDepth) return c.maxDepth > b.maxDepth;
-        if (c.count !== b.count) return c.count > b.count;
-        return false;
-    }
-
-    async function buildLegacySectionsViaHiddenFrame(scopeDoc) {
-        var hostDoc = scopeDoc || getLessonsRuntimeDocument(document);
-        if (!hostDoc || !hostDoc.createElement || !hostDoc.body) return [];
-        var orgUnitId = getCurrentLessonsOrgUnitId(hostDoc);
-        if (!orgUnitId) return [];
-
-        var hostHref = '';
-        try { hostHref = String(hostDoc.location && hostDoc.location.href ? hostDoc.location.href : ''); } catch (eH0) { hostHref = ''; }
-        var scannerUrls = [];
-        if (hostHref && /\/d2l\/ui\/apps\/smart-curriculum\//i.test(hostHref)) scannerUrls.push(hostHref);
-        var lessonsRootUrl = toAbsoluteSamePageUrl('/d2l/le/lessons/' + orgUnitId + '/', window.location.origin);
-        if (lessonsRootUrl && scannerUrls.indexOf(lessonsRootUrl) === -1) scannerUrls.push(lessonsRootUrl);
-        if (!scannerUrls.length) return [];
-
-        function findLegacyTreeDocFromRoot(rootDoc, depth, visited) {
-            if (!rootDoc || !rootDoc.querySelector) return null;
-            var marker = null;
-            try { marker = rootDoc.querySelector('.navigation-tree .navigation-item[data-objectid]'); } catch (eMk0) { marker = null; }
-            if (marker) return rootDoc;
-            if ((depth || 0) <= 0) return null;
-            var frames = [];
-            try { frames = Array.from(rootDoc.querySelectorAll('iframe')); } catch (eFr0) { frames = []; }
-            for (var i = 0; i < frames.length; i++) {
-                var fd = null;
-                try { fd = frames[i].contentDocument || (frames[i].contentWindow && frames[i].contentWindow.document) || null; } catch (eFr1) { fd = null; }
-                if (!fd) continue;
-                try {
-                    if (visited.has(fd)) continue;
-                    visited.add(fd);
-                } catch (eVs0) { }
-                var nested = findLegacyTreeDocFromRoot(fd, (depth || 0) - 1, visited);
-                if (nested) return nested;
-            }
-            return null;
-        }
-
-        return await new Promise(function (resolve) {
-            var done = false;
-            var iframe = hostDoc.createElement('iframe');
-            var scannerIdx = -1;
-            var activeScannerUrl = '';
-            var pollToken = 0;
-            var scanStartedAt = 0;
-            markExt(iframe);
-            iframe.setAttribute('aria-hidden', 'true');
-            iframe.setAttribute('tabindex', '-1');
-            iframe.style.cssText = 'position:fixed !important;left:-20000px !important;top:0 !important;'
-                + 'width:1600px !important;height:2400px !important;opacity:0 !important;pointer-events:none !important;'
-                + 'z-index:-2147483647 !important;border:0 !important;';
-
-            function loadNextScanner() {
-                scannerIdx += 1;
-                if (scannerIdx >= scannerUrls.length) return false;
-                activeScannerUrl = scannerUrls[scannerIdx];
-                pollToken += 1;
-                scanStartedAt = Date.now();
-                try {
-                    iframe.src = activeScannerUrl;
-                    return true;
-                } catch (eNav0) {
-                    return loadNextScanner();
-                }
-            }
-
-            function finish(sections) {
-                if (done) return;
-                done = true;
-                try { iframe.remove(); } catch (eRm0) { }
-                var list = Array.isArray(sections) ? sections : [];
-                logLessonsBulkDebug('legacy_hidden_sections_built', {
-                    orgUnitId: orgUnitId,
-                    scannerUrl: activeScannerUrl,
-                    scannerAttempts: scannerIdx + 1,
-                    count: list.length,
-                    sample: list.slice(0, 16).map(function (s) { return { key: s.key, label: s.label, depth: s.depth, unitCount: s.unitCount }; })
-                });
-                resolve(list);
-            }
-
-            var timeoutId = setTimeout(function () {
-                finish([]);
-            }, 26000);
-
-            iframe.onload = function () {
-                var thisPollToken = pollToken;
-                (async function pollReady() {
-                    if (done) return;
-                    if (thisPollToken !== pollToken) return;
-                    var scanDoc = null;
-                    try { scanDoc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document) || null; } catch (eDoc0) { scanDoc = null; }
-                    var treeDoc = null;
-                    try {
-                        treeDoc = findLegacyTreeDocFromRoot(scanDoc, 3, new Set());
-                    } catch (eReady0) { treeDoc = null; }
-                    if (!treeDoc) {
-                        if ((Date.now() - scanStartedAt) > 9000 && (scannerIdx + 1) < scannerUrls.length) {
-                            if (!loadNextScanner()) {
-                                clearTimeout(timeoutId);
-                                finish([]);
-                            }
-                            return;
-                        }
-                        await lessonsBulkDelay(120);
-                        if (!done) pollReady();
-                        return;
-                    }
-                    try {
-                        await expandLegacyLessonsTreeAll(treeDoc);
-                        await lessonsBulkDelay(180);
-                        var sections = normalizeLessonsBulkSections(buildLessonsTreeSectionsLegacy(treeDoc));
-                        if ((!sections || !sections.length) && (scannerIdx + 1) < scannerUrls.length) {
-                            if (!loadNextScanner()) {
-                                clearTimeout(timeoutId);
-                                finish([]);
-                            }
-                            return;
-                        }
-                        clearTimeout(timeoutId);
-                        finish(sections || []);
-                    } catch (eRun0) {
-                        if ((scannerIdx + 1) < scannerUrls.length) {
-                            if (!loadNextScanner()) {
-                                clearTimeout(timeoutId);
-                                finish([]);
-                            }
-                            return;
-                        }
-                        clearTimeout(timeoutId);
-                        finish([]);
-                    }
-                })();
-            };
-
-            try {
-                hostDoc.body.appendChild(iframe);
-                if (!loadNextScanner()) {
-                    clearTimeout(timeoutId);
-                    finish([]);
-                }
-            } catch (eApp0) {
-                clearTimeout(timeoutId);
-                finish([]);
-            }
-        });
-    }
-
-    function maybeStartLegacyApiSectionsHydration(scopeDoc, rootEl) {
-        var doc = scopeDoc || getLessonsRuntimeDocument(document);
-        if (!isLegacyLessonsTreeDocument(doc)) return;
-        var orgUnitId = getCurrentLessonsOrgUnitId(doc);
-        if (!orgUnitId) return;
-
-        var now = Date.now();
-        if (_lessonsLegacyApiSectionsCache.orgUnitId !== orgUnitId) {
-            _lessonsLegacyApiSectionsCache.orgUnitId = orgUnitId;
-            _lessonsLegacyApiSectionsCache.sections = [];
-            _lessonsLegacyApiSectionsCache.loading = false;
-            _lessonsLegacyApiSectionsCache.promise = null;
-            _lessonsLegacyApiSectionsCache.ts = 0;
-            _lessonsLegacyApiSectionsCache.lastAttemptTs = 0;
-            _lessonsLegacyApiSectionsCache.source = '';
-            _lessonsLegacyBackgroundResolveState.orgUnitId = orgUnitId;
-            _lessonsLegacyBackgroundResolveState.running = false;
-            _lessonsLegacyBackgroundResolveState.token = 0;
-            _lessonsLegacyBackgroundResolveState.resolvedKeys = new Set();
-        }
-
-        var allowHiddenBuild = !!(rootEl && rootEl.classList && rootEl.classList.contains('dtu-open'));
-        if (_lessonsLegacyApiSectionsCache.orgUnitId === orgUnitId) {
-            if (_lessonsLegacyApiSectionsCache.loading) return;
-            var cached = normalizeLessonsBulkSections(_lessonsLegacyApiSectionsCache.sections || []);
-            var cacheFresh = cached.length && (now - (_lessonsLegacyApiSectionsCache.ts || 0)) < 1000 * 60 * 20;
-            var needsHiddenUpgrade = allowHiddenBuild
-                && cached.length
-                && shouldAttemptLegacyHiddenSectionBuild(cached)
-                && String(_lessonsLegacyApiSectionsCache.source || '') !== 'hidden';
-            if (cacheFresh && !needsHiddenUpgrade) return;
-            if ((now - (_lessonsLegacyApiSectionsCache.lastAttemptTs || 0)) < 1000 * 12 && !needsHiddenUpgrade) return;
-        }
-
-        _lessonsLegacyApiSectionsCache.lastAttemptTs = now;
-        _lessonsLegacyApiSectionsCache.loading = true;
-        _lessonsLegacyApiSectionsCache.promise = (async function () {
-            try {
-                var sections = [];
-                var resolvedSource = '';
-                if (allowHiddenBuild) {
-                    sections = await buildLegacySectionsViaHiddenFrame(doc);
-                    if (sections && sections.length) resolvedSource = 'hidden';
-                }
-                if (!sections || !sections.length) {
-                    sections = await buildLegacyApiSectionsDeep(doc);
-                    if (sections && sections.length) resolvedSource = 'api';
-                    if (allowHiddenBuild && shouldAttemptLegacyHiddenSectionBuild(sections)) {
-                        var hiddenSections = await buildLegacySectionsViaHiddenFrame(doc);
-                        if (isLegacyQualityBetter(hiddenSections, sections)) {
-                            sections = hiddenSections;
-                            resolvedSource = 'hidden';
-                        }
-                    }
-                }
-                sections = normalizeLessonsBulkSections(sections);
-                if (Array.isArray(sections) && sections.length) {
-                    _lessonsLegacyApiSectionsCache.sections = sections;
-                    _lessonsLegacyApiSectionsCache.ts = Date.now();
-                    _lessonsLegacyApiSectionsCache.source = resolvedSource || _lessonsLegacyApiSectionsCache.source || 'api';
-                }
-            } catch (e0) {
-                logLessonsBulkDebug('legacy_api_sections_error', { error: String(e0 && e0.message ? e0.message : e0) });
-            } finally {
-                _lessonsLegacyApiSectionsCache.loading = false;
-                _lessonsLegacyApiSectionsCache.promise = null;
-                if (!_lessonsLegacyApiSectionsCache.ts) _lessonsLegacyApiSectionsCache.ts = Date.now();
-                if (rootEl && rootEl.isConnected && _lessonsBulkUiState.activeDoc === doc) {
-                    try { refreshLessonsBulkDownloadUi(rootEl, true); } catch (e1) { }
-                }
-            }
-        })();
-    }
-
-    function buildLessonsTreeSectionsLegacy(scopeDoc) {
-        var doc = scopeDoc || getLessonsRuntimeDocument(document);
-        var orgUnitId = getCurrentLessonsOrgUnitId(doc);
-        if (!orgUnitId) return [];
-
-        var treeRoot = null;
-        try { treeRoot = doc.querySelector('.navigation-tree'); } catch (e0) { treeRoot = null; }
-        if (!treeRoot) return [];
-
-        var itemEls = [];
-        try { itemEls = Array.from(treeRoot.querySelectorAll('.navigation-item[data-objectid]')); } catch (e1) { itemEls = []; }
-        if (!itemEls.length) return [];
-
-        var nodeByEl = new Map();
-        var nodes = itemEls.map(function (itemEl, idx) {
-            var objectId = '';
-            try { objectId = String(itemEl.getAttribute('data-objectid') || '').trim(); } catch (e2) { objectId = ''; }
-            var label = getLegacyLessonsTreeLabel(itemEl);
-            var isUnit = false;
-            try { isUnit = !!itemEl.querySelector('.unit-box[aria-expanded], .lesson-box[aria-expanded], [role="treeitem"][aria-expanded]'); } catch (e3) { isUnit = false; }
-            if (!isUnit) {
-                try { isUnit = !!itemEl.querySelector('.module-triangle'); } catch (e4) { isUnit = false; }
-            }
-
-            var href = '';
-            try {
-                href = (itemEl.getAttribute('action-href') || itemEl.getAttribute('href') || '').trim();
-            } catch (e5) { href = ''; }
-            if (!href && objectId) {
-                href = '/d2l/le/lessons/' + orgUnitId + '/' + (isUnit ? 'units' : 'topics') + '/' + objectId;
-            }
-            var node = {
-                idx: idx,
-                key: objectId || ('legacy-node-' + idx),
-                objectId: objectId,
-                label: label,
-                href: href,
-                isUnit: !!isUnit,
-                parent: null,
-                children: [],
-                depth: 0,
-                el: itemEl
-            };
-            nodeByEl.set(itemEl, node);
-            return node;
-        });
-        if (!nodes.length) return [];
-
-        nodes.forEach(function (node) {
-            var cur = node.el ? node.el.parentElement : null;
-            while (cur) {
-                if (cur.classList && cur.classList.contains('navigation-item') && cur.hasAttribute('data-objectid')) {
-                    var parentNode = nodeByEl.get(cur);
-                    if (parentNode && parentNode !== node) {
-                        node.parent = parentNode;
-                        parentNode.children.push(node);
-                        node.depth = parentNode.depth + 1;
-                    }
-                    break;
-                }
-                cur = cur.parentElement;
-            }
-        });
-
-        function isLegacySectionNode(n) {
-            if (!n || !n.isUnit) return false;
-            if (/\/units\//i.test(String(n.href || ''))) return true;
-            // Fallback for cases where href is not populated yet.
-            return true;
-        }
-        var candidateSections = nodes.filter(isLegacySectionNode);
-        if (!candidateSections.length) return [];
-        candidateSections.sort(function (a, b) { return (a.idx || 0) - (b.idx || 0); });
-
-        var seen = new Set();
-        var sections = [];
-        candidateSections.forEach(function (sectionNode) {
-            var lessonUrls = new Set();
-            var topicUrls = new Set();
-            var pending = [sectionNode];
-            while (pending.length) {
-                var cur = pending.pop();
-                if (!cur) continue;
-                var abs = toAbsoluteSamePageUrl(cur.href, window.location.href);
-                if (abs && /\/d2l\/le\/lessons\//i.test(abs)) {
-                    lessonUrls.add(abs);
-                    if (/\/topics\//i.test(abs)) topicUrls.add(abs);
-                }
-                if (cur.children && cur.children.length) {
-                    cur.children.forEach(function (child) { pending.push(child); });
-                }
-            }
-            var unitUrls = topicUrls.size ? Array.from(topicUrls) : Array.from(lessonUrls);
-            unitUrls = sanitizeLessonsSectionUnitUrls(unitUrls);
-            if (!unitUrls.length) return;
-
-            var key = 'legacy|' + sectionNode.key + '|' + sectionNode.label;
-            if (seen.has(key)) return;
-            seen.add(key);
-            sections.push({
-                key: key,
-                label: sectionNode.label || 'Untitled',
-                depth: sectionNode.depth || 0,
-                objectId: sectionNode.objectId || '',
-                unitUrls: unitUrls,
-                unitCount: unitUrls.length
-            });
-        });
-        return sections;
-    }
-
-    function buildLessonsTreeSections(scopeDoc) {
-        var doc = scopeDoc || getLessonsRuntimeDocument(document);
-        var tocHost = getLessonsTocHost(doc);
-        if (!tocHost || !tocHost.shadowRoot) return buildLessonsTreeSectionsLegacy(doc);
-
-        var itemEls = [];
-        try { itemEls = deepQueryAll('d2l-list-item-nav', tocHost.shadowRoot); } catch (e0) { itemEls = []; }
-        if (!itemEls.length) return buildLessonsTreeSectionsLegacy(doc);
-
-        var nodes = [];
-        var nodeByElement = new Map();
-        itemEls.forEach(function (itemEl, idx) {
-            var key = '';
-            try { key = (itemEl.getAttribute('key') || itemEl.getAttribute('data-key') || '').trim(); } catch (e1) { key = ''; }
-            var href = '';
-            try { href = (itemEl.getAttribute('action-href') || itemEl.getAttribute('href') || '').trim(); } catch (e2) { href = ''; }
-            var indent = NaN;
-            try { indent = parseInt(itemEl.getAttribute('indentation'), 10); } catch (e3) { indent = NaN; }
-            if (isNaN(indent)) {
-                try { indent = parseInt(itemEl.getAttribute('aria-level'), 10); } catch (e4) { indent = NaN; }
-            }
-            if (isNaN(indent)) indent = 0;
-            nodes.push({
-                idx: idx,
-                key: key || ('node-' + idx),
-                label: getLessonsTreeLabel(itemEl),
-                href: href,
-                indent: indent,
-                parent: null,
-                children: [],
-                depth: 0,
-                el: itemEl
-            });
-        });
-        if (!nodes.length) return [];
-        nodes.forEach(function (n) { nodeByElement.set(n.el, n); });
-
-        // Prefer true DOM nesting (more reliable than indentation in some DTU Learn trees).
-        var nestedLinked = false;
-        nodes.forEach(function (node) {
-            var pEl = null;
-            var cur = node.el ? node.el.parentElement : null;
-            while (cur) {
-                var tag = '';
-                try { tag = (cur.tagName || '').toLowerCase(); } catch (eTag) { tag = ''; }
-                if (tag === 'd2l-list-item-nav') {
-                    pEl = cur;
-                    break;
-                }
-                cur = cur.parentElement;
-            }
-            var parentNode = pEl ? nodeByElement.get(pEl) : null;
-            if (parentNode && parentNode !== node) {
-                node.parent = parentNode;
-                parentNode.children.push(node);
-                node.depth = parentNode.depth + 1;
-                nestedLinked = true;
-            }
-        });
-
-        // Fallback to indentation heuristics if no nesting links were detected.
-        if (!nestedLinked) {
-            var stack = [];
-            nodes.forEach(function (node) {
-                while (stack.length && stack[stack.length - 1].indent >= node.indent) {
-                    stack.pop();
-                }
-                if (stack.length) {
-                    node.parent = stack[stack.length - 1];
-                    node.parent.children.push(node);
-                    node.depth = node.parent.depth + 1;
-                }
-                stack.push(node);
-            });
-        }
-
-        var oldExamNode = null;
-        nodes.forEach(function (node) {
-            if (!oldExamNode && /old\s*exam\s*sets?/i.test(node.label || '')) oldExamNode = node;
-        });
-
-        var candidateSections = [];
-        function isUnitNode(n) { return !!(n && /\/units\//i.test(n.href || '')); }
-        candidateSections = nodes.filter(function (n) { return isUnitNode(n); });
-        if (!candidateSections.length) {
-            // Fallback for layouts where href is delayed/missing.
-            candidateSections = nodes.filter(function (n) {
-                try {
-                    return !!(n && n.el && n.el.getAttribute && n.el.getAttribute('expandable') !== null);
-                } catch (e0) {
-                    return false;
-                }
-            });
-        }
-        if (!candidateSections.length) {
-            candidateSections = nodes.filter(function (n) { return !!(n && n.children && n.children.length); });
-        }
-        if (!candidateSections.length) {
-            candidateSections = nodes.slice(0, Math.min(12, nodes.length));
-        }
-
-        var seen = new Set();
-        var sections = [];
-
-        function collectTopicUrlsForSection(sectionNode) {
-            var topicUrls = new Set();
-            var lessonUrls = new Set();
-            var pending = [sectionNode];
-            while (pending.length) {
-                var cur = pending.pop();
-                if (!cur) continue;
-                var abs = toAbsoluteSamePageUrl(cur.href, window.location.href);
-                if (abs && /\/d2l\/le\/lessons\//i.test(abs)) {
-                    lessonUrls.add(abs);
-                    if (/\/topics\//i.test(abs)) topicUrls.add(abs);
-                }
-                if (cur.children && cur.children.length) {
-                    cur.children.forEach(function (child) { pending.push(child); });
-                }
-            }
-            return topicUrls.size ? Array.from(topicUrls) : Array.from(lessonUrls);
-        }
-
-        candidateSections.forEach(function (sectionNode) {
-            if (!sectionNode) return;
-            var unitUrls = collectTopicUrlsForSection(sectionNode).filter(function (u) {
-                return /\/d2l\/le\/lessons\//i.test(u);
-            });
-            unitUrls = sanitizeLessonsSectionUnitUrls(unitUrls);
-            if (!unitUrls.length) return;
-            var key = sectionNode.key + '|' + sectionNode.depth + '|' + sectionNode.label;
-            if (seen.has(key)) return;
-            seen.add(key);
-            var label = sectionNode.label || 'Untitled';
-            sections.push({
-                key: key,
-                label: label,
-                depth: sectionNode.depth || 0,
-                unitUrls: unitUrls,
-                unitCount: unitUrls.length
-            });
-        });
-
-        if (sections && sections.length) return sections;
-        return buildLessonsTreeSectionsLegacy(doc);
-    }
-
-    function extractDownloadUrlsFromLessonsHtml(html, baseUrl) {
-        var out = new Set();
-        if (!html) return [];
-
-        var text = String(html || '');
-        var doc = null;
-        try { doc = new DOMParser().parseFromString(text, 'text/html'); } catch (e0) { doc = null; }
-
-        function maybeAdd(rawUrl, sourceText) {
-            var decoded = decodeEscapedUrlText(rawUrl);
-            if (!decoded) return;
-            if (/[<>"']/.test(decoded)) return;
-            if (/&(?:quot|apos|lt|gt|#\d+|#x[a-f0-9]+);/i.test(decoded)) return;
-            var abs = toAbsoluteSamePageUrl(decoded, baseUrl || window.location.href);
-            if (!abs) return;
-            if (isStrictFileDownloadUrl(abs)) {
-                out.add(abs);
-            }
-        }
-
-        if (doc && doc.querySelectorAll) {
-            doc.querySelectorAll('a[href], iframe[src], embed[src], source[src], object[data]').forEach(function (el) {
-                var raw = el.getAttribute('href') || el.getAttribute('src') || el.getAttribute('data') || '';
-                maybeAdd(raw, normalizeWhitespace(el.textContent || ''));
-            });
-        }
-
-        var regexes = [
-            /\/d2l\/le\/content\/[^"'\\\s<>)]+/gi,
-            /\/content\/enforced\/[^"'\\\s<>)]+/gi,
-            /https?:\/\/[^"'\\\s<>)]+/gi
-        ];
-        regexes.forEach(function (re) {
-            var m;
-            while ((m = re.exec(text)) !== null) {
-                maybeAdd(m[0], '');
-            }
-        });
-
-        return Array.from(out);
-    }
-
-    async function fetchLessonsUnitDownloadUrls(unitUrl) {
-        try {
-            var resp = await lessonsBulkFetch(unitUrl, { credentials: 'include', cache: 'no-store' });
-            if (!resp || !resp.ok) {
-                logLessonsBulkDebug('fetch_unit_http_fail', {
-                    unitUrl: unitUrl,
-                    status: resp ? resp.status : 'no_response',
-                    finalUrl: resp && resp.url ? resp.url : ''
-                });
-                return [];
-            }
-            var html = await resp.text();
-            var urls = extractDownloadUrlsFromLessonsHtml(html, unitUrl);
-            logLessonsBulkDebug('fetch_unit_scan', {
-                unitUrl: unitUrl,
-                status: resp.status,
-                finalUrl: resp.url || unitUrl,
-                found: (urls || []).length
-            });
-            if (urls && urls.length) return urls;
-        } catch (e0) {
-            logLessonsBulkDebug('fetch_unit_error', { unitUrl: unitUrl, error: String(e0 && e0.message ? e0.message : e0) });
-        }
-        return [];
-    }
-
-    function parseLessonsTopicIds(topicUrl) {
-        try {
-            var u = new URL(topicUrl, window.location.href);
-            var m = (u.pathname || '').match(/\/d2l\/le\/lessons\/(\d+)\/topics\/(\d+)/i);
-            if (!m) return null;
-            if (!isValidLessonsContentId(m[2])) return null;
-            return { orgUnitId: m[1], topicId: m[2] };
-        } catch (e0) {
-            return null;
-        }
-    }
-
-    function getTopicLabelHintFromTopicUrl(topicUrl) {
-        var ids = parseLessonsTopicIds(topicUrl);
-        if (!ids) return '';
-        var doc = getLessonsRuntimeDocument(document);
-
-        // Legacy tree (navigation-item with data-objectid=topicId)
-        try {
-            var legacyItem = doc.querySelector('.navigation-tree .navigation-item[data-objectid="' + ids.topicId + '"]');
-            if (legacyItem) {
-                var legacyLabel = getLegacyLessonsTreeLabel(legacyItem);
-                if (legacyLabel) return legacyLabel;
-            }
-        } catch (e0) { }
-
-        // Modern lessons toc
-        try {
-            var navItem = findTopicNavItem(topicUrl);
-            if (navItem) {
-                var label = getLessonsTreeLabel(navItem);
-                if (label) return label;
-            }
-        } catch (e1) { }
-
-        return 'topic-' + ids.topicId;
-    }
-
-    function parseLessonsUnitIds(unitUrl) {
-        try {
-            var u = new URL(unitUrl, window.location.href);
-            var m = (u.pathname || '').match(/\/d2l\/le\/lessons\/(\d+)\/units\/(\d+)/i);
-            if (!m) return null;
-            if (!isValidLessonsContentId(m[2])) return null;
-            return { orgUnitId: m[1], unitId: m[2] };
-        } catch (e0) {
-            return null;
-        }
-    }
-
-    function isTopicKeyHint(keyHint) {
-        var k = String(keyHint || '').toLowerCase();
-        return /(topic|topics|activity|activities|file|files|document|documents|contentobject|content_object)/.test(k);
-    }
-
-    function isModuleKeyHint(keyHint) {
-        var k = String(keyHint || '').toLowerCase();
-        if (!k) return false;
-        if (/topic/.test(k)) return false;
-        return /(module|modules|lesson|lessons|unit|units|folder|folders|child|children|item|items|submodule|submodules)/.test(k);
-    }
-
-    function collectTopicIdsFromJsonValue(value, outSet, seenObj, keyHint) {
-        if (!outSet || value == null) return;
-        var t = typeof value;
-        if (t === 'number') {
-            if (isTopicKeyHint(keyHint)) {
-                var numId = getValidLessonsContentId(value);
-                if (numId) outSet.add(numId);
-            }
-            return;
-        }
-        if (t === 'string') {
-            var s = String(value || '');
-            if (isTopicKeyHint(keyHint)) {
-                var direct = getValidLessonsContentId(s);
-                if (direct) outSet.add(direct);
-            }
-            var m = s.match(/\/d2l\/le\/lessons\/\d+\/topics\/(\d+)/i) || s.match(/\/topics\/(\d+)/i);
-            if (m && isValidLessonsContentId(m[1])) outSet.add(String(m[1]));
-            return;
-        }
-        if (t !== 'object') return;
-        try {
-            if (seenObj && seenObj.has(value)) return;
-            if (seenObj) seenObj.add(value);
-        } catch (e0) { }
-        if (Array.isArray(value)) {
-            for (var i = 0; i < value.length; i++) {
-                collectTopicIdsFromJsonValue(value[i], outSet, seenObj, keyHint);
-            }
-            return;
-        }
-        var topicIdDirect = value.TopicId || value.topicId || value.topicID || value.topic_id;
-        if (topicIdDirect != null && isValidLessonsContentId(topicIdDirect)) {
-            outSet.add(String(topicIdDirect));
-        }
-        var typeVal = String(value.Type || value.type || '').toLowerCase();
-        var idVal = value.Id || value.id;
-        if (idVal != null && isValidLessonsContentId(idVal) && /\btopic\b/.test(typeVal)) {
-            outSet.add(String(idVal));
-        }
-        var keys = Object.keys(value);
-        for (var k = 0; k < keys.length; k++) {
-            collectTopicIdsFromJsonValue(value[keys[k]], outSet, seenObj, keys[k]);
-        }
-    }
-
-    function collectModuleIdsFromJsonValue(value, currentModuleId, outSet, seenObj, keyHint) {
-        if (!outSet || value == null) return;
-        var t = typeof value;
-        if (t === 'number') {
-            if (isModuleKeyHint(keyHint)) {
-                var numId = getValidLessonsContentId(value);
-                if (numId && numId !== String(currentModuleId || '')) outSet.add(numId);
-            }
-            return;
-        }
-        if (t === 'string') {
-            var s = String(value || '');
-            if (isModuleKeyHint(keyHint)) {
-                var direct = getValidLessonsContentId(s);
-                if (direct && direct !== String(currentModuleId || '')) outSet.add(direct);
-            }
-            var re = /\/content\/modules\/(\d+)/gi;
-            var m;
-            while ((m = re.exec(s)) !== null) {
-                var mid = String(m[1] || '').trim();
-                if (isValidLessonsContentId(mid) && mid !== String(currentModuleId || '')) outSet.add(mid);
-            }
-            return;
-        }
-        if (t !== 'object') return;
-        try {
-            if (seenObj && seenObj.has(value)) return;
-            if (seenObj) seenObj.add(value);
-        } catch (e0) { }
-
-        if (Array.isArray(value)) {
-            for (var i = 0; i < value.length; i++) {
-                collectModuleIdsFromJsonValue(value[i], currentModuleId, outSet, seenObj, keyHint);
-            }
-            return;
-        }
-
-        var id = getApiObjectId(value);
-        var topicId = getApiTopicId(value);
-        var typeVal = String(value.Type || value.type || value.ContentObjectType || value.contentObjectType || value.ObjectType || '').toLowerCase();
-        var looksModule = false;
-        if (/(module|lesson|unit|folder)/.test(typeVal) && !/(topic|file|activity|document)/.test(typeVal)) {
-            looksModule = true;
-        } else if (id && !topicId) {
-            var childCount = value.ChildCount || value.childCount || value.ChildrenCount || value.childrenCount || 0;
-            if (childCount > 0 || value.Children || value.children || value.Modules || value.modules || value.SubModules || value.subModules || value.Items || value.items) {
-                looksModule = true;
-            }
-        }
-        if (looksModule && id && id !== String(currentModuleId || '')) outSet.add(id);
-
-        var keys = Object.keys(value);
-        for (var k = 0; k < keys.length; k++) {
-            collectModuleIdsFromJsonValue(value[keys[k]], currentModuleId, outSet, seenObj, keys[k]);
-        }
-    }
-
-    async function fetchUnitTopicUrlsViaApi(unitUrl) {
-        var ids = parseLessonsUnitIds(unitUrl);
-        if (!ids) {
-            logLessonsBulkDebug('unit_api_skip_no_ids', { unitUrl: unitUrl });
-            return [];
-        }
-        var outTopicIds = new Set();
-        var visitedModules = new Set();
-
-        async function walkModule(moduleId, depth) {
-            var id = String(moduleId || '').trim();
-            if (!id || !/^\d+$/.test(id)) return;
-            if (visitedModules.has(id)) return;
-            if ((depth || 0) > 20) return;
-            visitedModules.add(id);
-
-            var structure = await fetchLegacyModuleStructureApi(ids.orgUnitId, id);
-            if (!structure) return;
-
-            var beforeCount = outTopicIds.size;
-            var directTopics = getDirectTopicIdsFromStructure(structure || {});
-            directTopics.forEach(function (tid) {
-                var t = String(tid || '').trim();
-                if (/^\d+$/.test(t)) outTopicIds.add(t);
-            });
-            if (outTopicIds.size === beforeCount) {
-                collectTopicIdsFromJsonValue(structure, outTopicIds, new WeakSet());
-            }
-
-            var childDefs = getDirectModuleChildrenFromStructure(structure || {}, id);
-            var childIds = childDefs.map(function (d) { return String(d && d.id ? d.id : '').trim(); })
-                .filter(function (cid) { return /^\d+$/.test(cid) && cid !== id; });
-            if (!childIds.length) {
-                var fallbackChildIds = new Set();
-                collectModuleIdsFromJsonValue(structure, id, fallbackChildIds, new WeakSet());
-                childIds = Array.from(fallbackChildIds).filter(function (cid) {
-                    return /^\d+$/.test(String(cid || '').trim()) && String(cid) !== id;
-                });
-            }
-
-            for (var i = 0; i < childIds.length; i++) {
-                await walkModule(childIds[i], (depth || 0) + 1);
-                if (i % 6 === 5) await lessonsBulkDelay(18);
-            }
-        }
-
-        try {
-            await walkModule(ids.unitId, 0);
-            logLessonsBulkDebug('unit_api_scan', {
-                unitUrl: unitUrl,
-                apiUrl: 'recursive-module-structure',
-                status: 'ok',
-                finalUrl: '',
-                topicCount: outTopicIds.size,
-                moduleCount: visitedModules.size
-            });
-        } catch (eRec0) {
-            logLessonsBulkDebug('unit_api_recursive_error', {
-                unitUrl: unitUrl,
-                error: String(eRec0 && eRec0.message ? eRec0.message : eRec0)
-            });
-        }
-
-        // Fallback for unexpected API payloads.
-        if (!outTopicIds.size) {
-            var versions = ['1.75', '1.74', '1.73', '1.72', '1.71', '1.70', '1.69', '1.68', '1.67'];
-            for (var v = 0; v < versions.length; v++) {
-                var base = '/d2l/api/le/' + versions[v] + '/' + ids.orgUnitId + '/content/modules/' + ids.unitId;
-                var endpoints = [
-                    base + '/structure/',
-                    base
-                ];
-                var hadOkInVersion = false;
-                for (var j = 0; j < endpoints.length; j++) {
-                    try {
-                        var abs = toAbsoluteSamePageUrl(endpoints[j], window.location.origin);
-                        if (!abs) continue;
-                        var resp = await lessonsBulkFetch(abs, {
-                            credentials: 'include',
-                            cache: 'no-store',
-                            headers: { 'Accept': 'application/json' }
-                        });
-                        if (!resp || !resp.ok) {
-                            logLessonsBulkDebug('unit_api_http_fail', {
-                                unitUrl: unitUrl,
-                                apiUrl: abs,
-                                status: resp ? resp.status : 'no_response',
-                                finalUrl: resp && resp.url ? resp.url : ''
-                            });
-                            continue;
-                        }
-                        hadOkInVersion = true;
-                        var json = null;
-                        try { json = await resp.json(); } catch (e1) { json = null; }
-                        if (!json) continue;
-                        collectTopicIdsFromJsonValue(json, outTopicIds, new WeakSet());
-                        logLessonsBulkDebug('unit_api_scan', {
-                            unitUrl: unitUrl,
-                            apiUrl: abs,
-                            status: resp.status,
-                            finalUrl: resp.url || abs,
-                            topicCount: outTopicIds.size,
-                            moduleCount: visitedModules.size
-                        });
-                        if (outTopicIds.size) break;
-                    } catch (e2) {
-                        logLessonsBulkDebug('unit_api_error', {
-                            unitUrl: unitUrl,
-                            apiUrl: endpoints[j],
-                            error: String(e2 && e2.message ? e2.message : e2)
-                        });
-                    }
-                }
-                if (outTopicIds.size) break;
-                if (hadOkInVersion) {
-                    logLessonsBulkDebug('unit_api_stop_after_success_no_topics', {
-                        unitUrl: unitUrl,
-                        version: versions[v],
-                        moduleCount: visitedModules.size
-                    });
-                    break;
-                }
-            }
-        }
-
-        var topicUrls = Array.from(outTopicIds).map(function (tid) {
-            return '/d2l/le/lessons/' + ids.orgUnitId + '/topics/' + tid;
-        }).map(function (u) { return toAbsoluteSamePageUrl(u, window.location.origin); }).filter(Boolean);
-        logLessonsBulkDebug('unit_api_done', {
-            unitUrl: unitUrl,
-            topicCount: topicUrls.length,
-            moduleCount: visitedModules.size,
-            topicUrls: topicUrls.slice(0, 10)
-        });
-        return topicUrls;
-    }
-
-    async function fetchUnitTopicUrlsFromUnitPage(unitUrl) {
-        var out = new Set();
-        try {
-            var resp = await lessonsBulkFetch(unitUrl, { credentials: 'include', cache: 'no-store' });
-            if (!resp || !resp.ok) {
-                logLessonsBulkDebug('unit_page_topics_http_fail', {
-                    unitUrl: unitUrl,
-                    status: resp ? resp.status : 'no_response',
-                    finalUrl: resp && resp.url ? resp.url : ''
-                });
-                return [];
-            }
-            var html = await resp.text();
-            var text = String(html || '');
-            if (!text) return [];
-            var re = /\/d2l\/le\/lessons\/\d+\/topics\/\d+/gi;
-            var m;
-            while ((m = re.exec(text)) !== null) {
-                var abs = toAbsoluteSamePageUrl(m[0], window.location.origin);
-                if (abs) out.add(abs);
-            }
-            logLessonsBulkDebug('unit_page_topics_done', {
-                unitUrl: unitUrl,
-                status: resp.status,
-                finalUrl: resp.url || unitUrl,
-                topicCount: out.size,
-                topicUrls: Array.from(out).slice(0, 10)
-            });
-        } catch (e0) {
-            logLessonsBulkDebug('unit_page_topics_error', {
-                unitUrl: unitUrl,
-                error: String(e0 && e0.message ? e0.message : e0)
-            });
-        }
-        return Array.from(out);
-    }
-
-    function collectDownloadUrlsFromJsonValue(value, baseUrl, outSet, seenObj) {
-        if (!outSet) return;
-        if (value == null) return;
-        var t = typeof value;
-        if (t === 'string') {
-            var abs = toAbsoluteSamePageUrl(decodeEscapedUrlText(value), baseUrl || window.location.href);
-            if (abs && isStrictFileDownloadUrl(abs)) outSet.add(abs);
-            return;
-        }
-        if (t !== 'object') return;
-        try {
-            if (seenObj && seenObj.has(value)) return;
-            if (seenObj) seenObj.add(value);
-        } catch (e0) { }
-        if (Array.isArray(value)) {
-            for (var i = 0; i < value.length; i++) {
-                collectDownloadUrlsFromJsonValue(value[i], baseUrl, outSet, seenObj);
-            }
-            return;
-        }
-        var keys = Object.keys(value);
-        for (var k = 0; k < keys.length; k++) {
-            collectDownloadUrlsFromJsonValue(value[keys[k]], baseUrl, outSet, seenObj);
-        }
-    }
-
-    function isHtmlLikeResponse(resp) {
-        var ct = '';
-        try { ct = String(resp.headers.get('content-type') || '').toLowerCase(); } catch (e0) { ct = ''; }
-        if (!ct) return true;
-        return /(text\/html|application\/xhtml|text\/plain|json|xml)/.test(ct);
-    }
-
-    // First LE API version that answered for this page; later topics try it before the rest.
-    var _lessonsTopicApiVersion = '';
-
-    async function fetchTopicApiDownloadUrls(topicUrl) {
-        var ids = parseLessonsTopicIds(topicUrl);
-        if (!ids) {
-            logLessonsBulkDebug('topic_api_skip_no_ids', { topicUrl: topicUrl });
-            return [];
-        }
-
-        var out = new Set();
-        var versions = ['1.75', '1.74', '1.73', '1.72', '1.71', '1.70', '1.69', '1.68', '1.67'];
-        if (_lessonsTopicApiVersion) versions = [_lessonsTopicApiVersion];
-        for (var i = 0; i < versions.length; i++) {
-            var apiUrl = '/d2l/api/le/' + versions[i] + '/' + ids.orgUnitId + '/content/topics/' + ids.topicId;
-            try {
-                var abs = toAbsoluteSamePageUrl(apiUrl, window.location.origin);
-                if (!abs) continue;
-                var resp = await lessonsBulkFetch(abs, {
-                    credentials: 'include',
-                    cache: 'no-store',
-                    headers: { 'Accept': 'application/json' }
-                });
-                if (!resp || !resp.ok) {
-                    logLessonsBulkDebug('topic_api_http_fail', {
-                        topicUrl: topicUrl,
-                        apiUrl: abs,
-                        status: resp ? resp.status : 'no_response',
-                        finalUrl: resp && resp.url ? resp.url : ''
-                    });
-                    continue;
-                }
-                var json = null;
-                try { json = await resp.json(); } catch (e1) { json = null; }
-                if (!json) continue;
-                _lessonsTopicApiVersion = versions[i];
-                collectDownloadUrlsFromJsonValue(json, topicUrl, out, new WeakSet());
-                logLessonsBulkDebug('topic_api_scan', {
-                    topicUrl: topicUrl,
-                    apiUrl: abs,
-                    status: resp.status,
-                    finalUrl: resp.url || abs,
-                    runningFound: out.size
-                });
-                // A version that answered has told us everything this topic has.
-                break;
-            } catch (e2) {
-                logLessonsBulkDebug('topic_api_error', {
-                    topicUrl: topicUrl,
-                    apiUrl: apiUrl,
-                    error: String(e2 && e2.message ? e2.message : e2)
-                });
-            }
-        }
-        logLessonsBulkDebug('topic_api_done', { topicUrl: topicUrl, found: out.size });
-        return Array.from(out);
-    }
-
-    // The course table of contents answers, in one request, what every topic is
-    // and where its file lives. Loaded once per run; topics it can classify skip
-    // the per-topic page, viewContent and API fetches, and links skip the slow
-    // in-page resolve step entirely (a 349-page course spent ~25 minutes there).
-    var _lessonsTocIndex = { orgUnitId: '', index: null };
-
-    function buildLessonsTocIndex(toc) {
-        var index = new Map();
-        function walk(modules) {
-            if (!Array.isArray(modules)) return;
-            modules.forEach(function (mod) {
-                if (!mod || typeof mod !== 'object') return;
-                (Array.isArray(mod.Topics) ? mod.Topics : []).forEach(function (topic) {
-                    if (!topic || topic.TopicId == null) return;
-                    index.set(String(topic.TopicId), {
-                        type: String(topic.TypeIdentifier || ''),
-                        url: String(topic.Url || ''),
-                        title: String(topic.Title || '')
-                    });
-                });
-                walk(mod.Modules);
-            });
-        }
-        walk(toc && toc.Modules);
-        return index;
-    }
-
-    // { links, notFile } when the TOC settles the topic, otherwise null so the
-    // caller keeps its older discovery chain.
-    function classifyTopicFromTocIndex(index, topicUrl) {
-        if (!index || !index.size) return null;
-        var ids = parseLessonsTopicIds(topicUrl);
-        if (!ids) return null;
-        var entry = index.get(ids.topicId);
-        if (!entry) return null;
-        if (/^link$/i.test(entry.type)) return { links: [], notFile: true };
-        if (/^file$/i.test(entry.type)) {
-            var abs = toAbsoluteSamePageUrl(entry.url, window.location.origin);
-            if (abs && isStrictFileDownloadUrl(abs)) return { links: [abs], notFile: false };
-        }
-        return null;
-    }
-
-    async function loadLessonsTocIndex(orgUnitId) {
-        if (!orgUnitId) return null;
-        if (_lessonsTocIndex.orgUnitId === orgUnitId && _lessonsTocIndex.index) return _lessonsTocIndex.index;
-        var versions = ['1.75', '1.74', '1.73', '1.72', '1.71', '1.70', '1.69', '1.68', '1.67'];
-        if (_lessonsTopicApiVersion) versions = [_lessonsTopicApiVersion].concat(versions.filter(function (v) { return v !== _lessonsTopicApiVersion; }));
-        for (var i = 0; i < versions.length; i++) {
-            throwIfLessonsBulkAborted();
-            try {
-                var resp = await lessonsBulkFetch(window.location.origin + '/d2l/api/le/' + versions[i] + '/' + orgUnitId + '/content/toc', {
-                    credentials: 'include',
-                    cache: 'no-store',
-                    headers: { 'Accept': 'application/json' }
-                });
-                if (!resp || !resp.ok) continue;
-                var index = buildLessonsTocIndex(await resp.json());
-                _lessonsTopicApiVersion = versions[i];
-                _lessonsTocIndex = { orgUnitId: orgUnitId, index: index };
-                logLessonsBulkDebug('toc_index_loaded', { orgUnitId: orgUnitId, version: versions[i], topics: index.size });
-                return index;
-            } catch (e0) {
-                if (e0 && e0.name === 'AbortError') throw e0;
-            }
-        }
-        logLessonsBulkDebug('toc_index_unavailable', { orgUnitId: orgUnitId });
-        return null;
-    }
-
-    async function fetchTopicViewContentDownloadUrls(topicUrl) {
-        var ids = parseLessonsTopicIds(topicUrl);
-        if (!ids) {
-            logLessonsBulkDebug('viewcontent_skip_no_ids', { topicUrl: topicUrl });
-            return [];
-        }
-        var out = new Set();
-        var candidates = [
-            '/d2l/le/content/' + ids.orgUnitId + '/viewContent/' + ids.topicId + '/View',
-            '/d2l/le/content/' + ids.orgUnitId + '/topics/files/download/' + ids.topicId
-        ];
-
-        for (var i = 0; i < candidates.length; i++) {
-            try {
-                var abs = toAbsoluteSamePageUrl(candidates[i], window.location.origin);
-                if (!abs) continue;
-                var resp = await lessonsBulkFetch(abs, { credentials: 'include', cache: 'no-store' });
-                if (resp && resp.ok && !isHtmlLikeResponse(resp)) {
-                    // The download endpoint streams the file itself; reading it as text only burns bandwidth.
-                    try { if (resp.body) resp.body.cancel(); } catch (eCancel) { }
-                    logLessonsBulkDebug('viewcontent_skip_non_html', {
-                        topicUrl: topicUrl,
-                        candidateUrl: abs,
-                        contentType: resp.headers.get('content-type') || ''
-                    });
-                    continue;
-                }
-                if (!resp || !resp.ok) {
-                    logLessonsBulkDebug('viewcontent_http_fail', {
-                        topicUrl: topicUrl,
-                        candidateUrl: abs,
-                        status: resp ? resp.status : 'no_response',
-                        finalUrl: resp && resp.url ? resp.url : ''
-                    });
-                    continue;
-                }
-                var body = await resp.text();
-                if (!body) continue;
-                extractDownloadUrlsFromLessonsHtml(body, abs).forEach(function (u) {
-                    if (isStrictFileDownloadUrl(u)) out.add(u);
-                });
-                logLessonsBulkDebug('viewcontent_scan', {
-                    topicUrl: topicUrl,
-                    candidateUrl: abs,
-                    status: resp.status,
-                    finalUrl: resp.url || abs,
-                    runningFound: out.size
-                });
-                if (out.size) break;
-            } catch (e1) { }
-        }
-        logLessonsBulkDebug('viewcontent_done', { topicUrl: topicUrl, found: out.size });
-        return Array.from(out);
-    }
-
-    async function probeTopicDownloadViaIframe(topicUrl) {
-        return new Promise(function (resolve) {
-            var done = false;
-            var iframe = document.createElement('iframe');
-            markExt(iframe);
-            // Keep iframe rendered off-screen (not display:none) so Brightspace lazy loaders can hydrate content.
-            iframe.style.cssText = 'position:fixed !important;left:-10000px !important;top:0 !important;'
-                + 'width:1280px !important;height:900px !important;opacity:0.01 !important;pointer-events:none !important;'
-                + 'z-index:-2147483647 !important;border:0 !important;';
-
-            function finish(result) {
-                if (done) return;
-                done = true;
-                logLessonsBulkDebug('iframe_probe_done', {
-                    topicUrl: topicUrl,
-                    found: result && result.urls ? result.urls.length : 0
-                });
-                try { iframe.remove(); } catch (e0) { }
-                resolve(result || { urls: [], clicked: false });
-            }
-
-            function harvest(doc) {
-                var out = new Set();
-                if (!doc || !doc.querySelectorAll) return out;
-                doc.querySelectorAll('d2l-pdf-viewer[src], a[href], iframe[src], embed[src], source[src], object[data]').forEach(function (el) {
-                    var raw = el.getAttribute('href') || el.getAttribute('src') || el.getAttribute('data') || '';
-                    var abs = toAbsoluteSamePageUrl(raw, topicUrl);
-                    if (abs && isStrictFileDownloadUrl(abs)) out.add(abs);
-                });
-                try {
-                    var html = doc.documentElement ? doc.documentElement.outerHTML : '';
-                    extractDownloadUrlsFromLessonsHtml(html, topicUrl).forEach(function (u) { out.add(u); });
-                } catch (e1) { }
-                return out;
-            }
-
-            var timeoutId = setTimeout(function () {
-                var docT = null;
-                try { docT = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document); } catch (e2) { docT = null; }
-                var urlsT = Array.from(harvest(docT));
-                if (urlsT.length) return finish({ urls: urlsT, clicked: false });
-                finish({ urls: [], clicked: false });
-            }, 11000);
-
-            iframe.onload = function () {
-                var tries = 0;
-                (function poll() {
-                    tries++;
-                    var doc = null;
-                    try { doc = iframe.contentDocument || (iframe.contentWindow && iframe.contentWindow.document); } catch (e4) { doc = null; }
-                    var urls = Array.from(harvest(doc));
-                    if (urls.length) {
-                        clearTimeout(timeoutId);
-                        finish({ urls: urls, clicked: false });
-                        return;
-                    }
-                    if (tries >= 56) {
-                        clearTimeout(timeoutId);
-                        finish({ urls: [], clicked: false });
-                        return;
-                    }
-                    setTimeout(poll, 140);
-                })();
-            };
-
-            try {
-                iframe.src = topicUrl;
-                document.body.appendChild(iframe);
-            } catch (e6) {
-                logLessonsBulkDebug('iframe_probe_error', { topicUrl: topicUrl, error: String(e6 && e6.message ? e6.message : e6) });
-                clearTimeout(timeoutId);
-                finish({ urls: [], clicked: false });
-            }
-        });
-    }
-
-    async function fetchLessonsUnitDownloadResult(unitUrl, depth) {
-        depth = Number(depth || 0);
-        if (depth < 0) depth = 0;
-        if (depth > 3) return { links: [] };
-
-        var fromToc = classifyTopicFromTocIndex(_lessonsTocIndex.index, unitUrl);
-        if (fromToc) {
-            logLessonsBulkDebug('unit_result_toc', { unitUrl: unitUrl, found: fromToc.links.length, notFile: fromToc.notFile });
-            return fromToc;
-        }
-
-        if (/\/units\//i.test(unitUrl)) {
-            try {
-                var topicUrls = await fetchUnitTopicUrlsFromUnitPage(unitUrl);
-                if (!topicUrls || !topicUrls.length) {
-                    topicUrls = await fetchUnitTopicUrlsViaApi(unitUrl);
-                }
-                if (topicUrls && topicUrls.length) {
-                    var fromTopics = new Set();
-                    for (var ut = 0; ut < topicUrls.length; ut++) {
-                        if (isLessonsBulkRunAborted()) break;
-                        var tRes = await fetchLessonsUnitDownloadResult(topicUrls[ut], depth + 1);
-                        (tRes && tRes.links ? tRes.links : []).forEach(function (u) { fromTopics.add(u); });
-                        if (ut % 4 === 3) await lessonsBulkDelay(45);
-                    }
-                    logLessonsBulkDebug('unit_result_step_unit_api_topics', {
-                        unitUrl: unitUrl,
-                        topicCount: topicUrls.length,
-                        found: fromTopics.size
-                    });
-                    if (fromTopics.size) return { links: Array.from(fromTopics) };
-                }
-            } catch (eU0) {
-                logLessonsBulkDebug('unit_result_unit_api_topics_error', {
-                    unitUrl: unitUrl,
-                    error: String(eU0 && eU0.message ? eU0.message : eU0)
-                });
-            }
-        }
-
-        var links = await fetchLessonsUnitDownloadUrls(unitUrl);
-        logLessonsBulkDebug('unit_result_step_main', { unitUrl: unitUrl, found: (links || []).length });
-        if ((!links || !links.length) && /\/topics\//i.test(unitUrl)) {
-            try {
-                var viaContent = await fetchTopicViewContentDownloadUrls(unitUrl);
-                if (viaContent && viaContent.length) links = viaContent;
-            } catch (eC0) { }
-            logLessonsBulkDebug('unit_result_step_viewcontent', { unitUrl: unitUrl, found: (links || []).length });
-        }
-        if ((!links || !links.length) && /\/topics\//i.test(unitUrl)) {
-            try {
-                var viaApi = await fetchTopicApiDownloadUrls(unitUrl);
-                if (viaApi && viaApi.length) links = viaApi;
-            } catch (eA0) { }
-            logLessonsBulkDebug('unit_result_step_topic_api', { unitUrl: unitUrl, found: (links || []).length });
-        }
-        if ((!links || !links.length) && /\/topics\//i.test(unitUrl) && isLessonsBulkHeavyFallbackEnabled()) {
-            try {
-                var probed = await probeTopicDownloadViaIframe(unitUrl);
-                if (probed && Array.isArray(probed.urls) && probed.urls.length) links = probed.urls;
-            } catch (e0) { }
-            logLessonsBulkDebug('unit_result_step_iframe', { unitUrl: unitUrl, found: (links || []).length });
-        } else if ((!links || !links.length) && /\/topics\//i.test(unitUrl)) {
-            logLessonsBulkDebug('unit_result_step_iframe_skipped', { unitUrl: unitUrl, reason: 'heavy_fallback_disabled' });
-        }
-        logLessonsBulkDebug('unit_result_done', { unitUrl: unitUrl, found: (links || []).length, links: (links || []).slice(0, 5) });
-        return { links: links || [] };
-    }
-
-    function normalizeTopicCompareUrl(urlStr) {
-        try {
-            var u = new URL(urlStr, window.location.href);
-            return (u.origin + u.pathname).toLowerCase();
-        } catch (e0) {
-            return String(urlStr || '').toLowerCase();
-        }
-    }
-
-    function findTopicNavItem(topicUrl) {
-        var runtimeDoc = getLessonsRuntimeDocument(document);
-        var tocHost = getLessonsTocHost(runtimeDoc);
-        if (!tocHost || !tocHost.shadowRoot) return null;
-        var target = normalizeTopicCompareUrl(topicUrl);
-        var items = [];
-        try { items = deepQueryAll('d2l-list-item-nav[action-href]', tocHost.shadowRoot); } catch (e0) { items = []; }
-        for (var i = 0; i < items.length; i++) {
-            var href = '';
-            try { href = items[i].getAttribute('action-href') || ''; } catch (e1) { href = ''; }
-            if (!href) continue;
-            var abs = toAbsoluteSamePageUrl(href, window.location.href);
-            if (!abs) continue;
-            if (normalizeTopicCompareUrl(abs) === target) return items[i];
-        }
-        return null;
-    }
-
-    async function collectTopicFileUrlsInCurrentPage(topicUrl) {
-        var ids = parseLessonsTopicIds(topicUrl);
-        if (!ids) return [];
-        var runtimeDoc = getLessonsRuntimeDocument(document);
-        var panelId = 'd2l_content_' + ids.orgUnitId + '_' + ids.topicId;
-
-        var panel = runtimeDoc.getElementById(panelId);
-        if (!panel) {
-            var nav = findTopicNavItem(topicUrl);
-            if (nav) {
-                try { nav.click(); } catch (e0) { }
-                for (var i = 0; i < 70; i++) {
-                    await lessonsBulkDelay(220);
-                    panel = runtimeDoc.getElementById(panelId);
-                    if (panel) break;
-                }
-            }
-        }
-        if (!panel) {
-            logLessonsBulkDebug('collect_topic_panel_missing', { topicUrl: topicUrl, panelId: panelId });
-            return [];
-        }
-
-        var out = new Set();
-        panel.querySelectorAll('d2l-pdf-viewer[src], iframe[src], embed[src], source[src], object[data], a[href]').forEach(function (el) {
-            var raw = el.getAttribute('src') || el.getAttribute('href') || el.getAttribute('data') || '';
-            var abs = toAbsoluteSamePageUrl(raw, window.location.href);
-            if (abs && isStrictFileDownloadUrl(abs)) out.add(abs);
-        });
-        try {
-            extractDownloadUrlsFromLessonsHtml(panel.outerHTML || '', window.location.href).forEach(function (u) {
-                if (isStrictFileDownloadUrl(u)) out.add(u);
-            });
-        } catch (e1) { }
-
-        logLessonsBulkDebug('collect_topic_urls_done', {
-            topicUrl: topicUrl,
-            panelId: panelId,
-            found: out.size,
-            urls: Array.from(out).slice(0, 8)
-        });
-        if (out.size) return Array.from(out);
-        // Panel-based extraction can fail if the topic panel doesn't hydrate quickly.
-        try {
-            var viaApi = await fetchTopicApiDownloadUrls(topicUrl);
-            (viaApi || []).forEach(function (u) { if (isStrictFileDownloadUrl(u)) out.add(u); });
-        } catch (e2) { }
-        logLessonsBulkDebug('collect_topic_urls_after_api', {
-            topicUrl: topicUrl,
-            found: out.size,
-            urls: Array.from(out).slice(0, 8)
-        });
-        return Array.from(out);
-    }
-
-    function getFilenameFromContentDisposition(contentDisposition) {
-        if (!contentDisposition) return '';
-        var cd = String(contentDisposition);
-        var mStar = cd.match(/filename\*\s*=\s*([^;]+)/i);
-        if (mStar && mStar[1]) {
-            var raw = mStar[1].trim().replace(/^UTF-8''/i, '').replace(/^"(.*)"$/, '$1');
-            try { return decodeURIComponent(raw); } catch (e0) { return raw; }
-        }
-        var m = cd.match(/filename\s*=\s*([^;]+)/i);
-        if (m && m[1]) {
-            return m[1].trim().replace(/^"(.*)"$/, '$1');
-        }
-        return '';
-    }
-
-    function getFilenameFromUrl(url) {
-        if (!url) return 'downloaded-file';
-        try {
-            var u = new URL(url, window.location.href);
-            var path = (u.pathname || '').split('/');
-            var last = path.length ? path[path.length - 1] : '';
-            if (last && /\.[a-z0-9]{2,8}$/i.test(last)) return decodeURIComponent(last);
-        } catch (e0) { }
-        return 'downloaded-file';
-    }
-
-    function hasFilenameExtension(name) {
-        return /\.[a-z0-9]{1,12}$/i.test(String(name || ''));
-    }
-
-    function isGenericDownloadFileName(name) {
-        var n = String(name || '').trim().toLowerCase();
-        if (!n) return true;
-        n = n.replace(/\.[a-z0-9]{1,12}$/i, '');
-        return n === 'downloaded-file' || n === 'download' || n === 'file' || /^file-\d+$/.test(n);
-    }
-
-    function getExtensionFromUrlPath(url) {
-        if (!url) return '';
-        try {
-            var u = new URL(url, window.location.href);
-            var last = ((u.pathname || '').split('/').pop() || '').toLowerCase();
-            var m = last.match(/\.([a-z0-9]{1,12})$/i);
-            if (!m || !m[1]) return '';
-            return '.' + m[1].toLowerCase();
-        } catch (e0) {
-            return '';
-        }
-    }
-
-    function getExtensionFromContentType(contentType) {
-        var ct = String(contentType || '').toLowerCase().split(';')[0].trim();
-        if (!ct) return '';
-        var map = {
-            'application/pdf': '.pdf',
-            'text/plain': '.txt',
-            'text/markdown': '.md',
-            'text/csv': '.csv',
-            'application/json': '.json',
-            'application/xml': '.xml',
-            'text/xml': '.xml',
-            'application/zip': '.zip',
-            'application/x-zip-compressed': '.zip',
-            'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
-            'application/msword': '.doc',
-            'application/vnd.openxmlformats-officedocument.presentationml.presentation': '.pptx',
-            'application/vnd.ms-powerpoint': '.ppt',
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
-            'application/vnd.ms-excel': '.xls',
-            'image/png': '.png',
-            'image/jpeg': '.jpg',
-            'image/gif': '.gif',
-            'video/mp4': '.mp4',
-            'video/webm': '.webm',
-            'text/x-c': '.c',
-            'text/x-csrc': '.c',
-            'application/x-csrc': '.c',
-            'text/x-chdr': '.h',
-            'text/x-c++src': '.cpp',
-            'text/x-c++hdr': '.hpp',
-            'text/x-java-source': '.java',
-            'text/x-python': '.py'
-        };
-        if (map[ct]) return map[ct];
-        if (/c\+\+/.test(ct) && /source/.test(ct)) return '.cpp';
-        if (/c\+\+/.test(ct) && /header|hdr/.test(ct)) return '.hpp';
-        if (/x-csrc|c-source|x-c$/i.test(ct)) return '.c';
-        if (/x-chdr|c-header|header/i.test(ct)) return '.h';
-        return '';
-    }
-
-    function resolveDownloadFileName(url, contentDisposition, contentType, index, altUrl) {
-        var srcUrl = url || '';
-        var fileName = getFilenameFromContentDisposition(contentDisposition || '');
-        if (!fileName) fileName = getFilenameFromUrl(srcUrl);
-        var hint = _lessonsBulkUrlNameHints.get(srcUrl) || '';
-        if (!hint && altUrl) hint = _lessonsBulkUrlNameHints.get(String(altUrl)) || '';
-        if (!hint) {
-            try {
-                var su = new URL(srcUrl, window.location.href);
-                hint = _lessonsBulkUrlNameHints.get(su.origin + su.pathname) || '';
-            } catch (e0) { }
-        }
-        if (!hint && altUrl) {
-            try {
-                var au = new URL(altUrl, window.location.href);
-                hint = _lessonsBulkUrlNameHints.get(au.origin + au.pathname) || '';
-            } catch (e1) { }
-        }
-        if ((!fileName || isGenericDownloadFileName(fileName)) && hint) {
-            fileName = hint;
-        }
-        if (!fileName) fileName = 'file-' + String((index || 0) + 1);
-        if (!hasFilenameExtension(fileName)) {
-            var ext = getExtensionFromUrlPath(srcUrl) || getExtensionFromContentType(contentType || '');
-            if (ext) fileName += ext;
-        }
-        return sanitizeZipEntryName(fileName, 'file-' + String((index || 0) + 1));
-    }
-
-    function sanitizeZipEntryName(name, fallback) {
-        var v = normalizeWhitespace(String(name || '').trim());
-        if (!v) v = fallback || 'file';
-        v = v.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_');
-        v = v.replace(/\s+/g, ' ');
-        v = v.replace(/^\.+/, '').replace(/\.+$/, '');
-        if (!v) v = fallback || 'file';
-        return v.slice(0, 180);
-    }
-
-    function getLessonsBulkZipCrcTable() {
-        if (window.__DTU_AD_ZIP_CRC_TABLE__) return window.__DTU_AD_ZIP_CRC_TABLE__;
-        var table = new Uint32Array(256);
-        for (var n = 0; n < 256; n++) {
-            var c = n;
-            for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
-            table[n] = c >>> 0;
-        }
-        window.__DTU_AD_ZIP_CRC_TABLE__ = table;
-        return table;
-    }
-
-    function crc32Bytes(bytes) {
-        var table = getLessonsBulkZipCrcTable();
-        var c = 0xFFFFFFFF;
-        for (var i = 0; i < bytes.length; i++) {
-            c = table[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
-        }
-        return (c ^ 0xFFFFFFFF) >>> 0;
-    }
-
-    function zipDosDateTime(dateObj) {
-        var d = dateObj instanceof Date ? dateObj : new Date();
-        var year = Math.max(1980, Math.min(2107, d.getFullYear()));
-        var month = d.getMonth() + 1;
-        var day = d.getDate();
-        var hour = d.getHours();
-        var minute = d.getMinutes();
-        var second = Math.floor(d.getSeconds() / 2);
-        var dosTime = ((hour & 0x1F) << 11) | ((minute & 0x3F) << 5) | (second & 0x1F);
-        var dosDate = (((year - 1980) & 0x7F) << 9) | ((month & 0x0F) << 5) | (day & 0x1F);
-        return { time: dosTime >>> 0, date: dosDate >>> 0 };
-    }
-
-    function pushU16LE(out, v) {
-        out.push(v & 0xFF, (v >>> 8) & 0xFF);
-    }
-
-    function pushU32LE(out, v) {
-        out.push(v & 0xFF, (v >>> 8) & 0xFF, (v >>> 16) & 0xFF, (v >>> 24) & 0xFF);
-    }
-
-    function buildStoreOnlyZipBlob(entries) {
-        var encoder = new TextEncoder();
-        var chunks = [];
-        var central = [];
-        var offset = 0;
-
-        for (var i = 0; i < entries.length; i++) {
-            var e = entries[i];
-            var nameBytes = encoder.encode(e.name);
-            var data = e.bytes instanceof Uint8Array ? e.bytes : new Uint8Array(e.bytes || []);
-            var crc = crc32Bytes(data);
-            var dt = zipDosDateTime(e.date);
-
-            var local = [];
-            pushU32LE(local, 0x04034b50);
-            pushU16LE(local, 20);
-            pushU16LE(local, 0x0800);
-            pushU16LE(local, 0);
-            pushU16LE(local, dt.time);
-            pushU16LE(local, dt.date);
-            pushU32LE(local, crc);
-            pushU32LE(local, data.length);
-            pushU32LE(local, data.length);
-            pushU16LE(local, nameBytes.length);
-            pushU16LE(local, 0);
-            chunks.push(new Uint8Array(local));
-            chunks.push(nameBytes);
-            chunks.push(data);
-
-            var centralHdr = [];
-            pushU32LE(centralHdr, 0x02014b50);
-            pushU16LE(centralHdr, 20);
-            pushU16LE(centralHdr, 20);
-            pushU16LE(centralHdr, 0x0800);
-            pushU16LE(centralHdr, 0);
-            pushU16LE(centralHdr, dt.time);
-            pushU16LE(centralHdr, dt.date);
-            pushU32LE(centralHdr, crc);
-            pushU32LE(centralHdr, data.length);
-            pushU32LE(centralHdr, data.length);
-            pushU16LE(centralHdr, nameBytes.length);
-            pushU16LE(centralHdr, 0);
-            pushU16LE(centralHdr, 0);
-            pushU16LE(centralHdr, 0);
-            pushU16LE(centralHdr, 0);
-            pushU32LE(centralHdr, 0);
-            pushU32LE(centralHdr, offset);
-            central.push(new Uint8Array(centralHdr));
-            central.push(nameBytes);
-
-            offset += local.length + nameBytes.length + data.length;
-        }
-
-        var centralSize = 0;
-        for (var c = 0; c < central.length; c++) centralSize += central[c].length;
-        var centralOffset = offset;
-
-        for (var j = 0; j < central.length; j++) chunks.push(central[j]);
-
-        var eocd = [];
-        pushU32LE(eocd, 0x06054b50);
-        pushU16LE(eocd, 0);
-        pushU16LE(eocd, 0);
-        pushU16LE(eocd, entries.length);
-        pushU16LE(eocd, entries.length);
-        pushU32LE(eocd, centralSize);
-        pushU32LE(eocd, centralOffset);
-        pushU16LE(eocd, 0);
-        chunks.push(new Uint8Array(eocd));
-
-        return new Blob(chunks, { type: 'application/zip' });
-    }
-
-    async function fetchFileForBundle(url, index) {
-        try {
-            if (!isStrictFileDownloadUrl(url)) return { ok: false, reason: 'invalid-url' };
-            var resp = await lessonsBulkFetch(url, { credentials: 'include', cache: 'no-store' });
-            if (!resp || !resp.ok) {
-                return { ok: false, reason: 'http', status: resp ? resp.status : 'no_response', finalUrl: resp && resp.url ? resp.url : '' };
-            }
-            var declared = resp.headers && resp.headers.get ? Number(resp.headers.get('content-length')) : NaN;
-            if (isTooLargeForZipEntry(declared)) {
-                try { if (resp.body) resp.body.cancel(); } catch (eBig) { }
-                return { ok: false, reason: 'too-large', size: declared };
-            }
-            var ab = await resp.arrayBuffer();
-            var bytes = new Uint8Array(ab || new ArrayBuffer(0));
-            if (!bytes.length) return { ok: false, reason: 'empty' };
-            if (isTooLargeForZipEntry(bytes.length)) return { ok: false, reason: 'too-large', size: bytes.length };
-
-            var finalUrl = (resp && resp.url) ? resp.url : url;
-            var cd = resp && resp.headers && resp.headers.get ? resp.headers.get('content-disposition') : '';
-            var ct = resp && resp.headers && resp.headers.get ? resp.headers.get('content-type') : '';
-            var fileName = resolveDownloadFileName(url || finalUrl, cd, ct, index, finalUrl);
-            logLessonsBulkDebug('bundle_file_name', {
-                index: index,
-                url: url,
-                finalUrl: finalUrl,
-                contentType: ct,
-                fileName: fileName
-            });
-            return { ok: true, name: fileName, bytes: bytes, url: url };
-        } catch (e0) {
-            return { ok: false, reason: 'fetch', error: String(e0 && e0.message ? e0.message : e0) };
-        }
-    }
-
-    function getLessonsBulkZipBaseTitle() {
-        var title = '';
-        try { title = normalizeWhitespace(document.title || ''); } catch (e0) { title = ''; }
-        if (!title) return 'DTU Learn Course Content';
-
-        var parts = title.split(/\s+-\s+/).map(function (p) { return normalizeWhitespace(p || ''); }).filter(Boolean);
-        if (parts.length <= 1) {
-            return title.replace(/[\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim() || 'DTU Learn Course Content';
-        }
-
-        var best = parts[0];
-        var bestScore = -9999;
-        for (var i = 0; i < parts.length; i++) {
-            var p = parts[i] || '';
-            var score = 0;
-            if (/\b\d{5}\b/.test(p)) score += 5;
-            if (/\b(spring|autumn|fall|summer|winter|f\d{2}|e\d{2})\b/i.test(p)) score += 3;
-            if (/\s/.test(p)) score += 1;
-            if (/_/.test(p)) score -= 3;
-            if (/\.(pdf|docx?|pptx?|xlsx?|zip)\b/i.test(p)) score -= 4;
-            if (/^(book|old exam sets|course handbook|lecture slides|exercises and assignments)$/i.test(p)) score -= 4;
-            if (score > bestScore) {
-                bestScore = score;
-                best = p;
-            }
-        }
-
-        best = best.replace(/[\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim();
-        return best || 'DTU Learn Course Content';
-    }
-
-    function getLessonsBulkZipNameBase() {
-        var title = getLessonsBulkZipBaseTitle();
-        var d = new Date();
-        function pad(n) { return String(n).padStart(2, '0'); }
-        var stamp = d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '-' + pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds());
-        return (title + ' - Course Content - ' + stamp).slice(0, 120);
-    }
-
-    // The ZIP writer is ZIP32 (no ZIP64): sizes, offsets and the entry count are
-    // 32/16-bit, so one archive must stay well under 4 GiB and 65535 entries or
-    // it comes out corrupt. Courses are therefore split into parts, and each
-    // part is saved and released as soon as it is full, which also caps memory
-    // at about one part instead of the whole course.
-    var LESSONS_BULK_ZIP_PART_MAX_BYTES = 2e9;
-    var LESSONS_BULK_ZIP_PART_MAX_ENTRIES = 65000;
-
-    function getLessonsBulkZipPartLimits() {
-        var maxBytes = LESSONS_BULK_ZIP_PART_MAX_BYTES;
-        // Debug-only override (MB) so the split can be exercised on small courses.
-        try {
-            var mb = Number(localStorage.getItem('dtu_after_dark_bulk_zip_part_mb'));
-            if (isFinite(mb) && mb > 0) maxBytes = Math.min(maxBytes, mb * 1e6);
-        } catch (e0) { }
-        return { maxBytes: maxBytes, maxEntries: LESSONS_BULK_ZIP_PART_MAX_ENTRIES };
-    }
-
-    function shouldStartNewZipPart(partBytes, partEntries, nextSize, limits) {
-        var lim = limits || { maxBytes: LESSONS_BULK_ZIP_PART_MAX_BYTES, maxEntries: LESSONS_BULK_ZIP_PART_MAX_ENTRIES };
-        if (!partEntries) return false;
-        if (partEntries >= lim.maxEntries) return true;
-        return partBytes + nextSize > lim.maxBytes;
-    }
-
-    function isTooLargeForZipEntry(size) {
-        var n = Number(size);
-        // Leave room for this entry's own headers inside the 32-bit fields.
-        return isFinite(n) && n > 0xFFFFFFFF - 0x10000;
-    }
-
-    function getZipPartFileName(baseName, partNumber, isSplit) {
-        var base = sanitizeZipEntryName(baseName, 'DTU-Learn-Bulk-Download');
-        return base + (isSplit ? ' - part ' + partNumber : '') + '.zip';
-    }
-
-    function saveZipBlob(entries, zipName) {
-        var zipBlob = buildStoreOnlyZipBlob(entries);
-        var blobUrl = URL.createObjectURL(zipBlob);
-        var a = document.createElement('a');
-        markExt(a);
-        a.style.display = 'none';
-        a.href = blobUrl;
-        a.download = zipName;
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(function () {
-            try { a.remove(); } catch (e0) { }
-            try { URL.revokeObjectURL(blobUrl); } catch (e1) { }
-        }, 2500);
-    }
-
-    // Parts saved by the current run; the cancel message reports them.
-    var _lessonsBulkZipPartsSaved = 0;
-
-    async function downloadSingleBundledZipFromUrls(rootEl, urls) {
-        var list = Array.from(new Set((urls || []).filter(function (u) { return isStrictFileDownloadUrl(u); })));
-        if (!list.length) return { ok: false, reason: 'no-files' };
-
-        var limits = getLessonsBulkZipPartLimits();
-        var baseName = getLessonsBulkZipNameBase();
-        var failByReason = {};
-        var usedNames = new Map();
-        var partEntries = [];
-        var partBytes = 0;
-        var zipNames = [];
-        var fileCount = 0;
-        _lessonsBulkZipPartsSaved = 0;
-
-        function savePart(isFinal) {
-            var isSplit = !isFinal || zipNames.length > 0;
-            var zipName = getZipPartFileName(baseName, zipNames.length + 1, isSplit);
-            saveZipBlob(partEntries, zipName);
-            logLessonsBulkDebug('bundle_part_saved', { zipName: zipName, entries: partEntries.length, bytes: partBytes });
-            zipNames.push(zipName);
-            _lessonsBulkZipPartsSaved = zipNames.length;
-            partEntries = [];
-            partBytes = 0;
-        }
-
-        function addToPart(r, i) {
-            if (!r || !r.ok) {
-                var reason = (r && r.reason) ? r.reason : 'unknown';
-                failByReason[reason] = (failByReason[reason] || 0) + 1;
-                logLessonsBulkDebug('bundle_fetch_fail', { url: list[i], result: r || null });
-                return;
-            }
-            var entryName = sanitizeZipEntryName(r.name, 'file-' + String(i + 1));
-            var finalName = entryName;
-            var count = usedNames.get(entryName) || 0;
-            if (count > 0) {
-                var dot = entryName.lastIndexOf('.');
-                if (dot > 0) finalName = entryName.slice(0, dot) + ' (' + count + ')' + entryName.slice(dot);
-                else finalName = entryName + ' (' + count + ')';
-            }
-            usedNames.set(entryName, count + 1);
-            if (shouldStartNewZipPart(partBytes, partEntries.length, r.bytes.length, limits)) savePart(false);
-            partEntries.push({ name: finalName, bytes: r.bytes, date: new Date() });
-            partBytes += r.bytes.length;
-            fileCount++;
-        }
-
-        // Fetch a few files at once, but add them to parts strictly in list
-        // order so entry order and duplicate-name numbering match a one-by-one
-        // run. A result is dropped from `fetched` as soon as it is placed.
-        var fetched = new Array(list.length);
-        var nextFetch = 0;
-        var nextPlace = 0;
-        var fetchedCount = 0;
-        function placeReady() {
-            while (nextPlace < list.length && fetched[nextPlace] !== undefined) {
-                if (isLessonsBulkRunAborted()) return;
-                addToPart(fetched[nextPlace], nextPlace);
-                fetched[nextPlace] = null;
-                nextPlace++;
-            }
-        }
-        async function bundleWorker() {
-            while (nextFetch < list.length && !isLessonsBulkRunAborted()) {
-                var idx = nextFetch++;
-                fetched[idx] = await fetchFileForBundle(list[idx], idx);
-                fetchedCount++;
-                setLessonsBulkStatus(rootEl, 'Bundling file ' + fetchedCount + ' / ' + list.length
-                    + (zipNames.length ? ' (' + zipNames.length + ' part' + (zipNames.length === 1 ? '' : 's') + ' saved)' : '') + '...', 'work');
-                placeReady();
-            }
-        }
-        var bundleWorkers = [];
-        for (var w = 0; w < Math.min(LESSONS_BULK_FETCH_CONCURRENCY, list.length); w++) bundleWorkers.push(bundleWorker());
-        await Promise.all(bundleWorkers);
-        placeReady();
-
-        throwIfLessonsBulkAborted();
-        if (partEntries.length) savePart(true);
-        if (!zipNames.length) return { ok: false, reason: 'fetch-failed', failByReason: failByReason };
-        return { ok: true, fileCount: fileCount, parts: zipNames.length, failByReason: failByReason, zipName: zipNames[0], zipNames: zipNames };
-    }
-
-    function triggerDirectFileDownload(url, filename, index) {
-        try {
-            // Direct anchor download (no _blank) to avoid popup windows/tabs.
-            var a = document.createElement('a');
-            markExt(a);
-            a.style.display = 'none';
-            a.href = url;
-            var fallbackName = filename || ('dtu-file-' + String((index || 0) + 1));
-            if (fallbackName) a.download = fallbackName;
-            document.body.appendChild(a);
-            a.click();
-            setTimeout(function () {
-                try { a.remove(); } catch (e0) { }
-            }, 1000);
-            return true;
-        } catch (e1) {
-            return false;
-        }
-    }
-
-    var LESSONS_BULK_SCAN_CONCURRENCY = 4;
-    var LESSONS_BULK_FETCH_CONCURRENCY = 4;
-
-    // Set while a bulk run is active; aborting it cancels in-flight fetches and drops buffered file bytes.
-    var _lessonsBulkRunAbort = null;
 
     function isLessonsBulkRunAborted() {
-        return !!(_lessonsBulkRunAbort && _lessonsBulkRunAbort.signal.aborted);
+        return !!(_lessonsBulkState.runAbort && _lessonsBulkState.runAbort.signal.aborted);
     }
 
     function throwIfLessonsBulkAborted() {
@@ -3053,19 +251,9 @@
     }
 
     function cancelLessonsBulkRun() {
-        if (_lessonsBulkRunAbort && !_lessonsBulkRunAbort.signal.aborted) {
-            try { _lessonsBulkRunAbort.abort(); } catch (e0) { }
+        if (_lessonsBulkState.runAbort && !_lessonsBulkState.runAbort.signal.aborted) {
+            try { _lessonsBulkState.runAbort.abort(); } catch (e0) { }
         }
-    }
-
-    function lessonsBulkFetch(url, opts) {
-        var o = Object.assign({}, opts || {});
-        if (_lessonsBulkRunAbort) o.signal = _lessonsBulkRunAbort.signal;
-        return fetch(url, o);
-    }
-
-    function lessonsBulkDelay(ms) {
-        return new Promise(function (resolve) { setTimeout(resolve, ms || 0); });
     }
 
     function setLessonsBulkStatus(rootEl, text, tone) {
@@ -3101,13 +289,31 @@
         rootEl.classList.toggle('dtu-lbd-running', !!disabled);
     }
 
+    // Status after a bundle: what was saved, then every file that was not, by
+    // name, so a missing file is never a surprise when the student unzips.
+    function describeLessonsBundleResult(bundle) {
+        var fail = bundle.failByReason || {};
+        var names = Array.isArray(bundle.failedNames) ? bundle.failedNames : [];
+        var skippedLarge = fail['too-large'] || 0;
+        var text = bundle.parts > 1
+            ? 'Started ' + bundle.parts + ' ZIP downloads (' + bundle.fileCount + ' files, split into parts of up to 2 GB).'
+            : 'Started 1 bundled ZIP download (' + bundle.fileCount + ' file' + (bundle.fileCount === 1 ? '' : 's') + ').';
+        if (skippedLarge) text += ' Skipped ' + skippedLarge + ' file' + (skippedLarge === 1 ? '' : 's') + ' over 4 GB.';
+        if (names.length) {
+            var shown = names.slice(0, 5).join(', ');
+            if (names.length > 5) shown += ' and ' + (names.length - 5) + ' more';
+            text += ' ' + names.length + ' file' + (names.length === 1 ? '' : 's') + ' could not be downloaded: ' + shown + '.';
+        }
+        return text;
+    }
+
     async function runLessonsBulkDownload(rootEl) {
-        if (!rootEl || _lessonsBulkUiState.running || _lessonsBulkRunAbort) return;
+        if (!rootEl || _lessonsBulkUiState.running || _lessonsBulkState.runAbort) return;
         if (!isLessonsBulkDownloadEnabled()) return;
         if (!isDTULearnLessonsPage()) return;
         _lessonsBulkUiState.running = true;
-        _lessonsBulkRunAbort = new AbortController();
-        _lessonsBulkZipPartsSaved = 0;
+        _lessonsBulkState.runAbort = new AbortController();
+        _lessonsBulkState.zipPartsSaved = 0;
         setLessonsBulkControlsDisabled(rootEl, true);
 
         function ensureCurrentRun() {
@@ -3120,7 +326,7 @@
         try {
             ensureCurrentRun();
             _lessonsBulkUiState.activeDoc = (rootEl && rootEl.ownerDocument) ? rootEl.ownerDocument : getLessonsWorkingDocument(document);
-            _lessonsBulkUrlNameHints = new Map();
+            _lessonsBulkUrlNameHints.clear();
             if (isLegacyLessonsTreeDocument(_lessonsBulkUiState.activeDoc)) {
                 maybeStartLegacyApiSectionsHydration(_lessonsBulkUiState.activeDoc, rootEl);
                 var legacyOrgUnitId = getCurrentLessonsOrgUnitId(_lessonsBulkUiState.activeDoc);
@@ -3245,7 +451,7 @@
                     try {
                         scanResults[idx] = await fetchLessonsUnitDownloadResult(unitUrls[idx]);
                     } catch (eScan) {
-                        scanResults[idx] = { links: [] };
+                        scanResults[idx] = { links: [], unread: true };
                     }
                     scanDone++;
                     setLessonsBulkStatus(rootEl, 'Scanning page ' + scanDone + ' / ' + unitUrls.length + '...', 'work');
@@ -3322,7 +528,7 @@
                 bundledResolved: bundledUrls.length
             });
             if (!bundledUrls.length) {
-                setLessonsBulkStatus(rootEl, 'No downloadable files found in selected sections.', 'error');
+                setLessonsBulkStatus(rootEl, describeLessonsBulkEmptyResult(scanResults), 'error');
                 logLessonsBulkDebug('run_no_downloadable_files', {
                     selectedKeys: selectedKeys,
                     unitUrls: unitUrls,
@@ -3334,11 +540,7 @@
             setLessonsBulkStatus(rootEl, 'Building one ZIP bundle (' + bundledUrls.length + ' file(s))...', 'work');
             var bundle = await downloadSingleBundledZipFromUrls(rootEl, bundledUrls);
             if (bundle && bundle.ok) {
-                var skippedLarge = bundle.failByReason && bundle.failByReason['too-large'] ? bundle.failByReason['too-large'] : 0;
-                setLessonsBulkStatus(rootEl, (bundle.parts > 1
-                    ? 'Started ' + bundle.parts + ' ZIP downloads (' + bundle.fileCount + ' files, split into parts of up to 2 GB).'
-                    : 'Started 1 bundled ZIP download (' + bundle.fileCount + ' file' + (bundle.fileCount === 1 ? '' : 's') + ').')
-                    + (skippedLarge ? ' Skipped ' + skippedLarge + ' file' + (skippedLarge === 1 ? '' : 's') + ' over 4 GB.' : ''), 'ok');
+                setLessonsBulkStatus(rootEl, describeLessonsBundleResult(bundle), (bundle.failedNames && bundle.failedNames.length) ? 'error' : 'ok');
                 logLessonsBulkDebug('run_single_zip_ok', bundle);
             } else {
                 var bundleFail = (bundle && bundle.failByReason) ? bundle.failByReason : {};
@@ -3349,12 +551,12 @@
             }
         } catch (eRun) {
             if (!isLessonsBulkRunAborted()) throw eRun;
-            setLessonsBulkStatus(rootEl, _lessonsBulkZipPartsSaved
-                ? 'Cancelled. ' + _lessonsBulkZipPartsSaved + ' ZIP part' + (_lessonsBulkZipPartsSaved === 1 ? ' was' : 's were') + ' already saved; nothing more will be.'
+            setLessonsBulkStatus(rootEl, _lessonsBulkState.zipPartsSaved
+                ? 'Cancelled. ' + _lessonsBulkState.zipPartsSaved + ' ZIP part' + (_lessonsBulkState.zipPartsSaved === 1 ? ' was' : 's were') + ' already saved; nothing more will be.'
                 : 'Cancelled. Nothing was saved.', 'error');
             logLessonsBulkDebug('run_cancelled', {});
         } finally {
-            _lessonsBulkRunAbort = null;
+            _lessonsBulkState.runAbort = null;
             _lessonsBulkUiState.running = false;
             setLessonsBulkControlsDisabled(rootEl, false);
             updateLessonsBulkRunButton(rootEl);
@@ -3502,10 +704,6 @@
         // Topic-count prefetch is intentionally disabled for legacy fallback paths.
     }
 
-    function getLessonsBulkApi() {
-        try { return globalThis.DTUAfterDarkLessonsBulkUi || null; } catch (e0) { return null; }
-    }
-
     function getLessonsBulkStateRefs() {
         return {
             uiState: _lessonsBulkUiState,
@@ -3518,32 +716,26 @@
 
     function resetLessonsBulkState() {
         cancelLessonsBulkRun();
-        _lessonsBulkUiState = {
-            sections: [],
-            selectedKeys: new Set(),
-            sig: '',
-            running: false,
-            lastRefreshAt: 0,
-            activeDoc: null,
-            lastLegacyExpandAt: 0
-        };
-        _lessonsBulkUrlNameHints = new Map();
-        _lessonsLegacyApiSectionsCache = {
-            orgUnitId: '',
-            sections: [],
-            loading: false,
-            promise: null,
-            ts: 0,
-            lastAttemptTs: 0,
-            source: ''
-        };
-        _lessonsLegacyModuleStructureCache = new Map();
-        _lessonsLegacyBackgroundResolveState = {
-            orgUnitId: '',
-            running: false,
-            token: 0,
-            resolvedKeys: new Set()
-        };
+        _lessonsBulkUiState.sections = [];
+        _lessonsBulkUiState.selectedKeys = new Set();
+        _lessonsBulkUiState.sig = '';
+        _lessonsBulkUiState.running = false;
+        _lessonsBulkUiState.lastRefreshAt = 0;
+        _lessonsBulkUiState.activeDoc = null;
+        _lessonsBulkUiState.lastLegacyExpandAt = 0;
+        _lessonsBulkUrlNameHints.clear();
+        _lessonsLegacyApiSectionsCache.orgUnitId = '';
+        _lessonsLegacyApiSectionsCache.sections = [];
+        _lessonsLegacyApiSectionsCache.loading = false;
+        _lessonsLegacyApiSectionsCache.promise = null;
+        _lessonsLegacyApiSectionsCache.ts = 0;
+        _lessonsLegacyApiSectionsCache.lastAttemptTs = 0;
+        _lessonsLegacyApiSectionsCache.source = '';
+        _lessonsLegacyModuleStructureCache.clear();
+        _lessonsLegacyBackgroundResolveState.orgUnitId = '';
+        _lessonsLegacyBackgroundResolveState.running = false;
+        _lessonsLegacyBackgroundResolveState.token = 0;
+        _lessonsLegacyBackgroundResolveState.resolvedKeys = new Set();
     }
 
     function removeLessonsBulkDownloadControl() {
@@ -3585,6 +777,18 @@
                 try { styleEl.remove(); } catch (e3) { }
             });
         });
+    }
+
+    function makeLessonsBulkIcon(doc, className, pathData) {
+        var ns = 'http://www.w3.org/2000/svg';
+        var svg = doc.createElementNS(ns, 'svg');
+        svg.setAttribute('viewBox', '0 0 16 16');
+        svg.setAttribute('aria-hidden', 'true');
+        svg.setAttribute('class', className);
+        var path = doc.createElementNS(ns, 'path');
+        path.setAttribute('d', pathData);
+        svg.appendChild(path);
+        return svg;
     }
 
     function insertLessonsBulkDownloadControl() {
@@ -3712,7 +916,13 @@
             markExt(toggle);
             toggle.type = 'button';
             toggle.className = 'dtu-lbd-toggle';
-            toggle.textContent = 'Download content';
+            toggle.setAttribute('aria-expanded', 'false');
+            toggle.appendChild(makeLessonsBulkIcon(scopeDoc, 'dtu-lbd-icon', 'M8 2.5v7.5M4.75 6.75 8 10l3.25-3.25M3 13.5h10'));
+            var toggleLabel = scopeDoc.createElement('span');
+            toggleLabel.className = 'dtu-lbd-toggle-label';
+            toggleLabel.textContent = 'Download content';
+            toggle.appendChild(toggleLabel);
+            toggle.appendChild(makeLessonsBulkIcon(scopeDoc, 'dtu-lbd-chevron', 'M4 6l4 4 4-4'));
 
             var panel = scopeDoc.createElement('div');
             markExt(panel);
@@ -3799,6 +1009,7 @@
                 var isOpen = root.classList.contains('dtu-open');
                 if (isOpen) root.classList.remove('dtu-open');
                 else root.classList.add('dtu-open');
+                toggle.setAttribute('aria-expanded', isOpen ? 'false' : 'true');
                 if (!isOpen) {
                     var openDoc = (root && root.ownerDocument) ? root.ownerDocument : scopeDoc;
                     if (isLegacyLessonsTreeDocument(openDoc)) maybeStartLegacyApiSectionsHydration(openDoc, root);
@@ -3837,8 +1048,6 @@
         if (shouldRefresh) refreshLessonsBulkDownloadUi(root, false);
     }
 
-    // The Lessons iframe can mount its shadow TOC after the outer page becomes
-    // idle. Its mutations do not wake the top document's observer.
     function scheduleLessonsBulkBootstrap() {
         if (_lessonsBulkUiInserted || _lessonsBulkBootstrapTimer) return;
         var attempts = 0;
@@ -3869,6 +1078,31 @@
             scheduleLessonsBulkBootstrap();
         } else removeLessonsBulkDownloadControl();
     }
+
+    try {
+        globalThis.DTUAfterDarkLessonsBulkZipDeps = {
+            isStrictFileDownloadUrl: isStrictFileDownloadUrl,
+            lessonsBulkFetch: lessonsBulkFetch,
+            setLessonsBulkStatus: setLessonsBulkStatus,
+            isLessonsBulkRunAborted: isLessonsBulkRunAborted,
+            throwIfLessonsBulkAborted: throwIfLessonsBulkAborted
+        };
+        globalThis.DTUAfterDarkLessonsBulkTreeDeps = {
+            toAbsoluteSamePageUrl: toAbsoluteSamePageUrl,
+            lessonsBulkDelay: lessonsBulkDelay,
+            fetchLegacyModuleStructureApi: fetchLegacyModuleStructureApi,
+            getApiObjectTitle: getApiObjectTitle,
+            getDirectTopicIdsFromStructure: getDirectTopicIdsFromStructure,
+            getDirectModuleChildrenFromStructure: getDirectModuleChildrenFromStructure,
+            collectTopicIdsFromJsonValue: collectTopicIdsFromJsonValue,
+            collectModuleIdsFromJsonValue: collectModuleIdsFromJsonValue,
+            refreshLessonsBulkDownloadUi: refreshLessonsBulkDownloadUi
+        };
+        globalThis.DTUAfterDarkLessonsBulkFetchDeps = {
+            isLessonsBulkRunAborted: isLessonsBulkRunAborted,
+            throwIfLessonsBulkAborted: throwIfLessonsBulkAborted
+        };
+    } catch (eDeps) { }
 
     try {
         globalThis.DTUAfterDarkLessonsBulkUi = {

@@ -199,7 +199,8 @@
 
         try {
             root.querySelectorAll('.d2l-navigation-s-mobile-menu, .d2l-navigation-s-mobile-menu-mask, .d2l-navigation-s-mobile-menu-content, .d2l-navigation-s-mobile-menu-nav, .d2l-navigation-s-mobile-menu-course-menu').forEach(function (el) {
-                if (!el || !el.style) return;
+                // Light mode keeps Brightspace's own drawer (this pass also runs with dark mode off).
+                if (!el || !el.style || !darkModeEnabled) return;
                 el.style.setProperty('background', dark1, 'important');
                 el.style.setProperty('background-color', dark1, 'important');
                 el.style.setProperty('background-image', 'none', 'important');

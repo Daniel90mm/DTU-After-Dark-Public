@@ -1,15 +1,12 @@
 (function () {
     'use strict';
+    var markExt = globalThis.DTUAfterDarkDom.markExt;
+    var isTopWindow = globalThis.DTUAfterDarkDom.isTopWindow;
 
     function getDeps() {
         try { return globalThis.DTUAfterDarkKurserCourseEvalDeps || null; } catch (e0) { return null; }
     }
 
-    function markExt(el) {
-        var deps = getDeps();
-        if (el && deps && typeof deps.markExt === 'function') deps.markExt(el);
-        return el;
-    }
 
     function sendRuntimeMessage(msg, cb) {
         var deps = getDeps();
@@ -20,10 +17,6 @@
         if (cb) cb(null);
     }
 
-    function isTopWindow() {
-        var deps = getDeps();
-        return !!(deps && typeof deps.isTopWindow === 'function' && deps.isTopWindow());
-    }
 
     function isFeatureFlagEnabled(key) {
         var deps = getDeps();
@@ -229,17 +222,10 @@
         } catch (e) {
         }
 
-        var courseBasePath = null;
-        try {
-            var baseMatch = window.location.pathname.match(/\/course\/(?:\d{4}-\d{4}\/)?[A-Za-z0-9]+/i);
-            courseBasePath = (baseMatch && baseMatch[0]) ? baseMatch[0] : null;
-        } catch (e) {
-            courseBasePath = null;
-        }
-        if (!courseBasePath) {
-            courseBasePath = '/course/' + encodeURIComponent(courseCode);
-        }
-        var infoUrl = window.location.origin + courseBasePath + '/info';
+        // Only the current catalogue has an info page: /course/2024-2025/01017/info is a
+        // 404, while /course/01017/info lists the course's evaluations from every recent
+        // year. Older-year pages therefore read the current one.
+        var infoUrl = window.location.origin + '/course/' + encodeURIComponent(courseCode) + '/info';
 
         var infoFetchCreds = 'omit';
         try {
@@ -410,8 +396,13 @@
         container.setAttribute('data-dtu-cw-state', 'empty');
         container.appendChild(layout.makeColumnHead('Student evaluation'));
         var empty = layout.makeEl('div', 'dtu-cw-empty');
-        empty.appendChild(layout.makeEl('span', 'dtu-cw-empty-lead', 'No evaluation yet'));
-        var status = layout.makeEl('span', 'dtu-cw-status', 'New courses get one after they have been taught once.');
+        // A page from an older catalogue year may be a course DTU no longer offers, and
+        // kurser.dtu.dk lists evaluations only for courses in the current catalogue.
+        var olderYear = /\/course\/\d{4}-\d{4}\//i.test(window.location.pathname || '');
+        empty.appendChild(layout.makeEl('span', 'dtu-cw-empty-lead', olderYear ? 'No evaluation listed' : 'No evaluation yet'));
+        var status = layout.makeEl('span', 'dtu-cw-status', olderYear
+            ? 'kurser.dtu.dk lists evaluations only for courses in the current catalogue.'
+            : 'New courses get one after they have been taught once.');
         status.setAttribute('data-dtu-course-eval-status', '1');
         empty.appendChild(status);
         container.appendChild(empty);

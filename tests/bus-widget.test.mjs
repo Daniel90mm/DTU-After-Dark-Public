@@ -7,7 +7,7 @@ const NOW = new Date('2026-09-30T17:00:00').getTime();
 
 const ui = extractFunctions('darkmode.bus.js', ['busMinutesNow', 'formatBusClock', 'buildBusWidgetModel']).api;
 const rt = extractFunctions('darkmode.bus.js', [
-    'minutesUntilDeparture', 'isDelayed', 'getDelayMinutes', 'formatDepartureTime', 'formatDelayTag',
+    'copenhagenTimestamp', 'minutesUntilDeparture', 'isDelayed', 'getDelayMinutes', 'formatDepartureTime', 'formatDelayTag',
     'departureTimestamp', 'mapBusDepartureForDisplay'
 ], { globals: { Date: class extends Date { constructor(...a) { if (a.length) super(...a); else super(NOW); } static now() { return NOW; } } } }).api;
 
@@ -189,6 +189,19 @@ test('bus badges are split tags: number on a chip, type letter in Movia\'s colou
     const numbered = badges.createBusLineBadge('193');
     assert.equal(numbered.children.length, 1, 'numbered lines have no type block');
     assert.equal(numbered.attributes['data-dtu-bus-line-badge'], '193');
+});
+
+test('the Letbane (line L) is a Lyngby line with a plain L badge and both termini', () => {
+    assert.match(SRC, /lyngby: \{[\s\S]*?lines: \['150S', 'L',/);
+    assert.match(SRC, /'L': \['Lundtofte St\. \(Letbane\)', 'Ishøj St\. \(Letbane\)'\]/);
+    const l = badges.createBusLineBadge('L');
+    assert.deepEqual(l.children.map((c) => [c.className, c.textContent]), [['dtu-bus-badge-num', 'L']]);
+});
+
+test('Letbane rows drop the "(Letbane)" suffix the L badge already states', () => {
+    const rows = plain(ui.buildBusWidgetModel([{ line: 'L', direction: 'Ishøj St. (Letbane)', at: at('17:04'), delay: 0 }], { lines: [{ line: 'L' }] }, NOW));
+    assert.equal(rows[0].direction, 'Ishøj St.');
+    assert.equal(rows[0].title, 'L to Ishøj St.: 4 min');
 });
 
 test('widget badges share one width so a shorter number leaves no gap after its letter', () => {

@@ -1,5 +1,8 @@
 (function () {
     'use strict';
+    var markExt = globalThis.DTUAfterDarkDom.markExt;
+    var isTopWindow = globalThis.DTUAfterDarkDom.isTopWindow;
+    var normalizeWhitespace = globalThis.DTUAfterDarkDom.normalizeWhitespace;
 
     function getDeps() {
         try { return globalThis.DTUAfterDarkBusDeps || null; } catch (e0) { return null; }
@@ -17,31 +20,7 @@
         return {};
     }
 
-    function readUiState() {
-        var deps = getDeps();
-        if (!deps || typeof deps.getUiState !== 'function') return {};
-        return deps.getUiState() || {};
-    }
 
-    function writeUiState(patch) {
-        var deps = getDeps();
-        if (!deps || typeof deps.setUiState !== 'function') return;
-        deps.setUiState(patch || {});
-    }
-
-    function markExt(el) {
-        var deps = getDeps();
-        if (el && deps && typeof deps.markExt === 'function') deps.markExt(el);
-        return el;
-    }
-
-    function normalizeWhitespace(text) {
-        var deps = getDeps();
-        if (deps && typeof deps.normalizeWhitespace === 'function') {
-            return deps.normalizeWhitespace(text);
-        }
-        return String(text || '').replace(/\s+/g, ' ').trim();
-    }
 
     function rgbaFromHex(hex, alpha, fallbackHex) {
         var deps = getDeps();
@@ -51,20 +30,6 @@
         return fallbackHex || hex || 'rgba(0,0,0,' + alpha + ')';
     }
 
-    function isTopWindow() {
-        var deps = getDeps();
-        return !!(deps && typeof deps.isTopWindow === 'function' && deps.isTopWindow());
-    }
-
-    function isDTULearnHomepage() {
-        var deps = getDeps();
-        return !!(deps && typeof deps.isDTULearnHomepage === 'function' && deps.isDTULearnHomepage());
-    }
-
-    function isBusEnabled() {
-        var deps = getDeps();
-        return !!(deps && typeof deps.isBusEnabled === 'function' && deps.isBusEnabled());
-    }
 
     function isDarkModeEnabled() {
         var deps = getDeps();
@@ -102,106 +67,28 @@
         return true;
     }
 
-    function getResolvedAccent() {
-        var deps = getDeps();
-        if (deps && typeof deps.getResolvedAccent === 'function') return deps.getResolvedAccent();
-        try {
-            return (getComputedStyle(document.documentElement).getPropertyValue('--dtu-ad-accent') || '#1f7ae0').trim() || '#1f7ae0';
-        } catch (e0) {
-            return '#1f7ae0';
-        }
-    }
-
-    function getBusConfig() {
-        var deps = getDeps();
-        if (deps && typeof deps.getBusConfig === 'function') return deps.getBusConfig();
-        return null;
-    }
-
-    function buildDefaultBusConfig(campuses) {
-        var deps = getDeps();
-        if (deps && typeof deps.buildDefaultBusConfig === 'function') return deps.buildDefaultBusConfig(campuses);
-        return { campuses: [], stopIds: [], lines: [] };
-    }
-
-    function sanitizeBusCampusIds(campuses) {
-        var deps = getDeps();
-        if (deps && typeof deps.sanitizeBusCampusIds === 'function') return deps.sanitizeBusCampusIds(campuses);
-        return [];
-    }
-
-    function getCampusStopIds(campuses) {
-        var deps = getDeps();
-        if (deps && typeof deps.getCampusStopIds === 'function') return deps.getCampusStopIds(campuses);
-        return [];
-    }
-
-    function getCampusLineCodes(campuses) {
-        var deps = getDeps();
-        if (deps && typeof deps.getCampusLineCodes === 'function') return deps.getCampusLineCodes(campuses);
-        return [];
-    }
-
-    function getCampusLineDefinitions(campuses) {
-        var deps = getDeps();
-        if (deps && typeof deps.getCampusLineDefinitions === 'function') return deps.getCampusLineDefinitions(campuses);
-        return [];
-    }
-
-    function normalizeBusLines(lines, allowedLineSet) {
-        var deps = getDeps();
-        if (deps && typeof deps.normalizeBusLines === 'function') return deps.normalizeBusLines(lines, allowedLineSet);
-        return [];
-    }
-
-    function saveBusConfig(config) {
-        var deps = getDeps();
-        if (deps && typeof deps.saveBusConfig === 'function') deps.saveBusConfig(config);
-    }
-
-    function getLocalBusDirectionOptions(lineCode, config) {
-        var deps = getDeps();
-        if (deps && typeof deps.getLocalBusDirectionOptions === 'function') {
-            return deps.getLocalBusDirectionOptions(lineCode, config);
-        }
-        return [];
-    }
-
-    function stopBusPolling() {
-        var deps = getDeps();
-        if (deps && typeof deps.stopBusPolling === 'function') deps.stopBusPolling();
-    }
-
-    function abortInFlightBusRequests() {
-        var deps = getDeps();
-        if (deps && typeof deps.abortInFlightBusRequests === 'function') deps.abortInFlightBusRequests();
-    }
-
-    function updateBusDepartures() {
-        var deps = getDeps();
-        if (deps && typeof deps.updateBusDepartures === 'function') deps.updateBusDepartures();
-    }
-
     function getAdminToolsPlaceholder() {
         var deps = getDeps();
         if (deps && typeof deps.getAdminToolsPlaceholder === 'function') return deps.getAdminToolsPlaceholder();
         return null;
     }
 
-    function isApiQuotaExhausted() {
-        var deps = getDeps();
-        return !!(deps && typeof deps.isApiQuotaExhausted === 'function' && deps.isApiQuotaExhausted());
-    }
-
-    function showQuotaExhaustedMessage(scope) {
-        var deps = getDeps();
-        if (deps && typeof deps.showQuotaExhaustedMessage === 'function') deps.showQuotaExhaustedMessage(scope);
-    }
-
-    function getBusLineColors() {
-        var deps = getDeps();
-        return (deps && deps.lineColors) || {};
-    }
+    // Glue for the library split: the moved library files read the bus helpers
+    // through this namespace, so they can load before darkmode.library.js.
+    try {
+        globalThis.DTUAfterDarkBusRuntime = {
+            getRuntimeConfig: getRuntimeConfig,
+            markExt: markExt,
+            normalizeWhitespace: normalizeWhitespace,
+            rgbaFromHex: rgbaFromHex,
+            isTopWindow: isTopWindow,
+            isDarkModeEnabled: isDarkModeEnabled,
+            sendRuntimeMessage: sendRuntimeMessage,
+            isFeatureFlagEnabled: isFeatureFlagEnabled,
+            getAdminToolsPlaceholder: getAdminToolsPlaceholder,
+            isDTULearnHomepage: isDTULearnHomepage
+        };
+    } catch (eBusRuntime) { }
 
     // Movia's type colours (S blue, E green, A red). The badge is a split tag: the number
     // on a neutral chip and the type letter in its colour; numbered lines have no letter.
@@ -263,35 +150,6 @@
         return badge;
     }
 
-    function getBusCampusOrder() {
-        var deps = getDeps();
-        return (deps && Array.isArray(deps.campusOrder)) ? deps.campusOrder : [];
-    }
-
-    function getBusCampusPresets() {
-        var deps = getDeps();
-        return (deps && deps.campusPresets) || {};
-    }
-
-    function getDefaultCampuses() {
-        var deps = getDeps();
-        return (deps && Array.isArray(deps.defaultCampuses)) ? deps.defaultCampuses.slice() : [];
-    }
-
-    function getBusEnabledKey() {
-        var deps = getDeps();
-        return (deps && deps.busEnabledKey) || 'dtuDarkModeBusEnabled';
-    }
-
-    function getBusSetupDoneKey() {
-        var deps = getDeps();
-        return (deps && deps.busSetupDoneKey) || 'dtuDarkModeBusSetupDone';
-    }
-
-    function getLibraryDropdownFeatureKey() {
-        var deps = getDeps();
-        return (deps && deps.featureLibraryDropdownKey) || 'dtuAfterDarkFeatureLibraryDropdown';
-    }
 
     /* Hallmark: component: nav-bar departures widget + setup prompt, genre: utilitarian,
      * theme: DTU After Dark tokens (dark #2d2d2d/#e0e0e0, light #fff/#1f2937, --dtu-ad-accent).
@@ -364,9 +222,11 @@
         return (dep && typeof dep.minutes === 'number') ? dep.minutes : null;
     }
 
+    // Copenhagen clock time, like the departure boards, whatever zone the computer uses.
     function formatBusClock(ts) {
-        var d = new Date(ts);
-        return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+        return new Date(ts).toLocaleTimeString('en-GB', {
+            timeZone: 'Europe/Copenhagen', hourCycle: 'h23', hour: '2-digit', minute: '2-digit'
+        });
     }
 
     // One row per line (its next bus) so three lines fit the nav bar; with a
@@ -374,26 +234,34 @@
     // line's next three departures with their directions.
     function buildBusWidgetModel(departures, config, nowTs) {
         var groups = {};
+        var seen = {};
         (departures || []).forEach(function (dep) {
             if (!dep || !dep.line) return;
             var mins = busMinutesNow(dep, nowTs);
             if (mins !== null && mins < 0) return;
+            // The same bus can come back from two stops or two pages: one row each.
+            var key = dep.line + '|' + dep.direction + '|' + (typeof dep.at === 'number' ? dep.at : dep.time);
+            if (seen[key]) return;
+            seen[key] = true;
             (groups[dep.line] = groups[dep.line] || []).push({ dep: dep, mins: mins });
         });
         var order = [];
         var configured = (config && Array.isArray(config.lines)) ? config.lines.map(function (l) { return l && l.line; }).filter(Boolean) : [];
         configured.forEach(function (line) { if (order.indexOf(line) === -1) order.push(line); });
-        Object.keys(groups).sort().forEach(function (line) { if (order.indexOf(line) === -1) order.push(line); });
+        // Only the chosen lines are shown; other lines appear only when none are chosen.
+        if (!order.length) order = Object.keys(groups).sort();
         order = order.slice(0, 3);
 
         function describe(line, r) {
             var delay = typeof r.dep.delay === 'number' ? r.dep.delay : 0;
-            var when = r.mins === null ? String(r.dep.time || '') : (r.mins <= 0 ? 'Now' : (r.mins < 60 ? r.mins + ' min' : formatBusClock(r.dep.at)));
+            var when = r.mins === null ? String(r.dep.time || '') : (r.mins <= 0 ? 'Now' : (r.mins < 60 ? r.mins + ' min' : (typeof r.dep.at === 'number' ? formatBusClock(r.dep.at) : String(r.dep.time || ''))));
+            // Rejseplanen names Letbane stops "Ishøj St. (Letbane)"; the L badge already says it.
+            var direction = String(r.dep.direction || '').replace(/ \(Letbane\)$/, '');
             return {
-                direction: r.dep.direction || '',
+                direction: direction,
                 when: when,
                 delay: delay,
-                text: line + ' to ' + (r.dep.direction || '') + ': ' + when + (delay > 0 ? ', delayed ' + delay + ' min' : '')
+                text: line + ' to ' + direction + ': ' + when + (delay > 0 ? ', delayed ' + delay + ' min' : '')
             };
         }
 
@@ -448,11 +316,13 @@
         var now = Date.now();
         var departures = Array.isArray(state.cachedDepartures) ? state.cachedDepartures : [];
         var model = buildBusWidgetModel(departures, getBusConfig(), now);
+        if (_busConfigUnreadable) model = [];
         var hasRows = model.some(function (r) { return !r.none; });
         var stale = !!(state.lastBusFetch && (now - state.lastBusFetch) > 5 * 60 * 1000);
         // "Loading" only until the first fetch finishes, so a refetch never flips an empty
         // widget back and forth; a failed fetch says so instead of claiming no buses.
-        var status = hasRows ? '' : (isApiQuotaExhausted() ? 'Bus times paused until next month'
+        var status = hasRows ? '' : _busConfigUnreadable ? 'Bus settings could not be read'
+            : (isApiQuotaExhausted() ? 'Bus times paused until next month'
             : (!state.busHasResult ? 'Loading bus times'
                 : (state.busLastFetchFailed ? 'Bus times unavailable, retrying' : 'No upcoming buses')));
         var sig = JSON.stringify([model, status, stale]);
@@ -661,6 +531,12 @@
 
         var modal = document.createElement('div');
         markExt(modal);
+        // A real dialog: named by the heading each view draws, Escape closes, Tab stays inside.
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-labelledby', 'dtu-bus-config-title');
+        modal.tabIndex = -1;
+        var returnFocusTo = document.activeElement;
         modal.style.cssText = 'background: ' + modalTheme.background + '; border-radius: 14px; padding: 28px; max-width: 480px; '
             + 'width: 90%; max-height: 80vh; overflow-y: auto; color: ' + modalTheme.text + '; '
             + 'box-shadow: ' + modalTheme.overlayShadow + '; '
@@ -716,9 +592,41 @@
 
         var isClosing = false;
 
+        function onModalKey(e) {
+            // Reopening the setup removes this box without dismissModal: drop the stale handler.
+            if (overlay.isConnected === false) { document.removeEventListener('keydown', onModalKey, true); return; }
+            if (!e) return;
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                dismissModal();
+                return;
+            }
+            if (e.key !== 'Tab') return;
+            var focusables = Array.prototype.filter.call(
+                modal.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'),
+                function (el) { return el.offsetParent !== null; }
+            );
+            if (!focusables.length) { e.preventDefault(); modal.focus(); return; }
+            var first = focusables[0];
+            var last = focusables[focusables.length - 1];
+            var active = document.activeElement;
+            if (!modal.contains(active)) {
+                e.preventDefault();
+                (e.shiftKey ? last : first).focus();
+            } else if (e.shiftKey && (active === first || active === modal)) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && active === last) {
+                e.preventDefault();
+                first.focus();
+            }
+        }
+
         function dismissModal() {
             if (isClosing) return;
             isClosing = true;
+            document.removeEventListener('keydown', onModalKey, true);
+            try { if (returnFocusTo && returnFocusTo.isConnected && returnFocusTo.focus) returnFocusTo.focus(); } catch (eFocus) { }
 
             var config = getBusConfig();
             if (!config || !config.lines || config.lines.length === 0) {
@@ -752,6 +660,7 @@
             }
 
             var titleEl = document.createElement('h2');
+            titleEl.id = 'dtu-bus-config-title';
             titleEl.style.cssText = 'margin: 0 0 6px 0; font-size: 22px; font-weight: 700; color: ' + modalTheme.heading + '; letter-spacing: -0.3px;';
             titleEl.textContent = 'Choose Campus Stops';
             modal.appendChild(titleEl);
@@ -844,6 +753,7 @@
             var config = getModalBusConfig();
 
             var titleEl = document.createElement('h2');
+            titleEl.id = 'dtu-bus-config-title';
             titleEl.style.cssText = 'margin: 0 0 6px 0; font-size: 22px; font-weight: 700; color: ' + modalTheme.heading + '; letter-spacing: -0.3px;';
             titleEl.textContent = 'Bus Lines';
             modal.appendChild(titleEl);
@@ -887,6 +797,7 @@
                         + 'width: 28px; height: 28px; border-radius: 50%; cursor: pointer; font-size: 14px; '
                         + 'display: flex; align-items: center; justify-content: center; transition: all 0.15s;';
                     delBtn.textContent = '\u00D7';
+                    delBtn.setAttribute('aria-label', 'Remove line ' + lineCfg.line);
                     delBtn.addEventListener('mouseenter', function () { delBtn.style.borderColor = 'var(--dtu-ad-accent)'; delBtn.style.color = '#ef5350'; });
                     delBtn.addEventListener('mouseleave', function () { delBtn.style.borderColor = modalTheme.softBorder; delBtn.style.color = modalTheme.muted; });
                     (function (capturedIdx) {
@@ -942,6 +853,7 @@
             var configuredLineNames = config.lines.map(function (l) { return l.line; });
 
             var titleEl = document.createElement('h2');
+            titleEl.id = 'dtu-bus-config-title';
             titleEl.style.cssText = 'margin: 0 0 8px 0; font-size: 30px; font-weight: 800; color: ' + modalTheme.heading + '; letter-spacing: -0.5px;';
             titleEl.textContent = 'Add Bus Line';
             modal.appendChild(titleEl);
@@ -1046,7 +958,7 @@
             backBtn.style.cssText = 'background:' + (isDarkTheme ? 'rgba(255,255,255,0.04)' : 'rgba(15,23,42,0.05)') + ';'
                 + 'color:' + modalTheme.subtle + ';border:none;padding:10px 16px;border-radius:4px;cursor:pointer;'
                 + 'font-size:13px;font-weight:600;transition:background 0.16s ease,color 0.16s ease;';
-            backBtn.textContent = '\u2190 ' + (config.lines.length > 0 ? 'Back' : 'Campuses');
+            backBtn.textContent = config.lines.length > 0 ? 'Back' : 'Back to campuses';
             backBtn.addEventListener('mouseenter', function () {
                 backBtn.style.background = isDarkTheme ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.08)';
                 backBtn.style.color = modalTheme.text;
@@ -1070,6 +982,7 @@
 
 
             var titleEl = document.createElement('h2');
+            titleEl.id = 'dtu-bus-config-title';
             titleEl.style.cssText = 'margin: 0 0 6px 0; font-size: 22px; font-weight: 700; color: ' + modalTheme.heading + '; letter-spacing: -0.3px;';
             titleEl.textContent = 'Pick Directions';
             modal.appendChild(titleEl);
@@ -1136,7 +1049,7 @@
 
                 var arrow = document.createElement('span');
                 arrow.style.cssText = 'color: #66bb6a; font-size: 13px;';
-                arrow.textContent = '\u2192';
+                arrow.textContent = 'to';
 
                 var dirText = document.createElement('span');
                 dirText.style.cssText = 'font-size: 14px; color: ' + modalTheme.text + ';';
@@ -1217,6 +1130,8 @@
 
         overlay.appendChild(modal);
         document.body.appendChild(overlay);
+        document.addEventListener('keydown', onModalKey, true);
+        try { modal.focus(); } catch (eFocus) { }
     }
 
     function insertBusToggle() {
@@ -1305,7 +1220,7 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
     // Bus lines that serve DTU campuses.
     const DTU_BUS_LINES = [
         { line: '150S', name: 'Bus 150S' },
-        { line: '300S', name: 'Bus 300S' },
+        { line: 'L', name: 'Letbane L' },
         { line: '40E', name: 'Bus 40E' },
         { line: '15E', name: 'Bus 15E' },
         { line: '193', name: 'Bus 193' },
@@ -1324,7 +1239,7 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
     // These are used to avoid extra API calls while editing bus settings.
     const DTU_BUS_DIRECTION_TOKENS = {
         '150S': ['Nørreport St.', 'Kokkedal St.', 'Gl. Holte Øverødvej', 'Søhuset, Forskerparken'],
-        '300S': ['Rødovre Nord St.', 'Lundtofte, Lundtofteparken', 'DTU', 'Gladsaxe Trafikplads', 'Lyngby St.'],
+        'L': ['Lundtofte St. (Letbane)', 'Ishøj St. (Letbane)'],
         '40E': ['Høje Taastrup St.', 'Skodsborg St.', 'DTU, Rævehøjvej'],
         '15E': ['Nørreport St.'],
         '193': ['Lyngby St.', 'Vedbæk St.'],
@@ -1340,23 +1255,24 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
     // colour and use a neutral grey. Only the type letter of a badge carries this colour.
     const LINE_COLORS = {
         '150S': '#1d62b3',
-        '300S': '#1d62b3',
         '350S': '#1d62b3',
         '600S': '#1d62b3',
         '40E': '#1e7a3c',
         '15E': '#1e7a3c',
         '55E': '#1e7a3c',
         '193': '#4b5563',
+        'L': '#4b5563',
         '216': '#4b5563'
     };
 
-    // Campus presets: stop IDs + commonly used lines.
+    // Campus presets: stop IDs + commonly used lines. Checked against Rejseplanen's stop
+    // pages on 2026-11-07: the Letbane replaced 300S, which no longer serves any DTU stop.
     const DTU_CAMPUS_PRESETS = {
         lyngby: {
             id: 'lyngby',
             label: 'DTU Lyngby',
             stopIds: ['6015', '6026', '474', '496', '497', '473', '472', '53591', '53614', '53615'],
-            lines: ['150S', '300S', '40E', '15E', '193']
+            lines: ['150S', 'L', '40E', '15E', '193']
         },
         ballerup: {
             id: 'ballerup',
@@ -1378,7 +1294,6 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
     const BUS_ENABLED_KEY = 'dtuDarkModeBusEnabled';
     const BUS_CONFIG_KEY = 'dtuDarkModeBusConfig';
     const BUS_SETUP_DONE_KEY = 'dtuDarkModeBusSetupDone';
-    const DEADLINES_ENABLED_KEY = 'dtuDarkModeDeadlinesEnabled';
     const BUS_SHARED_CACHE_KEY = 'dtuDarkModeBusSharedCacheV1';
     const BUS_FETCH_LEASE_KEY = 'dtuDarkModeBusFetchLeaseV1';
     const BUS_FETCH_LEASE_MS = 25000;
@@ -1403,18 +1318,6 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
 
     function isBusEnabled() {
         return localStorage.getItem(BUS_ENABLED_KEY) === 'true';
-    }
-
-    function isDeadlinesEnabled() {
-        const stored = localStorage.getItem(DEADLINES_ENABLED_KEY);
-        return stored === null ? true : stored === 'true';
-    }
-
-    const SEARCH_WIDGET_ENABLED_KEY = 'dtuDarkModeSearchWidgetEnabled';
-
-    function isSearchWidgetEnabled() {
-        const stored = localStorage.getItem(SEARCH_WIDGET_ENABLED_KEY);
-        return stored === 'true';
     }
 
     function sanitizeBusStopIds(stopIds) {
@@ -1558,6 +1461,11 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
         if (opts && opts.keepUnknownLines) {
             lines = normalizeBusLines(rawConfig.lines, null);
         }
+        // An old or damaged config with no usable lines list gets the campus defaults
+        // instead of a widget that quietly shows nothing.
+        if (!lines.length && !(Array.isArray(rawConfig.lines) && !rawConfig.lines.length)) {
+            lines = buildDefaultBusConfig(campuses).lines;
+        }
 
         return {
             campuses: campuses,
@@ -1578,15 +1486,23 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
         };
     }
 
+    // True when bus settings are saved but cannot be read. Callers still get the default
+    // config to work with, but the widget says so and fetches nothing, instead of quietly
+    // showing departures for stops the student never chose. Saving settings clears it.
+    var _busConfigUnreadable = false;
+
     function getBusConfig() {
+        _busConfigUnreadable = false;
         try {
             var raw = localStorage.getItem(BUS_CONFIG_KEY);
             if (!raw) return buildDefaultBusConfig();
-            var parsed = JSON.parse(raw);
-            return normalizeBusConfig(parsed) || buildDefaultBusConfig();
+            var normalized = normalizeBusConfig(JSON.parse(raw));
+            if (normalized) return normalized;
         } catch (e) {
-            return buildDefaultBusConfig();
+            // reported through _busConfigUnreadable
         }
+        _busConfigUnreadable = true;
+        return buildDefaultBusConfig();
     }
 
     function saveBusConfig(config) {
@@ -1782,8 +1698,14 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
 
     function tryAcquireBusFetchLease() {
         var now = Date.now();
-        var lease = readBusFetchLease();
-        if (lease && lease.expiresAt > now && lease.owner !== BUS_TAB_ID) return false;
+        function heldByOther(lease) {
+            return !!lease && lease.expiresAt > now && lease.owner !== BUS_TAB_ID;
+        }
+        if (heldByOther(readBusFetchLease())) return false;
+        // localStorage has no compare-and-set. Reading again right before the write, then
+        // confirming after it, leaves only a tiny window for two tabs to both win (the
+        // cost then is one extra request, never wrong data).
+        if (heldByOther(readBusFetchLease())) return false;
         try {
             localStorage.setItem(BUS_FETCH_LEASE_KEY, JSON.stringify({
                 owner: BUS_TAB_ID,
@@ -1813,1900 +1735,6 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
                 /^\/d2l\/home\/?$/.test(window.location.pathname)
                 || /^\/d2l\/lp\/ouHome\/defaultHome\.d2l\/?$/i.test(window.location.pathname)
             );
-    }
-
-    function isDTULearnLegacyHeavyCourseToolPage() {
-        return window.location.hostname === 'learn.inside.dtu.dk'
-            && /^\/d2l\/lms\/(dropbox|classlist|group|news)\//i.test(window.location.pathname);
-    }
-
-    // Inject helpful external links into existing DTU Learn nav dropdowns.
-    // This runs best-effort and degrades gracefully if Brightspace changes markup.
-    function getLearnNavUiApi() {
-        try { return globalThis.DTUAfterDarkLearnNavUi || null; } catch (e0) { return null; }
-    }
-
-    try {
-        if (!globalThis.DTUAfterDarkLearnNavDeps) {
-            globalThis.DTUAfterDarkLearnNavDeps = {
-                isTopWindow: function () { return isTopWindow(); },
-                isFeatureFlagEnabled: isFeatureFlagEnabled,
-                normalizeWhitespace: normalizeWhitespace,
-                markExt: markExt,
-                showSettingsModal: showSettingsModal,
-                hideSettingsModal: hideSettingsModal,
-                featureLearnNavResourceLinksKey: FEATURE_LEARN_NAV_RESOURCE_LINKS_KEY
-            };
-        }
-    } catch (eLearnNavDeps) { }
-
-    function insertDTULearnNavResourceLinks() {
-        var api = getLearnNavUiApi();
-        if (api && typeof api.insertDTULearnNavResourceLinks === 'function') {
-            api.insertDTULearnNavResourceLinks();
-        }
-    }
-
-    function removeDTULearnNavResourceLinks() {
-        var api = getLearnNavUiApi();
-        if (api && typeof api.removeDTULearnNavResourceLinks === 'function') {
-            api.removeDTULearnNavResourceLinks();
-        }
-    }
-
-    function getDeadlinesUiApi() {
-        try { return globalThis.DTUAfterDarkDeadlinesUi || null; } catch (e0) { return null; }
-    }
-
-    try {
-        if (!globalThis.DTUAfterDarkDeadlinesDeps) {
-            globalThis.DTUAfterDarkDeadlinesDeps = {
-                isTopWindow: function () { return isTopWindow(); },
-                isDarkMode: function () { return !!isDarkModeEnabled(); },
-                isDeadlinesEnabled: isDeadlinesEnabled,
-                isSearchWidgetEnabled: isSearchWidgetEnabled,
-                isDTULearnHomepage: isDTULearnHomepage,
-                markExt: markExt,
-                normalizeWhitespace: normalizeWhitespace,
-                sendRuntimeMessage: sendRuntimeMessage,
-                getAdminToolsPlaceholder: getAdminToolsPlaceholder,
-                getAfterDarkAdminToolsList: getAfterDarkAdminToolsList,
-                formatIsoDateForDisplay: formatIsoDateForDisplay,
-                startOfTodayUtcTs: startOfTodayUtcTs,
-                diffDaysUtc: diffDaysUtc
-            };
-        }
-    } catch (eDeadlinesDeps) { }
-
-    function insertDeadlinesHomepageWidget() {
-        var api = getDeadlinesUiApi();
-        if (api && typeof api.insertDeadlinesHomepageWidget === 'function') {
-            api.insertDeadlinesHomepageWidget();
-        }
-    }
-
-    function insertDeadlinesToggle() {
-        var api = getDeadlinesUiApi();
-        if (api && typeof api.insertDeadlinesToggle === 'function') {
-            api.insertDeadlinesToggle();
-        }
-    }
-
-    function insertSearchWidgetToggle() {
-        var api = getDeadlinesUiApi();
-        if (api && typeof api.insertSearchWidgetToggle === 'function') {
-            api.insertSearchWidgetToggle();
-        }
-    }
-
-    // ===== LIBRARY NAV DROPDOWN =====
-    // Placed in the bottom nav bar (d2l-navigation-s-main-wrapper), after "Find Courses" and before "Study Rules".
-    function isLibraryEnabled() {
-        return isFeatureFlagEnabled(getLibraryDropdownFeatureKey());
-    }
-
-    var _libraryEventsCache = null;
-    var _libraryNewsCache = null;
-    var _libraryCrowdingCache = null;
-    var LIBRARY_RUNTIME_STYLE_ID = 'dtu-library-runtime-style';
-    var _libraryEscHandler = null;
-    var _libraryOccupancyAutoTimer = null;
-    var LIBRARY_CROWD_HEATMAP_EXPANDED_KEY = 'dtuAfterDarkLibraryCrowdHeatmapExpanded';
-
-    // Dark mode draws the typical line and historical band in a light neutral:
-    // the accent (DTU red by default) at low opacity is invisible on the dark
-    // panel, and keeping red for "Current" alone makes the three series distinct.
-    var LIBRARY_CHART_DARK_TYPICAL_STROKE = 'rgba(224,224,224,0.62)';
-    var LIBRARY_CHART_DARK_BAND_FILL = 'rgba(224,224,224,0.10)';
-
-    function ensureLibraryRuntimeStyles() {
-        if (!isTopWindow()) return;
-        var host = document.head || document.documentElement;
-        if (!host) return;
-
-        var style = document.getElementById(LIBRARY_RUNTIME_STYLE_ID);
-        if (!style) {
-            style = document.createElement('style');
-            style.id = LIBRARY_RUNTIME_STYLE_ID;
-            markExt(style);
-            host.appendChild(style);
-        }
-
-        var panelBg = isDarkModeEnabled() ? 'rgba(24,24,24,0.97)' : 'rgba(255,255,255,0.98)';
-        var panelBorder = isDarkModeEnabled() ? '#404040' : '#d6dce7';
-        var panelText = isDarkModeEnabled() ? '#e8e8e8' : '#1f2937';
-        var muted = isDarkModeEnabled() ? '#9aa0aa' : '#6b7280';
-        var sectionBg = isDarkModeEnabled() ? '#2d2d2d' : '#ffffff';
-        var rowBg = isDarkModeEnabled() ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.03)';
-        var rowBgHover = isDarkModeEnabled() ? 'rgba(255,255,255,0.06)' : 'rgba(15,23,42,0.06)';
-        var linkBg = isDarkModeEnabled() ? 'rgba(255,255,255,0.018)' : 'rgba(15,23,42,0.018)';
-        var linkBgHover = isDarkModeEnabled() ? 'rgba(255,255,255,0.045)' : 'rgba(15,23,42,0.045)';
-        var sectionTitle = isDarkModeEnabled() ? '#a3acb8' : '#667084';
-        var linkDivider = isDarkModeEnabled() ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)';
-        var feedDivider = isDarkModeEnabled() ? 'rgba(255,255,255,0.07)' : 'rgba(15,23,42,0.09)';
-        var stateBg = isDarkModeEnabled() ? 'rgba(255,255,255,0.02)' : '#f8fafc';
-        var actionBorder = isDarkModeEnabled() ? '#4a4a4a' : '#d4dbe6';
-        var actionBg = isDarkModeEnabled() ? 'rgba(255,255,255,0.03)' : 'rgba(15,23,42,0.03)';
-        var actionBgHover = isDarkModeEnabled() ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)';
-        var dateBg = isDarkModeEnabled() ? '#212121' : '#f3f6fb';
-        var panelShadow = isDarkModeEnabled() ? '0.7' : '0.25';
-        var crowdBg = isDarkModeEnabled() ? '#1a1a1a' : '#ffffff';
-        var crowdInset = isDarkModeEnabled() ? '#121212' : '#f5f5f5';
-        var crowdInsetSoft = isDarkModeEnabled() ? '#181818' : '#f8fafc';
-        var crowdBorder = isDarkModeEnabled() ? '#363636' : '#d8dde6';
-        var crowdText = isDarkModeEnabled() ? '#e0e0e0' : '#1a1a1a';
-        var crowdMuted = isDarkModeEnabled() ? '#888' : '#666';
-        var crowdTrack = isDarkModeEnabled() ? '#2a2a2a' : '#e8e8e8';
-        var crowdGood = '#2e7d32';
-        var crowdWarn = '#d97706'; // Fixed amber — keeps traffic-light semantics independent of accent colour
-        var crowdBad = '#c62828';
-        // Text-sized accents follow the extension's convention: the soft accent
-        // on dark surfaces (the base accent is too dark to read there).
-        var accentText = isDarkModeEnabled() ? 'var(--dtu-ad-accent-soft)' : 'var(--dtu-ad-accent-text, var(--dtu-ad-accent))';
-
-        var css = [
-            '.dtu-library-modal-overlay{position:fixed !important;inset:0 !important;z-index:1000000 !important;display:flex !important;align-items:center !important;justify-content:center !important;padding:20px !important;background:transparent !important;background-color:transparent !important;backdrop-filter:blur(4px) !important;-webkit-backdrop-filter:blur(4px) !important;}',
-            '.dtu-library-backdrop{position:fixed !important;inset:0 !important;z-index:999998 !important;background:transparent !important;background-color:transparent !important;}',
-            '.dtu-library-panel{display:flex !important;flex-direction:column !important;overflow:hidden !important;width:min(980px,calc(100vw - 40px)) !important;max-height:calc(100vh - 80px) !important;box-sizing:border-box !important;border-radius:14px !important;background:' + panelBg + ' !important;border:1px solid ' + panelBorder + ' !important;color:' + panelText + ' !important;box-shadow:0 20px 60px rgba(0,0,0,' + panelShadow + ') !important;}',
-            '.dtu-library-panel,.dtu-library-panel *{box-sizing:border-box !important;font-family:inherit !important;}',
-            '.dtu-library-header{display:flex !important;align-items:center !important;justify-content:space-between !important;gap:10px !important;padding:14px 18px 12px !important;border-bottom:1px solid ' + panelBorder + ' !important;background:rgba(255,255,255,0.02) !important;flex-shrink:0 !important;}',
-            '.dtu-library-header-main{display:flex !important;align-items:center !important;gap:14px !important;min-width:0 !important;flex:1 1 auto !important;}',
-            '.dtu-library-title{margin:0 !important;font-size:21px !important;font-weight:760 !important;line-height:1.1 !important;letter-spacing:-0.3px !important;color:' + panelText + ' !important;white-space:nowrap !important;}',
-            '.dtu-library-header-occupancy{display:flex !important;align-items:flex-end !important;justify-content:flex-start !important;gap:12px !important;flex-wrap:wrap !important;min-width:0 !important;flex:1 1 auto !important;}',
-            '.dtu-library-header-occ-item{display:flex !important;flex-direction:column !important;align-items:flex-start !important;justify-content:center !important;gap:2px !important;padding:0 !important;background:transparent !important;border:0 !important;min-width:54px !important;}',
-            '.dtu-library-header-occ-label{margin:0 !important;font-size:9px !important;font-weight:700 !important;line-height:1.1 !important;letter-spacing:0.55px !important;text-transform:uppercase !important;color:' + sectionTitle + ' !important;}',
-            '.dtu-library-header-occ-value{margin:0 !important;font-size:22px !important;font-weight:800 !important;line-height:0.95 !important;color:' + panelText + ' !important;}',
-            '.dtu-library-header-actions{display:flex !important;align-items:center !important;justify-content:flex-end !important;gap:8px !important;min-width:0 !important;flex:0 0 auto !important;}',
-            '.dtu-library-header-updated{margin:0 !important;font-size:10px !important;font-weight:600 !important;line-height:1.2 !important;letter-spacing:0.2px !important;color:' + muted + ' !important;white-space:nowrap !important;}',
-            '.dtu-library-header-occ-refresh{appearance:none !important;border:1px solid ' + actionBorder + ' !important;background:' + actionBg + ' !important;color:' + panelText + ' !important;border-radius:999px !important;cursor:pointer !important;padding:3px 8px !important;font-size:10px !important;font-weight:700 !important;line-height:1.1 !important;white-space:nowrap !important;min-height:24px !important;}',
-            '.dtu-library-header-occ-refresh:hover{background:' + actionBgHover + ' !important;border-color:var(--dtu-ad-accent) !important;color:var(--dtu-ad-accent-soft) !important;}',
-            'button.dtu-library-close{appearance:none !important;border:1px solid ' + actionBorder + ' !important;background:' + actionBg + ' !important;color:' + muted + ' !important;border-radius:7px !important;cursor:pointer !important;padding:2px 9px !important;line-height:1 !important;font-size:26px !important;min-width:34px !important;min-height:30px !important;}',
-            'button.dtu-library-close:hover{background:' + actionBgHover + ' !important;color:' + panelText + ' !important;border-color:var(--dtu-ad-accent) !important;}',
-            '.dtu-library-content{display:flex !important;flex-direction:column !important;gap:14px !important;padding:18px 22px 20px !important;overflow:auto !important;background:transparent !important;flex:1 1 auto !important;}',
-            '.dtu-library-layout{display:flex !important;flex-direction:column !important;gap:14px !important;}',
-            '.dtu-library-feed-grid{display:grid !important;grid-template-columns:repeat(2,minmax(0,1fr)) !important;gap:14px !important;}',
-            '.dtu-library-section{margin:0 !important;padding:12px !important;background:' + sectionBg + ' !important;border:1px solid ' + panelBorder + ' !important;border-radius:10px !important;}',
-            '.dtu-library-trend-section{padding:0 !important;background:transparent !important;border:0 !important;border-radius:0 !important;box-shadow:none !important;}',
-            '.dtu-library-trend-section .dtu-library-section-header{display:none !important;}',
-            '.dtu-library-trend-section .dtu-library-crowd{padding:0 !important;gap:10px !important;background:transparent !important;}',
-            '.dtu-library-trend-section .dtu-library-crowd-hero{padding:0 0 12px !important;background:transparent !important;box-shadow:inset 0 -1px 0 ' + crowdBorder + ' !important;}',
-            '.dtu-library-trend-section .dtu-library-crowd-chart-wrap{padding:0 !important;background:transparent !important;border:0 !important;border-radius:0 !important;box-shadow:none !important;}',
-            '.dtu-library-trend-section .dtu-library-crowd-chart{background:transparent !important;border-radius:0 !important;}',
-            '.dtu-library-trend-section .dtu-library-crowd-events,.dtu-library-trend-section .dtu-library-crowd-confidence{padding:0 !important;}',
-            '.dtu-library-section-header{display:flex !important;align-items:center !important;justify-content:space-between !important;gap:8px !important;margin:0 0 8px !important;padding:0 !important;background:transparent !important;}',
-            '.dtu-library-section-title{margin:0 !important;font-size:14px !important;font-weight:700 !important;letter-spacing:0 !important;text-transform:none !important;color:' + panelText + ' !important;background:transparent !important;}',
-            '.dtu-library-actions{display:flex !important;align-items:center !important;gap:8px !important;background:transparent !important;}',
-            'button.dtu-library-action-btn{appearance:none !important;border:1px solid ' + actionBorder + ' !important;background:' + actionBg + ' !important;color:' + panelText + ' !important;border-radius:7px !important;cursor:pointer !important;padding:4px 10px !important;font-size:11px !important;font-weight:650 !important;line-height:1.2 !important;white-space:nowrap !important;min-height:26px !important;}',
-            'button.dtu-library-action-btn:hover{background:' + actionBgHover + ' !important;border-color:var(--dtu-ad-accent) !important;color:var(--dtu-ad-accent-soft) !important;}',
-            '.dtu-library-links-section{padding:2px 0 0 !important;background:transparent !important;border:0 !important;}',
-            '.dtu-library-links-header{margin:0 0 6px !important;padding:0 4px !important;}',
-            '.dtu-library-links-title-wrap{display:flex !important;flex-direction:column !important;gap:3px !important;min-width:0 !important;background:transparent !important;}',
-            '.dtu-library-links-subtitle{margin:0 !important;font-size:11px !important;font-weight:520 !important;line-height:1.35 !important;color:' + muted + ' !important;background:transparent !important;}',
-            '.dtu-library-link-grid{display:grid !important;grid-template-columns:repeat(3,minmax(0,1fr)) !important;gap:8px 20px !important;background:transparent !important;}',
-            'a.dtu-library-link-item{display:grid !important;grid-template-columns:18px minmax(0,1fr) 14px !important;align-items:center !important;gap:12px !important;min-height:48px !important;padding:7px 4px 7px 2px !important;border-radius:0 !important;background:transparent !important;border:0 !important;box-shadow:inset 0 -1px 0 ' + linkDivider + ' !important;color:' + panelText + ' !important;text-decoration:none !important;text-align:left !important;white-space:normal !important;overflow-wrap:anywhere !important;transition:background-color 0.2s ease-in-out,transform 0.2s ease-in-out !important;}',
-            'a.dtu-library-link-item:hover{background:' + linkBgHover + ' !important;border-radius:12px !important;box-shadow:inset 0 -1px 0 transparent !important;color:' + panelText + ' !important;transform:translateY(-2px) !important;}',
-            '.dtu-library-link-icon{display:inline-flex !important;align-items:center !important;justify-content:center !important;align-self:start !important;flex-shrink:0 !important;width:18px !important;min-width:18px !important;height:18px !important;color:' + accentText + ' !important;}',
-            '.dtu-library-link-icon svg{display:block !important;color:inherit !important;width:18px !important;height:18px !important;stroke:currentColor !important;fill:none !important;stroke-width:1.9 !important;stroke-linecap:round !important;stroke-linejoin:round !important;}',
-            '.dtu-library-link-content{display:flex !important;flex-direction:column !important;gap:2px !important;min-width:0 !important;}',
-            '.dtu-library-link-label{display:block !important;min-width:0 !important;overflow-wrap:anywhere !important;font-size:13px !important;font-weight:700 !important;line-height:1.2 !important;color:' + panelText + ' !important;}',
-            '.dtu-library-link-meta{display:block !important;min-width:0 !important;overflow-wrap:anywhere !important;font-size:10.5px !important;font-weight:540 !important;line-height:1.3 !important;color:' + muted + ' !important;}',
-            '.dtu-library-link-arrow{display:inline-flex !important;align-items:center !important;justify-content:flex-end !important;align-self:center !important;width:14px !important;height:14px !important;color:' + sectionTitle + ' !important;transition:transform 0.2s ease-in-out,color 0.2s ease-in-out !important;}',
-            '.dtu-library-link-arrow svg{display:block !important;color:inherit !important;width:14px !important;height:14px !important;stroke:currentColor !important;fill:none !important;stroke-width:1.9 !important;stroke-linecap:round !important;stroke-linejoin:round !important;}',
-            'a.dtu-library-link-item:hover .dtu-library-link-icon,a.dtu-library-link-item:hover .dtu-library-link-arrow{color:' + accentText + ' !important;}',
-            '.dtu-library-panel a:focus-visible,.dtu-library-panel button:focus-visible{outline:2px solid ' + panelText + ' !important;outline-offset:2px !important;}',
-            '.dtu-library-panel:focus{outline:none !important;}',
-            'a.dtu-library-link-item:hover .dtu-library-link-arrow{transform:translateX(2px) !important;}',
-            '.dtu-library-crowd{display:flex !important;flex-direction:column !important;gap:12px !important;padding:2px 2px 0 !important;color:' + crowdText + ' !important;}',
-            '.dtu-library-crowd-card{background:transparent !important;border:0 !important;border-radius:0 !important;padding:0 !important;box-shadow:none !important;}',
-            '.dtu-library-crowd-hero{display:flex !important;flex-direction:column !important;gap:8px !important;padding:4px 6px 12px !important;background:transparent !important;box-shadow:inset 0 -1px 0 ' + crowdBorder + ' !important;}',
-            '.dtu-library-crowd-hero-top{display:flex !important;align-items:flex-end !important;justify-content:space-between !important;gap:14px !important;flex-wrap:wrap !important;}',
-            '.dtu-library-crowd-hero-main{display:flex !important;align-items:flex-end !important;gap:10px !important;flex-wrap:wrap !important;}',
-            '.dtu-library-crowd-hero-stats{display:flex !important;align-items:flex-end !important;gap:18px !important;flex-wrap:wrap !important;}',
-            '.dtu-library-crowd-hero-stat{display:flex !important;flex-direction:column !important;align-items:flex-start !important;gap:1px !important;min-width:74px !important;}',
-            '.dtu-library-crowd-hero-stat-label{margin:0 !important;font-size:9px !important;font-weight:700 !important;line-height:1.1 !important;letter-spacing:0.45px !important;text-transform:uppercase !important;color:' + crowdMuted + ' !important;}',
-            '.dtu-library-crowd-hero-stat-value{margin:0 !important;font-size:16px !important;font-weight:760 !important;line-height:1 !important;color:' + crowdText + ' !important;}',
-            '.dtu-library-crowd-hero-stat-hint{margin:0 !important;font-size:9px !important;font-weight:520 !important;line-height:1.1 !important;color:' + crowdMuted + ' !important;}',
-            '.dtu-library-crowd-label{margin:0 !important;font-size:9px !important;font-weight:700 !important;line-height:1.1 !important;letter-spacing:0.45px !important;text-transform:uppercase !important;color:' + crowdMuted + ' !important;}',
-            '.dtu-library-crowd-free-wrap{display:flex !important;align-items:flex-end !important;gap:6px !important;}',
-            '.dtu-library-crowd-free{margin:0 !important;font-size:30px !important;font-weight:800 !important;line-height:0.98 !important;letter-spacing:-0.35px !important;color:' + crowdText + ' !important;}',
-            '.dtu-library-crowd-free-unit{margin:0 0 3px !important;font-size:10px !important;font-weight:620 !important;line-height:1 !important;color:' + crowdMuted + ' !important;}',
-            '.dtu-library-crowd-hero.is-after-hours .dtu-library-crowd-hero-stats,.dtu-library-crowd-hero.is-after-hours .dtu-library-crowd-progress,.dtu-library-crowd-hero.is-after-hours .dtu-library-crowd-free-unit{display:none !important;}',
-            '.dtu-library-crowd-hero.is-after-hours .dtu-library-crowd-free{font-size:20px !important;letter-spacing:0 !important;}',
-            '.dtu-library-crowd-status{margin:0 0 3px !important;font-size:12px !important;font-weight:700 !important;line-height:1.1 !important;color:' + crowdMuted + ' !important;}',
-            '.dtu-library-crowd-progress{position:relative !important;width:100% !important;height:12px !important;margin-top:2px !important;border-radius:999px !important;background:' + crowdTrack + ' !important;border:1px solid ' + crowdBorder + ' !important;overflow:hidden !important;}',
-            '.dtu-library-crowd-progress-fill{position:absolute !important;left:0 !important;top:0 !important;bottom:0 !important;width:0 !important;border-radius:999px !important;background:' + crowdGood + ' !important;transition:width 0.25s ease !important;}',
-            '.dtu-library-crowd-progress[aria-valuetext*=\"Moderate\"] .dtu-library-crowd-progress-fill{background:' + crowdWarn + ' !important;}',
-            '.dtu-library-crowd-progress[aria-valuetext*=\"Busy\"] .dtu-library-crowd-progress-fill{background:' + crowdBad + ' !important;}',
-            '.dtu-library-crowd-chart-wrap{background:transparent !important;border:0 !important;border-radius:0 !important;padding:2px 0 0 !important;box-shadow:none !important;}',
-            '.dtu-library-crowd-chart{display:block !important;width:100% !important;height:136px !important;border-radius:0 !important;background:transparent !important;}',
-            '.dtu-library-crowd-chart-note{margin:10px 0 0 !important;font-size:10px !important;line-height:1.35 !important;color:' + crowdMuted + ' !important;}',
-            '.dtu-library-crowd-events{display:flex !important;flex-direction:column !important;gap:4px !important;margin-top:8px !important;}',
-            '.dtu-library-crowd-event{display:flex !important;align-items:flex-start !important;gap:6px !important;font-size:10px !important;line-height:1.3 !important;color:' + crowdMuted + ' !important;}',
-            '.dtu-library-crowd-event-dot{display:inline-block !important;width:8px !important;min-width:8px !important;height:8px !important;border-radius:2px !important;margin-top:2px !important;background:rgba(var(--dtu-ad-accent-rgb),0.45) !important;border:1px solid rgba(var(--dtu-ad-accent-rgb),0.75) !important;}',
-            '.dtu-library-crowd-event-text{display:inline !important;color:' + crowdMuted + ' !important;}',
-            '.dtu-library-crowd-confidence{margin:0 !important;font-size:10px !important;line-height:1.35 !important;color:' + crowdMuted + ' !important;}',
-            '.dtu-library-crowd-heatmap-toggle{appearance:none !important;border:1px solid ' + actionBorder + ' !important;background:' + actionBg + ' !important;color:' + crowdText + ' !important;border-radius:7px !important;cursor:pointer !important;padding:5px 9px !important;font-size:11px !important;font-weight:650 !important;line-height:1.2 !important;white-space:nowrap !important;}',
-            '.dtu-library-crowd-heatmap-toggle:hover{background:' + actionBgHover + ' !important;border-color:var(--dtu-ad-accent) !important;color:var(--dtu-ad-accent-soft) !important;}',
-            '.dtu-library-crowd-heatmap{display:none !important;background:' + crowdInset + ' !important;border:1px solid ' + crowdBorder + ' !important;border-radius:10px !important;padding:8px !important;}',
-            '.dtu-library-crowd-heatmap.is-open{display:block !important;}',
-            '.dtu-library-crowd-heatmap-head,.dtu-library-crowd-heatmap-row{display:grid !important;grid-template-columns:50px repeat(5,minmax(0,1fr)) !important;gap:4px !important;align-items:center !important;}',
-            '.dtu-library-crowd-heatmap-head{margin:0 0 4px !important;}',
-            '.dtu-library-crowd-heatmap-day{font-size:10px !important;font-weight:700 !important;line-height:1.1 !important;text-align:center !important;color:' + crowdMuted + ' !important;}',
-            '.dtu-library-crowd-heatmap-hour{font-size:10px !important;font-weight:650 !important;line-height:1.1 !important;color:' + crowdMuted + ' !important;}',
-            '.dtu-library-crowd-heatmap-cell{appearance:none !important;border:1px solid ' + crowdBorder + ' !important;border-radius:4px !important;min-height:16px !important;padding:0 !important;cursor:default !important;background:rgba(var(--dtu-ad-accent-rgb),0.08) !important;}',
-            '.dtu-library-crowd-heatmap-cell:focus-visible{outline:2px solid var(--dtu-ad-accent) !important;outline-offset:1px !important;}',
-            '.dtu-library-crowd-state{margin:0 !important;padding:10px !important;border-radius:8px !important;border:1px dashed ' + crowdBorder + ' !important;background:' + crowdInset + ' !important;font-size:11px !important;line-height:1.35 !important;color:' + crowdMuted + ' !important;}',
-            '.dtu-library-feed-section{padding:4px 0 0 !important;background:transparent !important;border:0 !important;}',
-            '.dtu-library-feed-header{margin:0 0 10px !important;padding:0 4px !important;}',
-            '.dtu-library-feed-list{display:flex !important;flex-direction:column !important;gap:0 !important;background:transparent !important;}',
-            'a.dtu-library-feed-item{display:flex !important;align-items:flex-start !important;gap:16px !important;padding:14px 4px 14px 0 !important;border-radius:0 !important;background:transparent !important;border:0 !important;box-shadow:inset 0 -1px 0 ' + feedDivider + ' !important;text-decoration:none !important;color:' + panelText + ' !important;transition:background-color 0.2s ease-in-out,transform 0.2s ease-in-out !important;}',
-            'a.dtu-library-feed-item:hover{background:' + rowBgHover + ' !important;border-radius:14px !important;box-shadow:inset 0 -1px 0 transparent !important;transform:translateY(-2px) !important;}',
-            '.dtu-library-date-badge{position:relative !important;display:flex !important;flex-direction:column !important;align-items:flex-start !important;justify-content:center !important;flex-shrink:0 !important;min-width:64px !important;height:auto !important;padding:2px 0 2px 14px !important;border-radius:0 !important;overflow:visible !important;background:transparent !important;border:0 !important;}',
-            '.dtu-library-date-badge::before{content:\"\" !important;position:absolute !important;top:6px !important;bottom:6px !important;left:0 !important;width:3px !important;border-radius:999px !important;background:' + accentText + ' !important;}',
-            '.dtu-library-date-day{margin:0 !important;font-size:24px !important;font-weight:790 !important;line-height:0.95 !important;color:' + panelText + ' !important;}',
-            '.dtu-library-date-month{margin:2px 0 0 !important;font-size:10px !important;font-weight:760 !important;line-height:1 !important;letter-spacing:0.7px !important;text-transform:uppercase !important;color:' + accentText + ' !important;}',
-            '.dtu-library-item-content{display:flex !important;flex-direction:column !important;gap:4px !important;min-width:0 !important;flex:1 1 auto !important;background:transparent !important;padding-top:1px !important;}',
-            '.dtu-library-news-badge{position:relative !important;display:inline-flex !important;align-items:center !important;padding:0 0 0 14px !important;margin:0 0 2px !important;border-radius:0 !important;background:transparent !important;border:0 !important;color:' + accentText + ' !important;font-size:10px !important;font-weight:760 !important;line-height:1.25 !important;letter-spacing:0.8px !important;text-transform:uppercase !important;}',
-            '.dtu-library-news-badge::before{content:\"\" !important;position:absolute !important;left:0 !important;top:50% !important;width:8px !important;height:1.5px !important;transform:translateY(-50%) !important;background:currentColor !important;border-radius:999px !important;}',
-            '.dtu-library-item-title{margin:0 !important;font-size:14px !important;font-weight:720 !important;line-height:1.35 !important;color:' + panelText + ' !important;display:-webkit-box !important;-webkit-line-clamp:2 !important;line-clamp:2 !important;-webkit-box-orient:vertical !important;overflow:hidden !important;}',
-            '.dtu-library-item-meta{margin:0 !important;font-size:11px !important;line-height:1.45 !important;color:' + muted + ' !important;white-space:normal !important;overflow-wrap:anywhere !important;}',
-            '.dtu-library-state-msg{margin:0 !important;padding:16px 12px !important;border-radius:9px !important;border:1px dashed ' + panelBorder + ' !important;background:' + stateBg + ' !important;text-align:center !important;color:' + muted + ' !important;font-size:12px !important;font-style:italic !important;}',
-            '@media (max-width: 900px){.dtu-library-header{flex-wrap:wrap !important;}.dtu-library-feed-grid{grid-template-columns:1fr !important;}.dtu-library-link-grid{grid-template-columns:repeat(2,minmax(0,1fr)) !important;}.dtu-library-header{align-items:flex-start !important;}.dtu-library-header-main{flex-wrap:wrap !important;align-items:flex-start !important;gap:10px !important;}.dtu-library-header-occupancy{width:100% !important;gap:10px !important;}.dtu-library-header-actions{width:100% !important;justify-content:flex-start !important;}}',
-            '@media (max-width: 520px){.dtu-library-modal-overlay{padding:8px !important;}.dtu-library-panel{width:calc(100vw - 16px) !important;max-height:calc(100vh - 16px) !important;border-radius:12px !important;}.dtu-library-header{padding:12px 14px 10px !important;}.dtu-library-content{padding:12px 14px 14px !important;}.dtu-library-link-grid{grid-template-columns:1fr !important;}.dtu-library-header-occupancy{gap:8px !important;}.dtu-library-header-occ-value{font-size:19px !important;}.dtu-library-header-updated{display:none !important;}}'
-        ].join('');
-
-        if (style.textContent !== css) style.textContent = css;
-    }
-
-    function requestLibraryEvents(cb, forceRefresh) {
-        sendRuntimeMessage({ type: 'dtu-library-events', forceRefresh: !!forceRefresh }, function (resp) {
-            if (!forceRefresh && resp && resp.ok && Array.isArray(resp.events) && !resp.events.length) {
-                requestLibraryEvents(cb, true);
-                return;
-            }
-            if (resp && resp.ok) _libraryEventsCache = resp;
-            if (cb) cb(resp);
-        });
-    }
-
-    function requestLibraryNews(cb, forceRefresh) {
-        sendRuntimeMessage({ type: 'dtu-library-news', forceRefresh: !!forceRefresh }, function (resp) {
-            if (!forceRefresh && resp && resp.ok && Array.isArray(resp.news) && !resp.news.length) {
-                requestLibraryNews(cb, true);
-                return;
-            }
-            if (resp && resp.ok) _libraryNewsCache = resp;
-            if (cb) cb(resp);
-        });
-    }
-
-    function requestLibraryCrowding(cb, forceRefresh) {
-        var apiUrl = getLibrarySharedTrendApiUrl();
-        if (!apiUrl) {
-            if (cb) cb({ ok: false, error: 'not_configured', message: 'Shared library occupancy is not configured in this build.' });
-            return;
-        }
-        sendRuntimeMessage({
-            type: 'dtu-library-live-stats',
-            forceRefresh: !!forceRefresh,
-            apiUrl: apiUrl,
-            lookbackDays: getLibrarySharedTrendLookbackDays()
-        }, function (resp) {
-            if (resp && resp.ok) {
-                _libraryCrowdingCache = resp;
-            }
-            if (cb) cb(resp);
-        });
-    }
-
-    function getLibrarySharedTrendApiUrl() {
-        try {
-            var config = getRuntimeConfig();
-            var url = String(config.LIVE_LIBRARY_TRENDS_URL || '').trim();
-            if (!url) return '';
-            if (!/^https:\/\//i.test(url)) return '';
-            return url;
-        } catch (e0) {
-            return '';
-        }
-    }
-
-    function getLibrarySharedTrendLookbackDays() {
-        try {
-            var config = getRuntimeConfig();
-            var n = parseInt(String(config.LIVE_LIBRARY_LOOKBACK_DAYS || '28').replace(/[^\d]/g, ''), 10);
-            if (!isFinite(n)) return 28;
-            return Math.max(3, Math.min(365, n));
-        } catch (e0) {
-            return 28;
-        }
-    }
-
-    function formatHourWindow(hour) {
-        var h = (hour % 24 + 24) % 24;
-        var n = (h + 1) % 24;
-        var hs = (h < 10 ? '0' : '') + h + ':00';
-        var ns = (n < 10 ? '0' : '') + n + ':00';
-        return hs + '-' + ns;
-    }
-
-    function parseLibraryIntLoose(value, fallback) {
-        var digits = String(value == null ? '' : value).match(/-?\d+/);
-        if (!digits) return (typeof fallback === 'number' ? fallback : null);
-        var num = parseInt(digits[0], 10);
-        return isFinite(num) ? num : (typeof fallback === 'number' ? fallback : null);
-    }
-
-    function parseLibraryNumLoose(value, fallback) {
-        var n = Number(value);
-        return isFinite(n) ? n : (typeof fallback === 'number' ? fallback : null);
-    }
-
-    function toLibraryDateKey(ts) {
-        var d = new Date(ts);
-        if (!(d instanceof Date) || isNaN(d.getTime())) return '';
-        var y = d.getFullYear();
-        var m = d.getMonth() + 1;
-        var day = d.getDate();
-        return y + '-' + (m < 10 ? '0' : '') + m + '-' + (day < 10 ? '0' : '') + day;
-    }
-
-    function parseLibraryMinuteOfDay(raw) {
-        if (typeof raw === 'number' && isFinite(raw)) {
-            if (raw >= 0 && raw < 24 * 60) return Math.round(raw);
-            if (raw > 24 * 60) {
-                var d0 = new Date(raw);
-                if (!isNaN(d0.getTime())) return d0.getHours() * 60 + d0.getMinutes();
-            }
-        }
-        var s = String(raw || '').trim();
-        if (!s) return null;
-        var hhmm = s.match(/^(\d{1,2}):(\d{2})$/);
-        if (hhmm) {
-            var hh = parseInt(hhmm[1], 10);
-            var mm = parseInt(hhmm[2], 10);
-            if (isFinite(hh) && isFinite(mm) && hh >= 0 && hh <= 23 && mm >= 0 && mm <= 59) {
-                return hh * 60 + mm;
-            }
-        }
-        var d = new Date(s);
-        if (!isNaN(d.getTime())) return d.getHours() * 60 + d.getMinutes();
-        return null;
-    }
-
-    function getLibraryWeekdayName(dayIndex) {
-        var names = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
-        return names[(dayIndex % 7 + 7) % 7];
-    }
-
-    function normalizeLibraryWeekdayKey(raw) {
-        var key = String(raw || '').toLowerCase().trim();
-        if (!key) return '';
-        if (/^(0|sun|sunday)$/.test(key)) return 'sunday';
-        if (/^(1|mon|monday)$/.test(key)) return 'monday';
-        if (/^(2|tue|tuesday)$/.test(key)) return 'tuesday';
-        if (/^(3|wed|wednesday)$/.test(key)) return 'wednesday';
-        if (/^(4|thu|thursday)$/.test(key)) return 'thursday';
-        if (/^(5|fri|friday)$/.test(key)) return 'friday';
-        if (/^(6|sat|saturday)$/.test(key)) return 'saturday';
-        if (key === 'generic') return 'generic';
-        return '';
-    }
-
-    function normalizeLibraryHourRows(rows) {
-        if (!Array.isArray(rows)) return [];
-        var map = {};
-        rows.forEach(function (row) {
-            var hour = parseLibraryIntLoose(row && (row.hour != null ? row.hour : row.hour_local), null);
-            var avg = parseLibraryNumLoose(
-                row && (row.avg_visitors != null ? row.avg_visitors
-                    : row.avgNow != null ? row.avgNow
-                        : row.avg_now),
-                null
-            );
-            var minV = parseLibraryNumLoose(
-                row && (row.min_visitors != null ? row.min_visitors
-                    : row.minNow != null ? row.minNow
-                        : row.min_now),
-                null
-            );
-            var maxV = parseLibraryNumLoose(
-                row && (row.max_visitors != null ? row.max_visitors
-                    : row.maxNow != null ? row.maxNow
-                        : row.max_now),
-                null
-            );
-            var samples = parseLibraryIntLoose(row && row.samples, 0);
-            if (hour == null || hour < 0 || hour > 23 || avg == null || !isFinite(avg)) return;
-
-            if (minV == null && maxV == null) {
-                var spread = Math.max(8, Math.abs(avg) * 0.08);
-                minV = Math.max(0, avg - spread);
-                maxV = avg + spread;
-            } else {
-                if (minV == null) minV = Math.max(0, avg - Math.max(5, Math.abs(avg - maxV)));
-                if (maxV == null) maxV = Math.max(avg, avg + Math.max(5, Math.abs(avg - minV)));
-            }
-            if (maxV < minV) {
-                var tmp = minV;
-                minV = maxV;
-                maxV = tmp;
-            }
-            map[hour] = {
-                hour: hour,
-                avg: avg,
-                min: minV,
-                max: maxV,
-                samples: Math.max(0, samples || 0),
-                window: formatHourWindow(hour)
-            };
-        });
-        var out = Object.keys(map).map(function (k) { return map[k]; });
-        out.sort(function (a, b) { return a.hour - b.hour; });
-        return out;
-    }
-
-    function normalizeLibraryWeekdayAverages(rawMap) {
-        var out = {};
-        if (!rawMap || typeof rawMap !== 'object') return out;
-        Object.keys(rawMap).forEach(function (key) {
-            var normKey = normalizeLibraryWeekdayKey(key);
-            if (!normKey) return;
-            var rows = normalizeLibraryHourRows(rawMap[key]);
-            if (rows.length) out[normKey] = rows;
-        });
-        return out;
-    }
-
-    function estimateLibraryWeekdayOccurrences(rows) {
-        if (!Array.isArray(rows) || !rows.length) return null;
-        var estimates = [];
-        rows.forEach(function (row) {
-            var samples = parseLibraryNumLoose(row && row.samples, null);
-            if (!isFinite(samples) || samples <= 0) return;
-            estimates.push(samples / 60);
-        });
-        if (!estimates.length) return null;
-        estimates.sort(function (a, b) { return a - b; });
-        var mid = Math.floor(estimates.length / 2);
-        var median = (estimates.length % 2)
-            ? estimates[mid]
-            : ((estimates[mid - 1] + estimates[mid]) / 2);
-        if (!isFinite(median) || median <= 0) return null;
-        return Math.max(1, Math.round(median));
-    }
-
-    function formatLibraryWeekdayObservations(weekdayName, count) {
-        var labels = {
-            sunday: 'Sunday',
-            monday: 'Monday',
-            tuesday: 'Tuesday',
-            wednesday: 'Wednesday',
-            thursday: 'Thursday',
-            friday: 'Friday',
-            saturday: 'Saturday'
-        };
-        var base = labels[normalizeLibraryWeekdayKey(weekdayName)] || 'day';
-        return count === 1 ? base : (base + 's');
-    }
-
-    function extractLibraryCurrentSnapshot(crowdingResp, fallbackOccupancyResp) {
-        var snap = {
-            visitors: null,
-            today: null,
-            freeSeats: null,
-            capacity: null,
-            fetchedAt: null,
-            source: '',
-            hasCurrent: false
-        };
-
-        var c = crowdingResp && crowdingResp.current ? crowdingResp.current : null;
-        var latest = crowdingResp && crowdingResp.latest ? crowdingResp.latest : null;
-
-        if (c || latest) {
-            snap.visitors = parseLibraryIntLoose(c && c.visitors != null ? c.visitors : latest && latest.now, null);
-            snap.today = parseLibraryIntLoose(c && c.total_visits != null ? c.total_visits : latest && latest.today, null);
-            snap.capacity = parseLibraryIntLoose(c && c.capacity != null ? c.capacity : latest && latest.capacity, null);
-            snap.freeSeats = parseLibraryIntLoose(c && c.free_seats != null ? c.free_seats : latest && latest.freeSeats, null);
-            if (snap.freeSeats == null && snap.capacity != null && snap.visitors != null) {
-                snap.freeSeats = Math.max(0, snap.capacity - snap.visitors);
-            }
-            var tsRaw = c && c.timestamp ? c.timestamp : (latest && (latest.fetchedAtIso || latest.fetchedAt));
-            var tsParsed = typeof tsRaw === 'number' ? tsRaw : Date.parse(tsRaw || '');
-            if (isFinite(tsParsed)) snap.fetchedAt = tsParsed;
-            snap.source = String((crowdingResp && crowdingResp.sourceUrl) || (latest && latest.source) || '').trim();
-            snap.hasCurrent = snap.visitors != null || snap.freeSeats != null;
-        }
-
-        if (!snap.hasCurrent && fallbackOccupancyResp && fallbackOccupancyResp.occupancy) {
-            var occ = fallbackOccupancyResp.occupancy;
-            snap.visitors = parseLibraryIntLoose(occ.now, null);
-            snap.today = parseLibraryIntLoose(occ.today, null);
-            snap.capacity = parseLibraryIntLoose(occ.capacity, null);
-            snap.freeSeats = parseLibraryIntLoose(occ.freeSeats, null);
-            if (snap.freeSeats == null && snap.capacity != null && snap.visitors != null) {
-                snap.freeSeats = Math.max(0, snap.capacity - snap.visitors);
-            }
-            var ts = parseLibraryIntLoose(occ.fetchedAt, null);
-            if (ts != null) snap.fetchedAt = ts;
-            snap.source = String(occ.source || '').trim();
-            snap.hasCurrent = snap.visitors != null || snap.freeSeats != null;
-        }
-
-        return snap;
-    }
-
-    function buildLibraryTodaySamplesFromPayload(crowdingResp, referenceTs) {
-        var today = crowdingResp && crowdingResp.today ? crowdingResp.today : null;
-        if (!today || !Array.isArray(today.samples)) return [];
-        var refDateKey = toLibraryDateKey(referenceTs || Date.now());
-        var byMinute = {};
-
-        today.samples.forEach(function (sample) {
-            if (!sample || typeof sample !== 'object') return;
-            var visitors = parseLibraryNumLoose(
-                sample.visitors != null ? sample.visitors
-                    : sample.now != null ? sample.now
-                        : sample.value,
-                null
-            );
-            if (visitors == null) return;
-
-            var minute = parseLibraryMinuteOfDay(
-                sample.time != null ? sample.time
-                    : sample.minute != null ? sample.minute
-                        : sample.timestamp != null ? sample.timestamp
-                            : sample.ts != null ? sample.ts
-                                : sample.at
-            );
-            if (minute == null || minute < 0 || minute >= 24 * 60) return;
-
-            var sampleTs = sample.timestamp != null ? Date.parse(sample.timestamp) : NaN;
-            if (!isFinite(sampleTs) && sample.ts != null) sampleTs = parseLibraryIntLoose(sample.ts, NaN);
-            if (isFinite(sampleTs)) {
-                var sampleDateKey = toLibraryDateKey(sampleTs);
-                if (sampleDateKey && refDateKey && sampleDateKey !== refDateKey) return;
-            }
-            byMinute[minute] = visitors;
-        });
-
-        return Object.keys(byMinute).map(function (k) {
-            return { minute: parseInt(k, 10), visitors: byMinute[k] };
-        }).sort(function (a, b) { return a.minute - b.minute; });
-    }
-
-    function mergeLibraryTodaySamples(primary, fallback, currentMinute, currentVisitors) {
-        var byMinute = {};
-        (fallback || []).forEach(function (p) {
-            if (p && isFinite(p.minute) && isFinite(p.visitors)) byMinute[p.minute] = p.visitors;
-        });
-        (primary || []).forEach(function (p) {
-            if (p && isFinite(p.minute) && isFinite(p.visitors)) byMinute[p.minute] = p.visitors;
-        });
-        if (isFinite(currentMinute) && isFinite(currentVisitors)) {
-            byMinute[currentMinute] = currentVisitors;
-        }
-        return Object.keys(byMinute).map(function (k) {
-            return { minute: parseInt(k, 10), visitors: byMinute[k] };
-        }).sort(function (a, b) { return a.minute - b.minute; });
-    }
-
-    function buildLibraryCrowdingModel(crowdingResp, fallbackOccupancyResp) {
-        var nowTs = Date.now();
-        var snapshot = extractLibraryCurrentSnapshot(crowdingResp, fallbackOccupancyResp);
-        var nowDate = new Date(snapshot.fetchedAt || nowTs);
-        var nowMinute = nowDate.getHours() * 60 + nowDate.getMinutes();
-        var weekdayName = getLibraryWeekdayName(nowDate.getDay());
-
-        var historical = crowdingResp && crowdingResp.historical ? crowdingResp.historical : null;
-        var weekdayMap = normalizeLibraryWeekdayAverages(historical && historical.weekday_averages);
-        var operatingStartHour = 8;
-        var operatingEndHour = 22;
-        var isWithinDisplayHours = isLibraryMinuteWithinDisplayHours(nowMinute, operatingStartHour, operatingEndHour);
-
-        if (!Object.keys(weekdayMap).length && crowdingResp && crowdingResp.trends && Array.isArray(crowdingResp.trends.hourly)) {
-            weekdayMap.generic = normalizeLibraryHourRows(crowdingResp.trends.hourly);
-        }
-
-        var weekdayRows = Array.isArray(weekdayMap[weekdayName]) ? weekdayMap[weekdayName] : [];
-        var hasWeekdaySpecificHistory = weekdayRows.length > 0;
-        var typicalRows = hasWeekdaySpecificHistory ? weekdayRows : (weekdayMap.generic || []);
-        var currentHour = Math.floor(nowMinute / 60);
-        var typicalNowRow = typicalRows.find(function (r) { return r.hour === currentHour; }) || null;
-        var typicalNow = typicalNowRow ? typicalNowRow.avg : null;
-        var typicalBandEndMinute = null;
-        if (typicalRows.length) {
-            typicalBandEndMinute = Math.min(operatingEndHour * 60, (typicalRows[typicalRows.length - 1].hour + 1) * 60);
-        }
-
-        var todaySamplesPayload = buildLibraryTodaySamplesFromPayload(crowdingResp, snapshot.fetchedAt || nowTs);
-        var todaySamples = mergeLibraryTodaySamples(
-            todaySamplesPayload,
-            [],
-            nowMinute,
-            snapshot.visitors
-        );
-
-        var daysCollected = parseLibraryIntLoose(historical && historical.days_collected, null);
-        if (daysCollected == null && crowdingResp && crowdingResp.trends) {
-            var totalSamples = parseLibraryIntLoose(crowdingResp.trends.totalSamples, null);
-            if (totalSamples != null) daysCollected = Math.max(1, Math.round(totalSamples / (60 * 8)));
-        }
-
-        var weekdayObservationCount = hasWeekdaySpecificHistory ? estimateLibraryWeekdayOccurrences(weekdayRows) : null;
-        var weekdayObservationEstimated = false;
-        if (weekdayObservationCount == null && daysCollected != null && daysCollected >= 7) {
-            weekdayObservationCount = Math.max(1, Math.round(daysCollected / 7));
-            weekdayObservationEstimated = true;
-        }
-
-        var occupancyRatio = null;
-        if (snapshot.capacity != null && snapshot.capacity > 0 && snapshot.visitors != null) {
-            occupancyRatio = Math.max(0, Math.min(1, snapshot.visitors / snapshot.capacity));
-        }
-
-        var heatmapDays = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
-        var heatmapAvailable = daysCollected != null && daysCollected >= 7
-            && heatmapDays.some(function (day) { return Array.isArray(weekdayMap[day]) && weekdayMap[day].length; });
-
-        return {
-            snapshot: snapshot,
-            nowTs: snapshot.fetchedAt || nowTs,
-            nowMinute: nowMinute,
-            weekdayName: weekdayName,
-            startHour: operatingStartHour,
-            endHour: operatingEndHour,
-            isWithinDisplayHours: isWithinDisplayHours,
-            todaySamples: todaySamples,
-            typicalRows: typicalRows,
-            weekdayMap: weekdayMap,
-            typicalNow: typicalNow,
-            typicalBandEndMinute: typicalBandEndMinute,
-            daysCollected: daysCollected,
-            weekdayObservationCount: weekdayObservationCount,
-            weekdayObservationEstimated: weekdayObservationEstimated,
-            hasWeekdaySpecificHistory: hasWeekdaySpecificHistory,
-            occupancyRatio: occupancyRatio,
-            heatmapAvailable: heatmapAvailable
-        };
-    }
-
-    function getLibraryCrowdingTier(occupancyRatio) {
-        // isFinite(null) === true in JS (null coerces to 0), so check for null explicitly
-        if (occupancyRatio == null || !isFinite(occupancyRatio)) {
-            return { key: 'unknown', label: 'Unknown', color: '#888' };
-        }
-        if (occupancyRatio <= 0.60) {
-            return { key: 'low', label: 'Plenty of seats', color: '#2e7d32' };
-        }
-        if (occupancyRatio <= 0.85) {
-            // Fixed amber — not accent — so the green→amber→red traffic-light
-            // system stays consistent regardless of the user's accent colour pick.
-            return { key: 'medium', label: 'Moderate', color: '#d97706' };
-        }
-        return { key: 'high', label: 'Busy', color: '#c62828' };
-    }
-
-    function formatLibraryHourMinute(minute) {
-        var m = Math.max(0, Math.min(1439, parseLibraryIntLoose(minute, 0)));
-        var hh = Math.floor(m / 60);
-        var mm = m % 60;
-        return (hh < 10 ? '0' : '') + hh + ':' + (mm < 10 ? '0' : '') + mm;
-    }
-
-    function formatLibraryMinuteRange(startMinute, endMinute) {
-        return formatLibraryHourMinute(startMinute) + '-' + formatLibraryHourMinute(endMinute);
-    }
-
-    function isLibraryMinuteWithinDisplayHours(minute, startHour, endHour) {
-        if (!isFinite(minute)) return false;
-        var startMinute = parseLibraryIntLoose(startHour, 0) * 60;
-        var endMinute = parseLibraryIntLoose(endHour, 24) * 60;
-        return minute >= startMinute && minute <= endMinute;
-    }
-
-    function parseLibraryTimeRangeFromText(text) {
-        var raw = String(text || '');
-        var m = raw.match(/(\d{1,2}):(\d{2})\s*[-–]\s*(\d{1,2}):(\d{2})/);
-        if (!m) return null;
-        var h1 = parseInt(m[1], 10);
-        var mm1 = parseInt(m[2], 10);
-        var h2 = parseInt(m[3], 10);
-        var mm2 = parseInt(m[4], 10);
-        if (![h1, mm1, h2, mm2].every(function (n) { return isFinite(n); })) return null;
-        if (h1 < 0 || h1 > 23 || h2 < 0 || h2 > 23 || mm1 < 0 || mm1 > 59 || mm2 < 0 || mm2 > 59) return null;
-        return { startMinute: h1 * 60 + mm1, endMinute: h2 * 60 + mm2 };
-    }
-
-    function isLibraryEventAtDtuLibrary(ev) {
-        var where = String((ev && ev.location) || '').toLowerCase();
-        return /dtu\s*library/.test(where);
-    }
-
-    function buildLibraryEventIntervals(eventsResp, model) {
-        if (!eventsResp || eventsResp.ok === false || !Array.isArray(eventsResp.events) || !model) return [];
-        var dayStart = new Date(model.nowTs || Date.now());
-        dayStart.setHours(0, 0, 0, 0);
-        var dayStartTs = dayStart.getTime();
-        var dayEndTs = dayStartTs + 24 * 60 * 60 * 1000;
-        var graphStart = model.startHour * 60;
-        var graphEnd = model.endHour * 60;
-        var out = [];
-
-        eventsResp.events.forEach(function (ev) {
-            if (!ev || !isLibraryEventAtDtuLibrary(ev)) return;
-
-            var startTs = Date.parse(ev.startIso || '');
-            var endTs = Date.parse(ev.endIso || '');
-
-            if (!isFinite(startTs)) {
-                return;
-            }
-
-            if (!isFinite(endTs) || endTs <= startTs) {
-                var parsed = parseLibraryTimeRangeFromText(ev.formattedDate || ev.excerpt || '');
-                if (parsed) {
-                    var base = new Date(startTs);
-                    startTs = new Date(base.getFullYear(), base.getMonth(), base.getDate(), Math.floor(parsed.startMinute / 60), parsed.startMinute % 60).getTime();
-                    endTs = new Date(base.getFullYear(), base.getMonth(), base.getDate(), Math.floor(parsed.endMinute / 60), parsed.endMinute % 60).getTime();
-                    if (endTs <= startTs) endTs += 24 * 60 * 60 * 1000;
-                } else {
-                    endTs = startTs + 60 * 60 * 1000;
-                }
-            }
-
-            if (endTs <= dayStartTs || startTs >= dayEndTs) return;
-
-            var clippedStart = Math.max(startTs, dayStartTs);
-            var clippedEnd = Math.min(endTs, dayEndTs);
-            var sDate = new Date(clippedStart);
-            var eDate = new Date(clippedEnd);
-            var startMinute = sDate.getHours() * 60 + sDate.getMinutes();
-            var endMinute = eDate.getHours() * 60 + eDate.getMinutes();
-
-            if (clippedEnd === dayEndTs) endMinute = 24 * 60;
-            startMinute = Math.max(graphStart, startMinute);
-            endMinute = Math.min(graphEnd, endMinute);
-            if (endMinute <= startMinute) return;
-
-            out.push({
-                startMinute: startMinute,
-                endMinute: endMinute,
-                title: String(ev.title || 'Library event'),
-                location: String(ev.location || '')
-            });
-        });
-
-        out.sort(function (a, b) { return a.startMinute - b.startMinute; });
-        return out;
-    }
-
-    function drawLibraryCrowdingChart(canvas, model, eventIntervals) {
-        if (!canvas || !model) return;
-        var dpr = Math.max(1, window.devicePixelRatio || 1);
-        var cssW = Math.max(320, Math.round(canvas.clientWidth || 640));
-        var cssH = Math.max(120, Math.round(canvas.clientHeight || 136));
-        var targetW = Math.round(cssW * dpr);
-        var targetH = Math.round(cssH * dpr);
-        if (canvas.width !== targetW) canvas.width = targetW;
-        if (canvas.height !== targetH) canvas.height = targetH;
-
-        var ctx = canvas.getContext('2d');
-        if (!ctx) return;
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.scale(dpr, dpr);
-
-        var rootStyles = getComputedStyle(document.documentElement);
-        var accent = (rootStyles.getPropertyValue('--dtu-ad-accent') || '#1f7ae0').trim();
-        var accentRgb = (rootStyles.getPropertyValue('--dtu-ad-accent-rgb') || '31,122,224').trim();
-        var gridColor = isDarkModeEnabled() ? 'rgba(255,255,255,0.12)' : 'rgba(15,23,42,0.14)';
-        var textColor = isDarkModeEnabled() ? '#9aa0aa' : '#667084';
-        // Helper: apply opacity to the dynamic accent color safely
-        function accentWithOpacity(opacity) { return 'rgba(' + accentRgb + ',' + opacity + ')'; }
-        var bandFill = isDarkModeEnabled() ? LIBRARY_CHART_DARK_BAND_FILL : accentWithOpacity(0.07);
-        var bandStroke = isDarkModeEnabled() ? LIBRARY_CHART_DARK_TYPICAL_STROKE : accentWithOpacity(0.48);
-        var markerColor = isDarkModeEnabled() ? '#f5f5f5' : '#1a1a1a';
-
-        // Hide the min-max band if there are fewer than 3 weekday observations
-        // (a range is meaningless with only 1–2 data points)
-        var _weekdayObs = (model.weekdayObservationCount != null) ? model.weekdayObservationCount : null;
-        var _daysObs = (model.daysCollected != null) ? model.daysCollected : null;
-        // Fall back to daysCollected / 7 when no weekday-specific count is available
-        var _impliedWeekdayObs = (_weekdayObs != null) ? _weekdayObs : (_daysObs != null ? Math.round(_daysObs / 7) : 0);
-        var showHistoricalBand = _impliedWeekdayObs >= 3;
-
-        var startMinute = model.startHour * 60;
-        var endMinute = model.endHour * 60;
-        var pad = { left: 38, right: 16, top: 14, bottom: 24 };
-        var w = cssW;
-        var h = cssH;
-        var innerW = Math.max(10, w - pad.left - pad.right);
-        var innerH = Math.max(10, h - pad.top - pad.bottom);
-
-        var today = (model.todaySamples || []).filter(function (p) {
-            return isFinite(p.minute) && isFinite(p.visitors) && p.minute >= startMinute && p.minute <= endMinute;
-        });
-        var typical = (model.typicalRows || []).filter(function (r) {
-            return isFinite(r.hour) && isFinite(r.avg) && r.hour >= model.startHour && r.hour <= model.endHour;
-        });
-        if (showHistoricalBand && typical.length >= 2) {
-            var spanCount = 0;
-            var spanTotal = 0;
-            typical.forEach(function (r) {
-                if (isFinite(r.min) && isFinite(r.max) && r.max >= r.min) {
-                    spanTotal += (r.max - r.min);
-                    spanCount += 1;
-                }
-            });
-            var avgHistoricalSpan = spanCount ? spanTotal / spanCount : 0;
-            var capacityForBand = parseLibraryNumLoose(model.snapshot && model.snapshot.capacity, null);
-            var maxUsefulSpan = isFinite(capacityForBand) && capacityForBand > 0 ? Math.max(160, capacityForBand * 0.45) : 260;
-            if (!spanCount || avgHistoricalSpan > maxUsefulSpan) showHistoricalBand = false;
-        }
-
-        var maxY = 0;
-        var capacityForScale = parseLibraryNumLoose(model.snapshot && model.snapshot.capacity, null);
-        if (isFinite(capacityForScale) && capacityForScale > 0) maxY = Math.max(maxY, capacityForScale);
-        today.forEach(function (p) { maxY = Math.max(maxY, p.visitors); });
-        typical.forEach(function (r) { maxY = Math.max(maxY, r.max, r.avg); });
-        if (!isFinite(maxY) || maxY <= 0) maxY = 100;
-        maxY = Math.ceil(maxY / 10) * 10;
-        // Always leave ~12.5% headroom above capacity so the max line floats
-        // visibly as a ceiling rather than sitting on the top edge (800 → 900)
-        if (isFinite(capacityForScale) && capacityForScale > 0) {
-            maxY = Math.max(maxY, Math.ceil(capacityForScale * 1.125 / 10) * 10);
-        }
-
-        function xForMinute(minute) {
-            var clamped = Math.max(startMinute, Math.min(endMinute, minute));
-            var t = (clamped - startMinute) / Math.max(1, endMinute - startMinute);
-            return pad.left + t * innerW;
-        }
-
-        function yForVisitors(value) {
-            var v = Math.max(0, Number(value || 0));
-            var t = v / Math.max(1, maxY);
-            return pad.top + (1 - t) * innerH;
-        }
-
-        var intervals = Array.isArray(eventIntervals) ? eventIntervals : [];
-        if (intervals.length) {
-            ctx.fillStyle = 'rgba(' + accentRgb + ',' + (isDarkModeEnabled() ? '0.12' : '0.10') + ')';
-            ctx.strokeStyle = 'rgba(' + accentRgb + ',' + (isDarkModeEnabled() ? '0.30' : '0.24') + ')';
-            ctx.lineWidth = 1;
-            intervals.forEach(function (itv) {
-                var x0 = xForMinute(itv.startMinute);
-                var x1 = xForMinute(itv.endMinute);
-                var wBand = Math.max(2, x1 - x0);
-                ctx.fillRect(x0, pad.top, wBand, innerH);
-                ctx.strokeRect(x0, pad.top, wBand, innerH);
-            });
-        }
-
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = gridColor;
-        ctx.fillStyle = textColor;
-        ctx.font = '10px sans-serif';
-
-        // Compute a clean round step size targeting ~5 ticks (e.g. 200, 250, 500…)
-        var _roughStep = maxY / 5;
-        var _mag = Math.pow(10, Math.floor(Math.log10(Math.max(1, _roughStep))));
-        var _norm = _roughStep / _mag;
-        var niceStepY = _norm <= 1.5 ? _mag : _norm <= 3 ? 2 * _mag : _norm <= 7 ? 5 * _mag : 10 * _mag;
-        for (var yValue = 0; yValue <= maxY + niceStepY * 0.01; yValue += niceStepY) {
-            var yPos = yForVisitors(yValue);
-            ctx.beginPath();
-            ctx.moveTo(pad.left, yPos);
-            ctx.lineTo(w - pad.right, yPos);
-            ctx.stroke();
-            ctx.textAlign = 'right';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(String(Math.round(yValue)), pad.left - 6, yPos);
-        }
-
-        var capacityValue = parseLibraryNumLoose(model.snapshot && model.snapshot.capacity, null);
-        if (isFinite(capacityValue) && capacityValue > 0) {
-            var capacityY = yForVisitors(capacityValue);
-            if (capacityY >= pad.top - 1 && capacityY <= (h - pad.bottom + 1)) {
-                ctx.beginPath();
-                ctx.moveTo(pad.left, capacityY);
-                ctx.lineTo(w - pad.right, capacityY);
-                ctx.strokeStyle = isDarkModeEnabled() ? 'rgba(255,255,255,0.70)' : 'rgba(15,23,42,0.60)';
-                ctx.lineWidth = 1.5;
-                ctx.setLineDash([5, 4]);
-                ctx.stroke();
-                ctx.setLineDash([]);
-                ctx.textAlign = 'right';
-                ctx.textBaseline = 'bottom';
-                ctx.fillStyle = isDarkModeEnabled() ? 'rgba(255,255,255,0.70)' : 'rgba(15,23,42,0.60)';
-                ctx.font = '10px sans-serif';
-                ctx.fillText('max ' + Math.round(capacityValue), w - pad.right - 2, capacityY - 2);
-            }
-        }
-
-        // Reset the pen: the capacity line above leaves a bright, thicker stroke
-        // and fill that the hour grid would otherwise inherit.
-        ctx.strokeStyle = gridColor;
-        ctx.lineWidth = 1;
-        ctx.fillStyle = textColor;
-        ctx.font = '10px sans-serif';
-        for (var hour = model.startHour; hour <= model.endHour; hour += 2) {
-            var xPos = xForMinute(hour * 60);
-            ctx.beginPath();
-            ctx.moveTo(xPos, pad.top);
-            ctx.lineTo(xPos, h - pad.bottom);
-            ctx.stroke();
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'top';
-            ctx.fillText((hour < 10 ? '0' : '') + hour + ':00', xPos, h - pad.bottom + 4);
-        }
-
-        if (typical.length >= 2) {
-            var firstTypical = typical[0];
-            var lastTypical = typical[typical.length - 1];
-            var typicalStartMinute = Math.max(startMinute, firstTypical.hour * 60);
-            var typicalEndMinute = Math.min(endMinute, (lastTypical.hour + 1) * 60);
-
-            // Only draw the shaded min-max band if we have enough historical observations
-            if (showHistoricalBand) {
-                ctx.beginPath();
-                ctx.moveTo(xForMinute(typicalStartMinute), yForVisitors(firstTypical.max));
-                typical.forEach(function (r) {
-                    ctx.lineTo(xForMinute(r.hour * 60 + 30), yForVisitors(r.max));
-                });
-                ctx.lineTo(xForMinute(typicalEndMinute), yForVisitors(lastTypical.max));
-                ctx.lineTo(xForMinute(typicalEndMinute), yForVisitors(lastTypical.min));
-                for (var i = typical.length - 1; i >= 0; i--) {
-                    var rr = typical[i];
-                    ctx.lineTo(xForMinute(rr.hour * 60 + 30), yForVisitors(rr.min));
-                }
-                ctx.lineTo(xForMinute(typicalStartMinute), yForVisitors(firstTypical.min));
-                ctx.closePath();
-                ctx.fillStyle = bandFill;
-                ctx.fill();
-            }
-
-            // Dashed "typical" average line — always shown when data exists
-            ctx.beginPath();
-            ctx.moveTo(xForMinute(typicalStartMinute), yForVisitors(firstTypical.avg));
-            typical.forEach(function (r) {
-                ctx.lineTo(xForMinute(r.hour * 60 + 30), yForVisitors(r.avg));
-            });
-            ctx.lineTo(xForMinute(typicalEndMinute), yForVisitors(lastTypical.avg));
-            ctx.strokeStyle = bandStroke;
-            ctx.lineWidth = 1.2;
-            ctx.setLineDash([4, 3]);
-            ctx.stroke();
-            ctx.setLineDash([]);
-        }
-
-        if (today.length >= 2) {
-            ctx.beginPath();
-            today.forEach(function (p, idx) {
-                var x = xForMinute(p.minute);
-                var y = yForVisitors(p.visitors);
-                if (idx === 0) ctx.moveTo(x, y);
-                else ctx.lineTo(x, y);
-            });
-            ctx.strokeStyle = accent;        // Current line: 100% opacity
-            ctx.lineWidth = 2.4;
-            ctx.lineJoin = 'round';
-            ctx.lineCap = 'round';
-            // Slight drop shadow for contrast on light accent colours
-            ctx.shadowColor = isDarkModeEnabled() ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.22)';
-            ctx.shadowBlur = 4;
-            ctx.stroke();
-            ctx.shadowColor = 'transparent';
-            ctx.shadowBlur = 0;
-        } else if (today.length === 1) {
-            ctx.beginPath();
-            ctx.arc(xForMinute(today[0].minute), yForVisitors(today[0].visitors), 3.2, 0, Math.PI * 2);
-            ctx.fillStyle = accent;
-            ctx.shadowColor = isDarkModeEnabled() ? 'rgba(0,0,0,0.45)' : 'rgba(0,0,0,0.22)';
-            ctx.shadowBlur = 4;
-            ctx.fill();
-            ctx.shadowColor = 'transparent';
-            ctx.shadowBlur = 0;
-        }
-
-        if (model.isWithinDisplayHours && isFinite(model.nowMinute)) {
-            var markerX = xForMinute(model.nowMinute);
-            ctx.beginPath();
-            ctx.moveTo(markerX, pad.top);
-            ctx.lineTo(markerX, h - pad.bottom);
-            ctx.strokeStyle = markerColor;
-            ctx.lineWidth = 1;
-            ctx.setLineDash([2, 3]);
-            ctx.stroke();
-            ctx.setLineDash([]);
-
-            if (model.snapshot && model.snapshot.visitors != null && isFinite(model.snapshot.visitors)) {
-                ctx.beginPath();
-                ctx.arc(markerX, yForVisitors(model.snapshot.visitors), 3, 0, Math.PI * 2);
-                ctx.fillStyle = markerColor;
-                ctx.fill();
-            }
-        }
-
-        // Return band-visibility flags so the caller can update the HTML legend
-        return { showHistoricalBand: showHistoricalBand, hasTypical: typical.length >= 2 };
-    }
-
-    function buildLibraryCrowdingInsightLine(model) {
-        if (!model || !model.snapshot || !model.snapshot.hasCurrent) {
-            return 'Library data unavailable right now.';
-        }
-
-        // After hours the hero already says when live numbers return.
-        if (!model.isWithinDisplayHours) return '';
-
-        var current = model.snapshot.visitors;
-        var typicalNow = model.typicalNow;
-        if (isFinite(current) && isFinite(typicalNow)) {
-            var delta = current - typicalNow;
-            var threshold = Math.max(20, typicalNow * 0.12);
-            if (delta <= -threshold) return 'Quieter than typical for this hour.';
-            if (delta >= threshold) return 'Busier than typical for this hour.';
-            return 'Around typical for this hour.';
-        }
-
-        if (model.occupancyRatio != null && isFinite(model.occupancyRatio)) {
-            if (model.occupancyRatio >= 0.85) return 'Almost full right now.';
-            if (model.occupancyRatio <= 0.60) return 'Plenty of free seats right now.';
-            return 'Moderately busy right now.';
-        }
-
-        return 'Building historical averages.';
-    }
-
-    function buildLibraryCrowdingConfidenceLine(model) {
-        if (!model) return '';
-        var sampleCount = (model.todaySamples || []).length;
-        var dayCount = parseLibraryIntLoose(model.daysCollected, null);
-        var weekdayCount = parseLibraryIntLoose(model.weekdayObservationCount, null);
-        if (dayCount != null && dayCount >= 7 && weekdayCount != null && weekdayCount > 0) {
-            var prefix = model.weekdayObservationEstimated ? 'Based on about ' : 'Based on ';
-            return prefix + weekdayCount + ' ' + formatLibraryWeekdayObservations(model.weekdayName, weekdayCount) + '.';
-        }
-        if (dayCount != null && dayCount > 0) {
-            return 'Based on about ' + dayCount + ' day' + (dayCount === 1 ? '' : 's') + ' of collected data.';
-        }
-        if (sampleCount > 0) {
-            return 'Today\'s shared trend is still building.';
-        }
-        return 'Building historical averages...';
-    }
-
-    function isLibraryHeatmapExpanded() {
-        try { return localStorage.getItem(LIBRARY_CROWD_HEATMAP_EXPANDED_KEY) === 'true'; } catch (e0) { return false; }
-    }
-
-    function setLibraryHeatmapExpanded(expanded) {
-        try { localStorage.setItem(LIBRARY_CROWD_HEATMAP_EXPANDED_KEY, expanded ? 'true' : 'false'); } catch (e0) { }
-    }
-
-    function removeDTULearnHelpDropdown() {
-        var api = getLearnNavUiApi();
-        if (api && typeof api.removeDTULearnHelpDropdown === 'function') {
-            api.removeDTULearnHelpDropdown();
-        }
-    }
-
-    function getLibraryUiApi() {
-        try { return globalThis.DTUAfterDarkLibraryUi || null; } catch (e0) { return null; }
-    }
-
-    try {
-        var existingLibraryDeps = globalThis.DTUAfterDarkLibraryDeps || {};
-        globalThis.DTUAfterDarkLibraryDeps = Object.assign({}, existingLibraryDeps, {
-            isTopWindow: existingLibraryDeps.isTopWindow || function () { return isTopWindow(); },
-            isLibraryEnabled: isLibraryEnabled,
-            isDTULearnHomepage: existingLibraryDeps.isDTULearnHomepage || isDTULearnHomepage,
-            deepQueryAll: existingLibraryDeps.deepQueryAll || deepQueryAll,
-            ensureLibraryRuntimeStyles: ensureLibraryRuntimeStyles,
-            requestLibraryEvents: requestLibraryEvents,
-            requestLibraryNews: requestLibraryNews,
-            requestLibraryCrowding: requestLibraryCrowding,
-            createLibraryTrendSection: createLibraryTrendSection,
-            renderLibraryTrendSection: renderLibraryTrendSection,
-            extractLibraryCurrentSnapshot: extractLibraryCurrentSnapshot,
-            formatLibraryOccupancyCount: formatLibraryOccupancyCount,
-            markExt: existingLibraryDeps.markExt || markExt,
-            getLibraryUiState: function () {
-                return {
-                    eventsCache: _libraryEventsCache,
-                    newsCache: _libraryNewsCache,
-                    crowdingCache: _libraryCrowdingCache,
-                    escHandler: _libraryEscHandler,
-                    occupancyAutoTimer: _libraryOccupancyAutoTimer
-                };
-            },
-            setLibraryUiState: function (next) {
-                if (!next || typeof next !== 'object') return;
-                if (Object.prototype.hasOwnProperty.call(next, 'eventsCache')) _libraryEventsCache = next.eventsCache || null;
-                if (Object.prototype.hasOwnProperty.call(next, 'newsCache')) _libraryNewsCache = next.newsCache || null;
-                if (Object.prototype.hasOwnProperty.call(next, 'crowdingCache')) _libraryCrowdingCache = next.crowdingCache || null;
-                if (Object.prototype.hasOwnProperty.call(next, 'escHandler')) _libraryEscHandler = next.escHandler || null;
-                if (Object.prototype.hasOwnProperty.call(next, 'occupancyAutoTimer')) _libraryOccupancyAutoTimer = next.occupancyAutoTimer || null;
-            }
-        });
-    } catch (eLibDeps) { }
-
-    function removeLibraryNavDropdown() {
-        var api = getLibraryUiApi();
-        if (api && typeof api.removeLibraryNavDropdown === 'function') {
-            api.removeLibraryNavDropdown();
-        }
-    }
-
-    function hideLibraryPanel() {
-        var api = getLibraryUiApi();
-        if (api && typeof api.hideLibraryPanel === 'function') {
-            api.hideLibraryPanel();
-        }
-    }
-
-    function insertLibraryNavDropdown() {
-        var api = getLibraryUiApi();
-        if (api && typeof api.insertLibraryNavDropdown === 'function') {
-            api.insertLibraryNavDropdown();
-        }
-    }
-
-    function showLibraryPanel(anchorBtn) {
-        var api = getLibraryUiApi();
-        if (api && typeof api.showLibraryPanel === 'function') {
-            api.showLibraryPanel(anchorBtn);
-        }
-    }
-
-    function formatLibraryOccupancyCount(value) {
-        if (typeof value !== 'number' || !isFinite(value)) return '--';
-        try { return value.toLocaleString('en-GB'); } catch (e0) { return String(value); }
-    }
-
-    function setLibraryHeatmapOpenState(section, expanded) {
-        if (!section || !section.heatmap || !section.heatmapToggle) return;
-        if (expanded) section.heatmap.classList.add('is-open');
-        else section.heatmap.classList.remove('is-open');
-        section.heatmapToggle.textContent = expanded ? 'Hide weekly pattern' : 'Show weekly pattern';
-        setLibraryHeatmapExpanded(expanded);
-    }
-
-    function renderLibraryHeatmap(section, model) {
-        if (!section || !section.heatmapGrid) return;
-        while (section.heatmapGrid.firstChild) section.heatmapGrid.removeChild(section.heatmapGrid.firstChild);
-
-        if (!model || !model.heatmapAvailable) {
-            if (section.heatmapToggle) section.heatmapToggle.style.display = 'none';
-            if (section.heatmap) section.heatmap.classList.remove('is-open');
-            return;
-        }
-
-        var days = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
-        var dayShort = { monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu', friday: 'Fri' };
-        var hourStart = 8;
-        var hourEnd = 21;
-
-        if (section.heatmapToggle) section.heatmapToggle.style.display = '';
-        setLibraryHeatmapOpenState(section, isLibraryHeatmapExpanded());
-
-        var allValues = [];
-        days.forEach(function (day) {
-            var rows = model.weekdayMap[day] || [];
-            rows.forEach(function (r) {
-                if (r.hour >= hourStart && r.hour <= hourEnd && isFinite(r.avg)) allValues.push(r.avg);
-            });
-        });
-        var minV = allValues.length ? Math.min.apply(null, allValues) : 0;
-        var maxV = allValues.length ? Math.max.apply(null, allValues) : 1;
-        if (!isFinite(minV)) minV = 0;
-        if (!isFinite(maxV) || maxV <= minV) maxV = minV + 1;
-
-        var head = document.createElement('div');
-        head.className = 'dtu-library-crowd-heatmap-head';
-        var blank = document.createElement('div');
-        blank.className = 'dtu-library-crowd-heatmap-hour';
-        head.appendChild(blank);
-        days.forEach(function (day) {
-            var cellHead = document.createElement('div');
-            cellHead.className = 'dtu-library-crowd-heatmap-day';
-            cellHead.textContent = dayShort[day];
-            head.appendChild(cellHead);
-        });
-        section.heatmapGrid.appendChild(head);
-
-        for (var hour = hourStart; hour <= hourEnd; hour++) {
-            var row = document.createElement('div');
-            row.className = 'dtu-library-crowd-heatmap-row';
-
-            var hourCell = document.createElement('div');
-            hourCell.className = 'dtu-library-crowd-heatmap-hour';
-            hourCell.textContent = ((hour - hourStart) % 2 === 0) ? ((hour < 10 ? '0' : '') + hour + ':00') : '';
-            row.appendChild(hourCell);
-
-            days.forEach(function (day) {
-                var rowData = (model.weekdayMap[day] || []).find(function (r) { return r.hour === hour; }) || null;
-                var avg = rowData && isFinite(rowData.avg) ? rowData.avg : null;
-                var frac = avg == null ? 0 : Math.max(0, Math.min(1, (avg - minV) / (maxV - minV)));
-                var alpha = avg == null ? 0.04 : (0.10 + 0.78 * frac);
-                var cell = document.createElement('button');
-                cell.type = 'button';
-                cell.className = 'dtu-library-crowd-heatmap-cell';
-                cell.style.setProperty('background', 'rgba(var(--dtu-ad-accent-rgb),' + alpha.toFixed(3) + ')', 'important');
-                cell.setAttribute('aria-label', (dayShort[day] + ' ' + (hour < 10 ? '0' : '') + hour + ':00')
-                    + (avg == null ? ' - no data' : (' - avg ' + Math.round(avg) + ' visitors')));
-                if (avg == null) {
-                    cell.title = dayShort[day] + ' ' + (hour < 10 ? '0' : '') + hour + ':00 - no data';
-                } else {
-                    var pct = (model.snapshot && model.snapshot.capacity) ? Math.round((avg / Math.max(1, model.snapshot.capacity)) * 100) : null;
-                    cell.title = dayShort[day] + ' ' + (hour < 10 ? '0' : '') + hour + ':00 - avg ' + Math.round(avg)
-                        + ' visitors' + (pct != null ? (' (' + pct + '% full)') : '');
-                }
-                row.appendChild(cell);
-            });
-
-            section.heatmapGrid.appendChild(row);
-        }
-    }
-
-    function createLibraryTrendSection() {
-        var container = document.createElement('div');
-        container.className = 'dtu-library-section dtu-library-trend-section';
-        container.setAttribute('data-dtu-library-feed-type', 'occupancy-trend');
-        markExt(container);
-
-        var header = document.createElement('div');
-        header.className = 'dtu-library-section-header';
-        markExt(header);
-
-        var h3 = document.createElement('div');
-        h3.className = 'dtu-library-section-title';
-        h3.textContent = '';
-        h3.style.display = 'none';
-        markExt(h3);
-
-        var actions = document.createElement('div');
-        actions.className = 'dtu-library-actions';
-        markExt(actions);
-
-        var retryBtn = document.createElement('button');
-        retryBtn.type = 'button';
-        retryBtn.className = 'dtu-library-action-btn';
-        retryBtn.textContent = 'Retry';
-        retryBtn.style.display = 'none';
-        markExt(retryBtn);
-        actions.appendChild(retryBtn);
-
-        header.appendChild(h3);
-        header.appendChild(actions);
-        container.appendChild(header);
-
-        var body = document.createElement('div');
-        body.className = 'dtu-library-crowd';
-        markExt(body);
-
-        var hero = document.createElement('div');
-        hero.className = 'dtu-library-crowd-card dtu-library-crowd-hero';
-        markExt(hero);
-
-        var freeValue = document.createElement('div');
-        freeValue.className = 'dtu-library-crowd-free';
-        freeValue.textContent = '--%';
-        markExt(freeValue);
-        var freeUnit = document.createElement('div');
-        freeUnit.className = 'dtu-library-crowd-free-unit';
-        freeUnit.textContent = 'filled';
-        markExt(freeUnit);
-        var freeWrap = document.createElement('div');
-        freeWrap.className = 'dtu-library-crowd-free-wrap';
-        markExt(freeWrap);
-        freeWrap.appendChild(freeValue);
-        freeWrap.appendChild(freeUnit);
-        var status = document.createElement('div');
-        status.className = 'dtu-library-crowd-status';
-        status.textContent = 'Waiting for data...';
-        markExt(status);
-        var heroTop = document.createElement('div');
-        heroTop.className = 'dtu-library-crowd-hero-top';
-        markExt(heroTop);
-        var heroMain = document.createElement('div');
-        heroMain.className = 'dtu-library-crowd-hero-main';
-        markExt(heroMain);
-        heroMain.appendChild(freeWrap);
-        heroMain.appendChild(status);
-
-        var heroStats = document.createElement('div');
-        heroStats.className = 'dtu-library-crowd-hero-stats';
-        markExt(heroStats);
-        function createHeroStat(label, hint) {
-            var stat = document.createElement('div');
-            stat.className = 'dtu-library-crowd-hero-stat';
-            markExt(stat);
-            var statLabel = document.createElement('div');
-            statLabel.className = 'dtu-library-crowd-hero-stat-label';
-            statLabel.textContent = label;
-            markExt(statLabel);
-            var statValue = document.createElement('div');
-            statValue.className = 'dtu-library-crowd-hero-stat-value';
-            statValue.textContent = '--';
-            markExt(statValue);
-            var statHint = document.createElement('div');
-            statHint.className = 'dtu-library-crowd-hero-stat-hint';
-            statHint.textContent = hint || '';
-            markExt(statHint);
-            stat.appendChild(statLabel);
-            stat.appendChild(statValue);
-            stat.appendChild(statHint);
-            heroStats.appendChild(stat);
-            return statValue;
-        }
-        var nowStatValue = createHeroStat('Now', 'in library');
-        var todayStatValue = createHeroStat('Today', 'visits today');
-        var freeStatValue = createHeroStat('Free', 'seats available');
-
-        var progress = document.createElement('div');
-        progress.className = 'dtu-library-crowd-progress';
-        progress.setAttribute('role', 'progressbar');
-        progress.setAttribute('aria-valuemin', '0');
-        progress.setAttribute('aria-valuemax', '100');
-        progress.setAttribute('aria-valuenow', '0');
-        progress.setAttribute('aria-valuetext', 'Unknown');
-        var progressFill = document.createElement('div');
-        progressFill.className = 'dtu-library-crowd-progress-fill';
-        progress.appendChild(progressFill);
-
-        heroTop.appendChild(heroMain);
-        heroTop.appendChild(heroStats);
-        hero.appendChild(heroTop);
-        hero.appendChild(progress);
-
-        var chartWrap = document.createElement('div');
-        chartWrap.className = 'dtu-library-crowd-chart-wrap';
-        chartWrap.style.setProperty('position', 'relative', 'important');
-        markExt(chartWrap);
-        var chartCanvas = document.createElement('canvas');
-        chartCanvas.className = 'dtu-library-crowd-chart';
-        chartCanvas.setAttribute('role', 'img');
-        chartCanvas.setAttribute('aria-label', 'Library occupancy chart');
-        markExt(chartCanvas);
-        var chartNote = document.createElement('div');
-        chartNote.className = 'dtu-library-crowd-chart-note';
-        chartNote.textContent = 'Building historical averages...';
-        markExt(chartNote);
-        var eventLegend = document.createElement('div');
-        eventLegend.className = 'dtu-library-crowd-events';
-        eventLegend.style.display = 'none';
-        markExt(eventLegend);
-        var chartTooltip = document.createElement('div');
-        chartTooltip.className = 'dtu-library-crowd-chart-tooltip';
-        chartTooltip.style.cssText = 'display:none;position:absolute;pointer-events:none;z-index:10;background:rgba(20,20,20,0.88);color:#f0f0f0;font-size:11px;line-height:1.4;padding:5px 8px;border-radius:6px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.35);';
-        markExt(chartTooltip);
-        chartWrap.appendChild(chartCanvas);
-        chartWrap.appendChild(chartTooltip);
-
-        var chartLegend = document.createElement('div');
-        chartLegend.className = 'dtu-library-crowd-chart-legend';
-        chartLegend.style.cssText = 'display:flex !important;gap:12px !important;justify-content:flex-end !important;margin:4px 2px 2px !important;flex-wrap:wrap !important;';
-        markExt(chartLegend);
-        chartWrap.appendChild(chartLegend);
-
-        chartWrap.appendChild(chartNote);
-        chartWrap.appendChild(eventLegend);
-
-        var confidence = document.createElement('div');
-        confidence.className = 'dtu-library-crowd-confidence';
-        confidence.textContent = '';
-        markExt(confidence);
-
-        var heatmapToggle = document.createElement('button');
-        heatmapToggle.type = 'button';
-        heatmapToggle.className = 'dtu-library-crowd-heatmap-toggle';
-        heatmapToggle.textContent = 'Show weekly pattern';
-        heatmapToggle.style.display = 'none';
-        markExt(heatmapToggle);
-
-        var heatmap = document.createElement('div');
-        heatmap.className = 'dtu-library-crowd-heatmap';
-        markExt(heatmap);
-        var heatmapGrid = document.createElement('div');
-        markExt(heatmapGrid);
-        heatmap.appendChild(heatmapGrid);
-
-        var state = document.createElement('div');
-        state.className = 'dtu-library-crowd-state';
-        state.style.display = 'none';
-        state.textContent = 'Library data unavailable.';
-        markExt(state);
-
-        body.appendChild(hero);
-        body.appendChild(chartWrap);
-        body.appendChild(confidence);
-        body.appendChild(heatmapToggle);
-        body.appendChild(heatmap);
-        body.appendChild(state);
-        container.appendChild(body);
-
-        var sectionRef = {
-            container: container,
-            titleEl: h3,
-            retryBtn: retryBtn,
-            hero: hero,
-            freeValue: freeValue,
-            status: status,
-            nowStatValue: nowStatValue,
-            todayStatValue: todayStatValue,
-            freeStatValue: freeStatValue,
-            progress: progress,
-            progressFill: progressFill,
-            chartCanvas: chartCanvas,
-            chartTooltip: chartTooltip,
-            chartLegend: chartLegend,
-            chartNote: chartNote,
-            eventLegend: eventLegend,
-            confidence: confidence,
-            heatmapToggle: heatmapToggle,
-            heatmap: heatmap,
-            heatmapGrid: heatmapGrid,
-            state: state,
-            onRetry: null
-        };
-
-        retryBtn.addEventListener('click', function () {
-            if (typeof sectionRef.onRetry === 'function') sectionRef.onRetry();
-        });
-        heatmapToggle.addEventListener('click', function () {
-            var next = !sectionRef.heatmap.classList.contains('is-open');
-            setLibraryHeatmapOpenState(sectionRef, next);
-        });
-
-        return sectionRef;
-    }
-
-    function renderLibraryTrendSection(section, crowdingResp, fallbackOccupancyResp, eventsResp) {
-        if (!section) return;
-        var model = buildLibraryCrowdingModel(crowdingResp, fallbackOccupancyResp);
-        var eventIntervals = buildLibraryEventIntervals(eventsResp, model);
-        var snap = model.snapshot || {};
-        var tier = getLibraryCrowdingTier(model.occupancyRatio);
-        var insightLine = buildLibraryCrowdingInsightLine(model);
-        var showLiveOccupancy = !!model.isWithinDisplayHours;
-        var statusLabel = showLiveOccupancy ? tier.label : 'After hours';
-        var statusColor = showLiveOccupancy ? tier.color : (isDarkModeEnabled() ? '#b6bcc8' : '#667084');
-        var shownVisitors = showLiveOccupancy ? snap.visitors : null;
-        var shownToday = showLiveOccupancy ? snap.today : null;
-        var shownFreeSeats = showLiveOccupancy ? snap.freeSeats : null;
-
-        if (section.titleEl) section.titleEl.textContent = '';
-        // isFinite(null) === true in JS — must check for null explicitly
-        var pct = (showLiveOccupancy && model.occupancyRatio != null && isFinite(model.occupancyRatio) ? Math.round(model.occupancyRatio * 100) : null);
-        // After hours the live numbers are hidden, so say that once instead of
-        // showing an empty percentage and three empty stats.
-        if (section.hero) section.hero.classList.toggle('is-after-hours', !showLiveOccupancy);
-        if (section.freeValue) section.freeValue.textContent = !showLiveOccupancy ? 'After hours' : (pct == null ? '--%' : (pct + '%'));
-        if (section.status) {
-            section.status.textContent = showLiveOccupancy ? statusLabel
-                : 'Live numbers return at ' + (model.startHour < 10 ? '0' : '') + model.startHour + ':00';
-            section.status.style.setProperty('color', statusColor, 'important');
-        }
-        if (section.nowStatValue) section.nowStatValue.textContent = formatLibraryOccupancyCount(shownVisitors);
-        if (section.todayStatValue) section.todayStatValue.textContent = formatLibraryOccupancyCount(shownToday);
-        if (section.freeStatValue) section.freeStatValue.textContent = formatLibraryOccupancyCount(shownFreeSeats);
-
-        if (section.progress) {
-            section.progress.setAttribute('aria-valuenow', String(pct == null ? 0 : pct));
-            section.progress.setAttribute('aria-valuetext', statusLabel);
-            if (showLiveOccupancy && tier.key === 'medium') section.progress.setAttribute('aria-valuetext', 'Moderate');
-            if (showLiveOccupancy && tier.key === 'high') section.progress.setAttribute('aria-valuetext', 'Busy');
-            if (section.progressFill) {
-                section.progressFill.style.setProperty('width', String(Math.max(0, Math.min(100, pct || 0))) + '%', 'important');
-                section.progressFill.style.setProperty('background', statusColor, 'important');
-            }
-        }
-        var chartFlags = drawLibraryCrowdingChart(section.chartCanvas, model, eventIntervals) || {};
-        if (section.chartNote) {
-            section.chartNote.textContent = insightLine;
-            section.chartNote.style.setProperty('display', insightLine ? '' : 'none', 'important');
-        }
-
-        // Update the HTML legend below the canvas
-        if (section.chartLegend) {
-            var accentRgbForLeg = (getComputedStyle(document.documentElement).getPropertyValue('--dtu-ad-accent-rgb') || '31,122,224').trim();
-            var accentForLeg = (getComputedStyle(document.documentElement).getPropertyValue('--dtu-ad-accent') || '#1f7ae0').trim();
-            var legMuted = isDarkModeEnabled() ? '#888' : '#667084';
-            while (section.chartLegend.firstChild) section.chartLegend.removeChild(section.chartLegend.firstChild);
-            function makeLegendSvg(kind) {
-                var svgNs = 'http://www.w3.org/2000/svg';
-                var svg = document.createElementNS(svgNs, 'svg');
-                svg.setAttribute('width', '18');
-                svg.setAttribute('height', '8');
-                svg.setAttribute('viewBox', '0 0 18 8');
-                svg.style.display = 'block';
-
-                if (kind === 'historical') {
-                    var rect = document.createElementNS(svgNs, 'rect');
-                    rect.setAttribute('x', '0');
-                    rect.setAttribute('y', '1');
-                    rect.setAttribute('width', '18');
-                    rect.setAttribute('height', '6');
-                    rect.setAttribute('fill', isDarkModeEnabled() ? LIBRARY_CHART_DARK_BAND_FILL : 'rgba(' + accentRgbForLeg + ',0.07)');
-                    rect.setAttribute('stroke', isDarkModeEnabled() ? 'rgba(224,224,224,0.28)' : 'rgba(' + accentRgbForLeg + ',0.28)');
-                    rect.setAttribute('stroke-width', '0.8');
-                    rect.setAttribute('rx', '1');
-                    svg.appendChild(rect);
-                    return svg;
-                }
-
-                var line = document.createElementNS(svgNs, 'line');
-                line.setAttribute('x1', '0');
-                line.setAttribute('y1', '4');
-                line.setAttribute('x2', '18');
-                line.setAttribute('y2', '4');
-                line.setAttribute('stroke-linecap', 'round');
-                if (kind === 'typical') {
-                    line.setAttribute('stroke', isDarkModeEnabled() ? LIBRARY_CHART_DARK_TYPICAL_STROKE : 'rgba(' + accentRgbForLeg + ',0.60)');
-                    line.setAttribute('stroke-width', '1.4');
-                    line.setAttribute('stroke-dasharray', '4 3');
-                } else {
-                    line.setAttribute('stroke', accentForLeg);
-                    line.setAttribute('stroke-width', '2.2');
-                }
-                svg.appendChild(line);
-                return svg;
-            }
-            function makeLegItem(label, kind) {
-                var item = document.createElement('span');
-                item.style.cssText = 'display:inline-flex !important;align-items:center !important;gap:5px !important;font-size:9px !important;color:' + legMuted + ' !important;white-space:nowrap !important;';
-                markExt(item);
-                var icon = document.createElement('span');
-                icon.appendChild(makeLegendSvg(kind));
-                markExt(icon);
-                var lbl = document.createElement('span');
-                lbl.textContent = label;
-                markExt(lbl);
-                item.appendChild(icon);
-                item.appendChild(lbl);
-                return item;
-            }
-            // Solid line swatch — Current
-            section.chartLegend.appendChild(makeLegItem('Current', 'current'));
-            // Dashed line swatch — Typical (only if typical data exists)
-            if (chartFlags.hasTypical) {
-                section.chartLegend.appendChild(makeLegItem('Typical', 'typical'));
-            }
-            // Shaded band swatch — only when enough historical data
-            if (chartFlags.showHistoricalBand && chartFlags.hasTypical) {
-                section.chartLegend.appendChild(makeLegItem('Hist. range', 'historical'));
-            }
-        }
-
-        if (section.chartCanvas) {
-            if (showLiveOccupancy) {
-                section.chartCanvas.setAttribute(
-                    'aria-label',
-                    'Library occupancy chart. Currently '
-                    + formatLibraryOccupancyCount(snap.visitors)
-                    + ' visitors, '
-                    + formatLibraryOccupancyCount(snap.freeSeats)
-                    + ' free seats.'
-                );
-            } else {
-                section.chartCanvas.setAttribute(
-                    'aria-label',
-                    'Library occupancy chart. After hours; live occupancy is hidden outside the '
-                    + formatLibraryMinuteRange(model.startHour * 60, model.endHour * 60)
-                    + ' graph window.'
-                );
-            }
-
-            // Store live model reference for the tooltip handler
-            section.chartCanvas._dtuModel = model;
-
-            // Set up hover tooltip (once per canvas element)
-            if (!section.chartCanvas._dtuTooltipBound && section.chartTooltip) {
-                section.chartCanvas._dtuTooltipBound = true;
-                var _tip = section.chartTooltip;
-                var _cnv = section.chartCanvas;
-
-                _cnv.addEventListener('mousemove', function (e) {
-                    var m = _cnv._dtuModel;
-                    if (!m) { _tip.style.display = 'none'; return; }
-                    var dpr = Math.max(1, window.devicePixelRatio || 1);
-                    var cssW = Math.max(320, Math.round(_cnv.clientWidth || 640));
-                    var pad = { left: 38, right: 16, top: 14, bottom: 24 };
-                    var innerW = Math.max(10, cssW - pad.left - pad.right);
-                    var rect = _cnv.getBoundingClientRect();
-                    var mouseX = e.clientX - rect.left;
-                    // Convert canvas x to minute
-                    var startMinute = m.startHour * 60;
-                    var endMinute = m.endHour * 60;
-                    var t = (mouseX - pad.left) / Math.max(1, innerW);
-                    var hoverMinute = Math.round(startMinute + t * (endMinute - startMinute));
-                    hoverMinute = Math.max(startMinute, Math.min(endMinute, hoverMinute));
-                    var hoverHour = Math.floor(hoverMinute / 60);
-                    var hoverMin = hoverMinute % 60;
-                    var timeLabel = (hoverHour < 10 ? '0' : '') + hoverHour + ':' + (hoverMin < 10 ? '0' : '') + hoverMin;
-
-                    // Find closest today sample
-                    var todaySamples = (m.todaySamples || []).filter(function (p) { return isFinite(p.minute) && isFinite(p.visitors); });
-                    var closestToday = null, bestDist = Infinity;
-                    todaySamples.forEach(function (p) {
-                        var d = Math.abs(p.minute - hoverMinute);
-                        if (d < bestDist) { bestDist = d; closestToday = p; }
-                    });
-
-                    // Find typical row for this hour
-                    var typicalRows = (m.typicalRows || []);
-                    var typicalRow = typicalRows.find(function (r) { return r.hour === hoverHour; }) || null;
-
-                    var parts = [timeLabel];
-                    if (closestToday && bestDist <= 30) parts.push('Current: ' + Math.round(closestToday.visitors));
-                    if (typicalRow && isFinite(typicalRow.avg)) parts.push('Typical: ' + Math.round(typicalRow.avg));
-
-                    if (parts.length <= 1) { _tip.style.display = 'none'; return; }
-                    _tip.textContent = parts.join('  |  ');
-
-                    // Position tooltip: above cursor, clamped inside chartWrap
-                    var wrapRect = _cnv.parentNode.getBoundingClientRect();
-                    var tipLeft = e.clientX - wrapRect.left + 10;
-                    var tipTop = e.clientY - wrapRect.top - 32;
-                    _tip.style.display = 'block';
-                    _tip.style.left = tipLeft + 'px';
-                    _tip.style.top = Math.max(2, tipTop) + 'px';
-                });
-
-                _cnv.addEventListener('mouseleave', function () {
-                    _tip.style.display = 'none';
-                });
-            }
-        }
-
-        if (section.eventLegend) {
-            while (section.eventLegend.firstChild) section.eventLegend.removeChild(section.eventLegend.firstChild);
-            if (eventIntervals.length) {
-                section.eventLegend.style.display = '';
-                var maxLegendItems = 4;
-                eventIntervals.slice(0, maxLegendItems).forEach(function (itv) {
-                    var row = document.createElement('div');
-                    row.className = 'dtu-library-crowd-event';
-                    markExt(row);
-                    var dot = document.createElement('span');
-                    dot.className = 'dtu-library-crowd-event-dot';
-                    markExt(dot);
-                    var txt = document.createElement('span');
-                    txt.className = 'dtu-library-crowd-event-text';
-                    txt.textContent = formatLibraryMinuteRange(itv.startMinute, itv.endMinute) + ': ' + (itv.title || 'DTU Library event');
-                    markExt(txt);
-                    row.appendChild(dot);
-                    row.appendChild(txt);
-                    section.eventLegend.appendChild(row);
-                });
-                if (eventIntervals.length > maxLegendItems) {
-                    var more = document.createElement('div');
-                    more.className = 'dtu-library-crowd-event';
-                    more.textContent = '+' + (eventIntervals.length - maxLegendItems) + ' more DTU Library event overlay' + (eventIntervals.length - maxLegendItems === 1 ? '' : 's');
-                    markExt(more);
-                    section.eventLegend.appendChild(more);
-                }
-            } else {
-                section.eventLegend.style.display = 'none';
-            }
-        }
-
-        if (section.confidence) section.confidence.textContent = buildLibraryCrowdingConfidenceLine(model);
-
-        renderLibraryHeatmap(section, model);
-
-        var unavailable = !snap.hasCurrent;
-        if (section.state) {
-            if (unavailable) {
-                section.state.style.display = '';
-                section.state.textContent = crowdingResp && crowdingResp.error === 'not_configured'
-                    ? 'Shared library occupancy is not configured in this build.'
-                    : 'Library data unavailable. Try refreshing.';
-            } else {
-                section.state.style.display = 'none';
-            }
-        }
-        if (section.retryBtn) section.retryBtn.style.display = unavailable ? '' : 'none';
-    }
-
-    function getAfterDarkAdminToolsList() {
-        const placeholder = getAdminToolsPlaceholder();
-        if (!placeholder) return null;
-        const columns = placeholder.querySelectorAll('.d2l-admin-tools-column');
-        let targetList = null;
-        columns.forEach(col => {
-            const h2 = col.querySelector('h2');
-            if (h2 && normalizeWhitespace(h2.textContent) === 'DTU After Dark') {
-                targetList = col.querySelector('ul.d2l-list');
-            }
-        });
-        return targetList;
-    }
-
-    function syncAfterDarkFeatureToggleStates() {
-        if (!isTopWindow()) return;
-        const mapping = [
-            { id: 'feature-content-shortcut-toggle', key: FEATURE_CONTENT_SHORTCUT_KEY },
-            { id: 'feature-learn-nav-resource-links-toggle', key: FEATURE_LEARN_NAV_RESOURCE_LINKS_KEY },
-            { id: 'feature-kurser-grade-stats-toggle', key: FEATURE_KURSER_GRADE_STATS_KEY },
-            { id: 'feature-kurser-course-eval-toggle', key: FEATURE_KURSER_COURSE_EVAL_KEY },
-            { id: 'feature-smart-room-linker-toggle', key: FEATURE_SMART_ROOM_LINKER_KEY },
-            { id: 'feature-textbook-links-toggle', key: FEATURE_TEXTBOOK_LINKS_KEY },
-            { id: 'feature-campusnet-gpa-tools-toggle', key: FEATURE_CAMPUSNET_GPA_TOOLS_KEY },
-            { id: 'feature-participant-intel-toggle', key: FEATURE_PARTICIPANT_INTEL_KEY },
-            { id: 'feature-participant-intel-demographics-toggle', key: FEATURE_PARTICIPANT_INTEL_DEMOGRAPHICS_KEY },
-            { id: 'feature-participant-intel-shared-history-toggle', key: FEATURE_PARTICIPANT_INTEL_SHARED_HISTORY_KEY },
-            { id: 'feature-participant-intel-retention-toggle', key: FEATURE_PARTICIPANT_INTEL_RETENTION_KEY },
-            { id: 'feature-studyplan-exam-cluster-toggle', key: FEATURE_STUDYPLAN_EXAM_CLUSTER_KEY },
-            { id: 'library-dropdown-toggle', key: getLibraryDropdownFeatureKey() },
-            { id: 'feature-lessons-bulk-download-toggle', key: FEATURE_LEARN_LESSONS_BULK_DOWNLOAD_KEY }
-        ];
-        mapping.forEach(function (m) {
-            const el = document.querySelector('#' + m.id);
-            if (el) el.checked = isFeatureFlagEnabled(m.key);
-        });
-    }
-
-    // ===== STANDALONE SETTINGS MODAL =====
-    // Lives in darkmode.settings.js. darkmode.js keeps the runtime bridge only.
-
-    function getSettingsUiApi() {
-        try { return globalThis.DTUAfterDarkSettingsUi || null; } catch (e0) { return null; }
-    }
-
-    try {
-        if (!globalThis.DTUAfterDarkSettingsDeps) {
-            globalThis.DTUAfterDarkSettingsDeps = {
-                isTopWindow: function () { return isTopWindow(); },
-                isDarkModeEnabled: function () { return !!isDarkModeEnabled(); },
-                getCurrentUrlWithoutHash: getCurrentUrlWithoutHash,
-                buildSuggestedPausePatternsForCurrentUrl: buildSuggestedPausePatternsForCurrentUrl,
-                normalizeUrlPausePattern: normalizeUrlPausePattern,
-                isPauseProtectedPattern: isPauseProtectedPattern,
-                getUrlPausePatterns: getUrlPausePatterns,
-                saveUrlPausePatterns: saveUrlPausePatterns,
-                getMatchingUrlPausePatterns: getMatchingUrlPausePatterns,
-                markExt: markExt,
-                applyAfterDarkAdminMenuThemeVars: applyAfterDarkAdminMenuThemeVars,
-                getFeatureKeys: function () {
-                    return {
-                        campusnetGpaTools: FEATURE_CAMPUSNET_GPA_TOOLS_KEY,
-                        kurserGradeStats: FEATURE_KURSER_GRADE_STATS_KEY,
-                        textbookLinks: FEATURE_TEXTBOOK_LINKS_KEY,
-                        studyplanExamCluster: FEATURE_STUDYPLAN_EXAM_CLUSTER_KEY,
-                        kurserCourseEval: FEATURE_KURSER_COURSE_EVAL_KEY,
-                        smartRoomLinker: FEATURE_SMART_ROOM_LINKER_KEY,
-                        contentShortcut: FEATURE_CONTENT_SHORTCUT_KEY,
-                        learnNavResourceLinks: FEATURE_LEARN_NAV_RESOURCE_LINKS_KEY,
-                        participantIntel: FEATURE_PARTICIPANT_INTEL_KEY,
-                        libraryDropdown: getLibraryDropdownFeatureKey(),
-                        learnLessonsBulkDownload: FEATURE_LEARN_LESSONS_BULK_DOWNLOAD_KEY,
-                        participantIntelDemographics: FEATURE_PARTICIPANT_INTEL_DEMOGRAPHICS_KEY,
-                        participantIntelSharedHistory: FEATURE_PARTICIPANT_INTEL_SHARED_HISTORY_KEY,
-                        participantIntelRetention: FEATURE_PARTICIPANT_INTEL_RETENTION_KEY
-                    };
-                },
-                getSettingKeys: function () {
-                    return {
-                        busEnabled: BUS_ENABLED_KEY,
-                        deadlinesEnabled: DEADLINES_ENABLED_KEY,
-                        searchWidgetEnabled: SEARCH_WIDGET_ENABLED_KEY
-                    };
-                },
-                saveDarkModePreference: saveDarkModePreference,
-                isMojanglesEnabled: isMojanglesEnabled,
-                insertMojanglesText: insertMojanglesText,
-                isBusEnabled: isBusEnabled,
-                isApiQuotaExhausted: isApiQuotaExhausted,
-                showQuotaExhaustedMessage: showQuotaExhaustedMessage,
-                getBusConfig: getBusConfig,
-                showBusConfigModal: showBusConfigModal,
-                stopBusPolling: stopBusPolling,
-                abortInFlightBusRequests: abortInFlightBusRequests,
-                insertBusDisplay: insertBusDisplay,
-                updateBusDepartures: updateBusDepartures,
-                forceBusImmediateRefresh: function () { _lastBusFetch = 0; updateBusDepartures(); },
-                isDeadlinesEnabled: isDeadlinesEnabled,
-                insertDeadlinesHomepageWidget: insertDeadlinesHomepageWidget,
-                isSearchWidgetEnabled: isSearchWidgetEnabled,
-                isFeatureFlagEnabled: isFeatureFlagEnabled,
-                setFeatureFlagEnabled: setFeatureFlagEnabled,
-                insertBookFinderLinks: insertBookFinderLinks,
-                insertGPARow: insertGPARow,
-                insertGPASimulator: insertGPASimulator,
-                syncCampusnetActualGradeExclusionControls: syncCampusnetActualGradeExclusionControls,
-                insertKurserGradeStats: insertKurserGradeStats,
-                insertKurserTextbookLinks: insertKurserTextbookLinks,
-                scheduleStudyplanExamCluster: scheduleStudyplanExamCluster,
-                insertKurserCourseEvaluation: insertKurserCourseEvaluation,
-                scheduleSmartRoomLinkerScan: scheduleSmartRoomLinkerScan,
-                removeSmartRoomLinks: removeSmartRoomLinks,
-                insertContentButtons: insertContentButtons,
-                startContentButtonBootstrap: startContentButtonBootstrap,
-                removeContentButtons: removeContentButtons,
-                insertDTULearnNavResourceLinks: insertDTULearnNavResourceLinks,
-                removeDTULearnNavResourceLinks: removeDTULearnNavResourceLinks,
-                insertParticipantIntelligence: insertParticipantIntelligence,
-                insertLibraryNavDropdown: insertLibraryNavDropdown,
-                removeLibraryNavDropdown: removeLibraryNavDropdown,
-                runLessonsBulkDownloadChecks: runLessonsBulkDownloadChecks,
-                showContentShortcutOverridesModal: showContentShortcutOverridesModal,
-                getAccentThemeId: function () { return _accentThemeId; },
-                getAccentCustomHex: function () { return _accentCustomHex; },
-                setAccentThemeId: setAccentThemeId,
-                setAccentCustomHex: setAccentCustomHex,
-                accentThemeOrder: ACCENT_THEME_ORDER,
-                accentThemes: ACCENT_THEMES,
-                accentCustomDefault: ACCENT_CUSTOM_DEFAULT
-            };
-        }
-    } catch (eSettingsDeps) { }
-
-    function applyFeatureToggleImmediately(featureKey, enabled) {
-        var api = getSettingsUiApi();
-        if (api && typeof api.applyFeatureToggleImmediately === 'function') {
-            api.applyFeatureToggleImmediately(featureKey, enabled);
-        }
-    }
-
-    function hideSettingsModal() {
-        var api = getSettingsUiApi();
-        if (api && typeof api.hideSettingsModal === 'function') {
-            api.hideSettingsModal();
-            return;
-        }
-        var overlay = document.querySelector('.dtu-settings-modal-overlay');
-        if (overlay) overlay.remove();
-        try {
-            var settingsBtn = document.querySelector('.dtu-settings-nav-item button');
-            if (settingsBtn) settingsBtn.setAttribute('aria-expanded', 'false');
-        } catch (e0) { }
-    }
-
-    function showPausedUrlRulesModal(opts) {
-        var api = getSettingsUiApi();
-        if (api && typeof api.showPausedUrlRulesModal === 'function') {
-            api.showPausedUrlRulesModal(opts);
-        }
-    }
-
-    function showSettingsModal() {
-        var api = getSettingsUiApi();
-        if (api && typeof api.showSettingsModal === 'function') {
-            api.showSettingsModal();
-        }
-    }
-
-    // Settings nav item in the bottom nav bar (same pattern as Library dropdown)
-    function insertSettingsNavItem() {
-        var api = getLearnNavUiApi();
-        if (api && typeof api.insertSettingsNavItem === 'function') {
-            api.insertSettingsNavItem();
-        }
     }
 
     function isDTULearnQuizSubmissionsPage() {
@@ -3795,7 +1823,7 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
         return true;
     }
 
-    // Server-side quota exhaustion (HTTP 429/403) â€” persists until next month
+    // Server-side quota exhaustion (HTTP 429 only, see fetchBusWidgetDepartures): persists until next month
     function isApiQuotaExhausted() {
         if (_apiQuotaExhausted) return true;
         var stored = localStorage.getItem(API_QUOTA_KEY);
@@ -3977,21 +2005,43 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
         document.body.appendChild(notice);
     }
 
+    // Rejseplanen gives Copenhagen wall-clock times; read them in that zone whatever zone
+    // the computer is set to. On the autumn night 02:00 to 02:59 happens twice: the first
+    // one not more than 5 minutes gone is meant. A time skipped in spring reads as CEST.
+    function copenhagenTimestamp(dateStr, timeStr) {
+        var date = String(dateStr || '');
+        var dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
+        var dotted = /^(\d{1,2})\.(\d{1,2})\.(\d{2}|\d{4})$/.exec(date);
+        var tm = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(String(timeStr || ''));
+        if (!tm || (!dm && !dotted)) return null;
+        var y = dm ? +dm[1] : +(dotted[3].length === 2 ? '20' + dotted[3] : dotted[3]);
+        var mo = dm ? +dm[2] : +dotted[2];
+        var d = dm ? +dm[3] : +dotted[1];
+        var wall = Date.UTC(y, mo - 1, d, +tm[1], +tm[2], +(tm[3] || 0));
+        if (isNaN(wall)) return null;
+        var fmt = copenhagenTimestamp.fmt || (copenhagenTimestamp.fmt = new Intl.DateTimeFormat('en-GB', {
+            timeZone: 'Europe/Copenhagen', hourCycle: 'h23', year: 'numeric', month: '2-digit',
+            day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit'
+        }));
+        function wallOf(ts) {
+            var p = {};
+            fmt.formatToParts(new Date(ts)).forEach(function (part) { p[part.type] = +part.value; });
+            return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second);
+        }
+        var fits = [wall - 7200000, wall - 3600000].filter(function (ts) { return wallOf(ts) === wall; });
+        if (!fits.length) return wall - 7200000;
+        var now = Date.now();
+        for (var i = 0; i < fits.length; i++) {
+            if (fits[i] >= now - 5 * 60000) return fits[i];
+        }
+        return fits[fits.length - 1];
+    }
+
     // Calculate minutes until a departure
     function minutesUntilDeparture(dep) {
-        const timeStr = dep.rtTime || dep.time;
-        const dateStr = dep.rtDate || dep.date;
-        if (!timeStr || !dateStr) return null;
-        let depDate;
-        if (dateStr.includes('.')) {
-            const parts = dateStr.split('.');
-            const year = parts[2].length === 2 ? '20' + parts[2] : parts[2];
-            depDate = new Date(year + '-' + parts[1] + '-' + parts[0] + 'T' + timeStr);
-        } else {
-            depDate = new Date(dateStr + 'T' + timeStr);
-        }
-        if (isNaN(depDate.getTime())) return null;
-        return Math.round((depDate.getTime() - Date.now()) / 60000);
+        var ts = copenhagenTimestamp(dep.rtDate || dep.date, dep.rtTime || dep.time);
+        if (ts === null) return null;
+        return Math.round((ts - Date.now()) / 60000);
     }
 
     // Check if a departure is delayed and by how many minutes
@@ -4029,19 +2079,7 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
     }
 
     function departureTimestamp(dep) {
-        var mins = minutesUntilDeparture(dep);
-        if (mins === null) return null;
-        var timeStr = dep.rtTime || dep.time;
-        var dateStr = dep.rtDate || dep.date;
-        var d;
-        if (String(dateStr).includes('.')) {
-            var parts = String(dateStr).split('.');
-            var year = parts[2].length === 2 ? '20' + parts[2] : parts[2];
-            d = new Date(year + '-' + parts[1] + '-' + parts[0] + 'T' + timeStr);
-        } else {
-            d = new Date(dateStr + 'T' + timeStr);
-        }
-        return isNaN(d.getTime()) ? null : d.getTime();
+        return copenhagenTimestamp(dep.rtDate || dep.date, dep.rtTime || dep.time);
     }
 
     function mapBusDepartureForDisplay(dep) {
@@ -4084,6 +2122,21 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
                 return !!lineCfg.line;
             })
         };
+    }
+
+    // A departure is shown only for a chosen line (exact code: 40 is not 40E) heading a
+    // chosen direction (no directions or '*' means any; a direction matches by substring).
+    function busDepartureMatchesConfig(dep, config) {
+        var lines = (config && Array.isArray(config.lines)) ? config.lines : [];
+        var configLine = lines.find(function (l) { return l && l.line === (dep && dep.line); });
+        if (!configLine) return false;
+        var dirs = Array.isArray(configLine.directions) ? configLine.directions : [];
+        if (!dirs.length || dirs.indexOf('*') !== -1) return true;
+        var depDir = normalizeWhitespace(String(dep.direction || '')).toLowerCase();
+        return dirs.some(function (d) {
+            var token = normalizeWhitespace(String(d || '')).toLowerCase();
+            return !!token && !!depDir && depDir.indexOf(token) !== -1;
+        });
     }
 
     async function fetchBusWidgetDepartures(config, opts) {
@@ -4191,18 +2244,8 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
                 if (depResult && depResult.reason === 'aborted') { aborted = true; break; }
                 var deps = depResult && Array.isArray(depResult.departures) ? depResult.departures : [];
                 deps.forEach(function (dep) {
-                    var configLine = config.lines.find(function (l) { return l.line === dep.line; });
-                    if (!configLine) return;
+                    if (!busDepartureMatchesConfig(dep, config)) return;
                     if (lineCounts[dep.line] >= DEPS_PER_LINE) return;
-                    var dirs = Array.isArray(configLine.directions) ? configLine.directions : [];
-                    var matchAnyDirection = !dirs.length || dirs.indexOf('*') !== -1;
-                    var matchesDir = matchAnyDirection || dirs.some(function (d) {
-                        var token = normalizeWhitespace(String(d || '')).toLowerCase();
-                        var depDir = normalizeWhitespace(String(dep.direction || '')).toLowerCase();
-                        if (!token || !depDir) return false;
-                        return depDir.indexOf(token) !== -1;
-                    });
-                    if (!matchesDir) return;
 
                     var key = dep.line + '|' + dep.direction + '|' + dep.time + '|' + dep.date;
                     if (seen.has(key)) return;
@@ -4231,29 +2274,30 @@ const LIVE_TRANSIT_API_BASE = getRuntimeConfig().LIVE_TRANSIT_API_BASE || '';
         if (!config || !config.stopIds || config.stopIds.length === 0) return [];
 
         if (LIVE_TRANSIT_API_BASE) {
-            var widgetResult = await fetchBusWidgetDepartures(config);
-            if (widgetResult && widgetResult.ok && Array.isArray(widgetResult.departures) && widgetResult.departures.length) {
-                return widgetResult.departures;
+            function chosen(result) {
+                var deps = (result && result.ok && Array.isArray(result.departures)) ? result.departures : [];
+                return deps.filter(function (dep) { return busDepartureMatchesConfig(dep, config); });
             }
+            var widgetResult = await fetchBusWidgetDepartures(config);
+            var widgetDeps = chosen(widgetResult);
+            if (widgetDeps.length) return widgetDeps;
+            // The proxy matches directions more strictly than the setup names them; ask for
+            // every direction and keep the chosen ones by the same substring match.
             if (widgetResult && widgetResult.ok && hasRestrictiveBusDirectionFilters(config)) {
                 var relaxedConfig = buildAllDirectionsBusConfig(config);
-                var relaxedResult = await fetchBusWidgetDepartures(relaxedConfig, { consumeBudget: false });
-                if (relaxedResult && relaxedResult.ok && Array.isArray(relaxedResult.departures) && relaxedResult.departures.length) {
-                    return relaxedResult.departures;
-                }
+                return chosen(await fetchBusWidgetDepartures(relaxedConfig, { consumeBudget: false }));
             }
-            if (widgetResult && widgetResult.ok) return widgetResult.departures || [];
+            if (widgetResult && widgetResult.ok) return [];
+            // Aborted means the tab was hidden or left mid-fetch.
+            if (widgetResult && widgetResult.reason === 'aborted') return null;
             if (widgetResult && (widgetResult.reason === 'http' || widgetResult.reason === 'network' || widgetResult.reason === 'timeout')) {
                 noteBusFetchOutcome({ requestCount: 1, successCount: 0, errorCount: 1 });
                 _busLastFetchFailed = true;
             }
-            // Aborted means the tab was hidden or left mid-fetch: falling back to
-            // one request per stop here fired up to ten extra calls for nothing.
-            if (widgetResult && widgetResult.reason === 'aborted') return null;
-            if (widgetResult && (widgetResult.reason === 'quota' || widgetResult.reason === 'daily')) return [];
-            if (!LIVE_TRANSIT_API_BASE && !REJSEPLANEN_KEY) return [];
+            // A failed widget request backs off; it never retries once per stop.
+            return [];
         }
-        if (!LIVE_TRANSIT_API_BASE && !REJSEPLANEN_KEY) return [];
+        if (!REJSEPLANEN_KEY) return [];
         return fetchBusDeparturesLegacy(config);
     }
 
@@ -4306,11 +2350,6 @@ function setBusUiState(patch) {
 
     function getBusSetupDoneKey() {
         return BUS_SETUP_DONE_KEY;
-    }
-
-    function forceImmediateBusRefresh() {
-        _lastBusFetch = 0;
-        updateBusDepartures();
     }
 
 // Uses real departure times: fetch-time minutes go stale, and once every
@@ -4412,8 +2451,9 @@ function setBusUiState(patch) {
             return;
         }
         const config = getBusConfig();
-        if (!config) {
+        if (!config || _busConfigUnreadable) {
             stopBusPolling();
+            insertBusDisplay();
             return;
         }
         var configSig = getBusConfigSignature(config);
@@ -4425,6 +2465,7 @@ function setBusUiState(patch) {
         if (!consumedShared && backoffRemaining <= 0 && now - _lastBusFetch >= interval && !_busFetchInProgress) {
             if (tryAcquireBusFetchLease()) {
                 try {
+                    var previousFetch = _lastBusFetch;
                     _lastBusFetch = now;
                     _busFetchInProgress = true;
                     var fetched;
@@ -4441,6 +2482,9 @@ function setBusUiState(patch) {
                         // A failed fetch keeps the buses already shown (their minutes keep
                         // counting down) and is never shared as "no buses".
                         _busHasResult = true;
+                        // Freshness stays at the last good fetch, so an old list shows as
+                        // stale; the error backoff stops a refetch on every tick.
+                        _lastBusFetch = previousFetch;
                     } else {
                         _cachedDepartures = fetched;
                         _busHasResult = true;
@@ -4476,8 +2520,7 @@ function setBusUiState(patch) {
             getBusConfig: getBusConfig,
             isApiQuotaExhausted: isApiQuotaExhausted,
             showQuotaExhaustedMessage: showQuotaExhaustedMessage,
-            styleQuizSubmissionHistogram: styleQuizSubmissionHistogram,
-            forceImmediateRefresh: forceImmediateBusRefresh
+            styleQuizSubmissionHistogram: styleQuizSubmissionHistogram
         };
     } catch (eExport) { }
 })();

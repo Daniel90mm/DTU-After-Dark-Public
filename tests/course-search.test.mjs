@@ -32,9 +32,11 @@ function fixture({ homepage = true } = {}) {
     return { api, widget, nav, enable(v) { enabled = v; }, present(v) { present = v; } };
 }
 
-test('Course Search defaults off and accepts only a stored true', () => {
+// darkmode.js holds the copy the extension runs (the darkmode.bus.js copy this
+// test used to lift was dead). Off until the student turns it on (Daniel, 2026-11-07).
+test('Course Search is off until stored, then accepts only a stored true', () => {
     const storage = makeLocalStorage();
-    const { api } = extractFunctions('darkmode.bus.js', ['isSearchWidgetEnabled'], {
+    const { api } = extractFunctions('darkmode.js', ['isSearchWidgetEnabled'], {
         globals: { localStorage: storage, SEARCH_WIDGET_ENABLED_KEY: 'search' }
     });
     assert.equal(api.isSearchWidgetEnabled(), false);

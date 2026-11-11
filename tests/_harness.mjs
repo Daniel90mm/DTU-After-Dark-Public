@@ -63,23 +63,65 @@ function makeSandbox(globals) {
     };
     sandbox.globalThis = sandbox;
     if (!sandbox.window) sandbox.window = sandbox;
-    return vm.createContext(sandbox);
+    const context = vm.createContext(sandbox);
+    // Every content module reads the shared DOM helpers; the manifests load darkmode.dom.js first.
+    if (!globals.DTUAfterDarkDom) loadDom(context);
+    return context;
 }
 
-// Runs `file` with `globals` in scope and returns the named inner functions.
-export function loadModuleInternals(file, names, globals = {}) {
-    const source = readSource(file);
+const DOM_SOURCE = readSource('darkmode.dom.js');
+
+// For tests that build their own sandbox object: load the shared DOM helpers into it first.
+export function loadDom(sandbox) {
+    if (!vm.isContext(sandbox)) vm.createContext(sandbox);
+    // A test window without a top is the top frame, as the old per-module isTopWindow stubs assumed.
+    const win = sandbox.window || sandbox;
+    if (win && typeof win === 'object' && !('top' in win)) win.top = win;
+    vm.runInContext(DOM_SOURCE, sandbox, { filename: 'darkmode.dom.js' });
+    return sandbox;
+}
+
+// Runs `file` (or several files in order) with `globals` in scope and returns
+// the named inner functions. Split background scripts share globalThis
+// namespaces, so each file is loaded into the same context.
+export function loadModuleInternals(fileOrFiles, names, globals = {}) {
+    const files = Array.isArray(fileOrFiles) ? fileOrFiles : [fileOrFiles];
     const tail = /\}\)\(\);\s*$/;
-    if (!tail.test(source)) throw new Error(`${file} does not end with an IIFE close`);
     const exposed = names
-        .map((name) => `${JSON.stringify(name)}: typeof ${name} === 'function' ? ${name} : undefined`)
-        .join(',\n');
-    const patched = source.replace(tail, `globalThis.__testApi = {\n${exposed}\n};\n})();`);
+        .map((name) => `if (typeof ${name} === 'function') __testApi[${JSON.stringify(name)}] = ${name};`)
+        .join('\n');
     const context = makeSandbox(globals);
-    vm.runInContext(patched, context, { filename: file });
+    for (const file of files) {
+        const source = readSource(file);
+        if (!tail.test(source)) throw new Error(`${file} does not end with an IIFE close`);
+        const patched = source.replace(tail, `const __testApi = globalThis.__testApi || (globalThis.__testApi = {});\n${exposed}\n})();`);
+        vm.runInContext(patched, context, { filename: file });
+    }
     const api = context.__testApi;
     for (const name of names) {
-        if (typeof api[name] !== 'function') throw new Error(`${file}: ${name} not found`);
+        if (typeof api[name] !== 'function') throw new Error(`${files.join(', ')}: ${name} not found`);
+    }
+    return { api, context };
+}
+
+// Runs several plain-JS modules in one sandbox, in manifest order, and returns
+// the named inner functions from whichever module declares them.
+export function loadModulesInternals(files, names, globals = {}) {
+    const context = makeSandbox(globals);
+    const tail = /\}\)\(\);\s*$/;
+    for (const file of files) {
+        const source = readSource(file);
+        if (!tail.test(source)) throw new Error(`${file} does not end with an IIFE close`);
+        const expose = [
+            'globalThis.__testApi = globalThis.__testApi || {};',
+            ...names.map((name) => `if (typeof ${name} === 'function') globalThis.__testApi[${JSON.stringify(name)}] = ${name};`)
+        ].join('\n');
+        const patched = source.replace(tail, `${expose}\n})();`);
+        vm.runInContext(patched, context, { filename: file });
+    }
+    const api = context.__testApi;
+    for (const name of names) {
+        if (typeof api[name] !== 'function') throw new Error(`${files.join(', ')}: ${name} not found`);
     }
     return { api, context };
 }

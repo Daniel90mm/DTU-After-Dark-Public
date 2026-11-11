@@ -1,261 +1,73 @@
 (function () {
     'use strict';
 
-    function getDeps() {
-        try { return globalThis.DTUAfterDarkSettingsDeps || null; } catch (e0) { return null; }
+    var _settingsBridge = globalThis.DTUAfterDarkSettingsBridge;
+    if (!_settingsBridge) throw new Error('darkmode.settings.js loaded before darkmode.settings.bridge.js');
+    var _settingsPause = globalThis.DTUAfterDarkSettingsPause;
+    if (!_settingsPause || typeof _settingsPause.showPausedUrlRulesModal !== 'function') {
+        throw new Error('darkmode.settings.js loaded before darkmode.settings.pause.js');
+    }
+    var _settingsFooter = globalThis.DTUAfterDarkSettingsFooter;
+    if (!_settingsFooter || typeof _settingsFooter.createAfterDarkDisclaimerFooter !== 'function') {
+        throw new Error('darkmode.settings.js loaded before darkmode.settings.footer.js');
     }
 
-    function callDep(name, args, fallback) {
-        var deps = getDeps();
-        if (deps && typeof deps[name] === 'function') {
-            return deps[name].apply(null, args || []);
-        }
-        return fallback;
-    }
-
-    function getDepValue(name, fallback) {
-        var deps = getDeps();
-        if (deps && Object.prototype.hasOwnProperty.call(deps, name)) return deps[name];
-        return fallback;
-    }
-
-    function isTopWindow() {
-        return !!callDep('isTopWindow', [], false);
-    }
-
-    function isDarkModeEnabled() {
-        return !!callDep('isDarkModeEnabled', [], false);
-    }
-
-    function getCurrentUrlWithoutHash() {
-        return callDep('getCurrentUrlWithoutHash', [], window.location.origin + window.location.pathname + window.location.search);
-    }
-
-    function buildSuggestedPausePatternsForCurrentUrl() {
-        return callDep('buildSuggestedPausePatternsForCurrentUrl', [], []) || [];
-    }
-
-    function normalizeUrlPausePattern(pattern) {
-        return callDep('normalizeUrlPausePattern', [pattern], '');
-    }
-
-    function isPauseProtectedPattern(pattern) {
-        return !!callDep('isPauseProtectedPattern', [pattern], false);
-    }
-
-    function getUrlPausePatterns() {
-        return callDep('getUrlPausePatterns', [], []) || [];
-    }
-
-    function saveUrlPausePatterns(patterns) {
-        callDep('saveUrlPausePatterns', [patterns], null);
-    }
-
-    function getMatchingUrlPausePatterns(url) {
-        return callDep('getMatchingUrlPausePatterns', [url], []) || [];
-    }
-
-    function markExt(el) {
-        callDep('markExt', [el], null);
-        return el;
-    }
-
-    function applyAfterDarkAdminMenuThemeVars(rootEl) {
-        callDep('applyAfterDarkAdminMenuThemeVars', [rootEl], null);
-    }
-
-    function getFeatureKeys() {
-        return callDep('getFeatureKeys', [], {}) || {};
-    }
-
-    function getSettingKeys() {
-        return callDep('getSettingKeys', [], {
-            busEnabled: 'dtuDarkModeBusEnabled',
-            deadlinesEnabled: 'dtuDarkModeDeadlinesEnabled',
-            searchWidgetEnabled: 'dtuDarkModeSearchWidgetEnabled'
-        }) || {};
-    }
-
-    function saveDarkModePreference(enabled) {
-        return callDep('saveDarkModePreference', [enabled], null);
-    }
-
-    function isMojanglesEnabled() {
-        return !!callDep('isMojanglesEnabled', [], true);
-    }
-
-    function insertMojanglesText() {
-        callDep('insertMojanglesText', [], null);
-    }
-
-    function isBusEnabled() {
-        return !!callDep('isBusEnabled', [], false);
-    }
-
-    function isApiQuotaExhausted() {
-        return !!callDep('isApiQuotaExhausted', [], false);
-    }
-
-    function showQuotaExhaustedMessage(scope) {
-        callDep('showQuotaExhaustedMessage', [scope], null);
-    }
-
-    function getBusConfig() {
-        return callDep('getBusConfig', [], null);
-    }
-
-    function showBusConfigModal() {
-        callDep('showBusConfigModal', [], null);
-    }
-
-    function stopBusPolling() {
-        callDep('stopBusPolling', [], null);
-    }
-
-    function abortInFlightBusRequests() {
-        callDep('abortInFlightBusRequests', [], null);
-    }
-
-    function insertBusDisplay() {
-        callDep('insertBusDisplay', [], null);
-    }
-
-    function updateBusDepartures() {
-        callDep('updateBusDepartures', [], null);
-    }
-
-    function forceBusImmediateRefresh() {
-        callDep('forceBusImmediateRefresh', [], null);
-    }
-
-    function isDeadlinesEnabled() {
-        return !!callDep('isDeadlinesEnabled', [], false);
-    }
-
-    function insertDeadlinesHomepageWidget() {
-        callDep('insertDeadlinesHomepageWidget', [], null);
-    }
-
-    function isSearchWidgetEnabled() {
-        return !!callDep('isSearchWidgetEnabled', [], false);
-    }
-
-    function isFeatureFlagEnabled(key) {
-        return !!callDep('isFeatureFlagEnabled', [key], false);
-    }
-
-    function setFeatureFlagEnabled(key, enabled) {
-        callDep('setFeatureFlagEnabled', [key, enabled], null);
-    }
-
-    function insertBookFinderLinks() {
-        callDep('insertBookFinderLinks', [], null);
-    }
-
-    function insertGPARow() {
-        callDep('insertGPARow', [], null);
-    }
-
-    function insertGPASimulator() {
-        callDep('insertGPASimulator', [], null);
-    }
-
-    function syncCampusnetActualGradeExclusionControls() {
-        callDep('syncCampusnetActualGradeExclusionControls', [], null);
-    }
-
-    function insertKurserGradeStats() {
-        callDep('insertKurserGradeStats', [], null);
-    }
-
-    function insertKurserTextbookLinks() {
-        callDep('insertKurserTextbookLinks', [], null);
-    }
-
-    function scheduleStudyplanExamCluster(delayMs) {
-        callDep('scheduleStudyplanExamCluster', [delayMs], null);
-    }
-
-    function insertKurserCourseEvaluation() {
-        callDep('insertKurserCourseEvaluation', [], null);
-    }
-
-    function scheduleSmartRoomLinkerScan(root, delayMs) {
-        callDep('scheduleSmartRoomLinkerScan', [root, delayMs], null);
-    }
-
-    function removeSmartRoomLinks() {
-        callDep('removeSmartRoomLinks', [], null);
-    }
-
-    function insertContentButtons() {
-        callDep('insertContentButtons', [], null);
-    }
-
-    function startContentButtonBootstrap() {
-        callDep('startContentButtonBootstrap', [], null);
-    }
-
-    function removeContentButtons() {
-        callDep('removeContentButtons', [], null);
-    }
-
-    function insertDTULearnNavResourceLinks() {
-        callDep('insertDTULearnNavResourceLinks', [], null);
-    }
-
-    function removeDTULearnNavResourceLinks() {
-        callDep('removeDTULearnNavResourceLinks', [], null);
-    }
-
-    function insertParticipantIntelligence() {
-        callDep('insertParticipantIntelligence', [], null);
-    }
-
-    function insertLibraryNavDropdown() {
-        callDep('insertLibraryNavDropdown', [], null);
-    }
-
-    function removeLibraryNavDropdown() {
-        callDep('removeLibraryNavDropdown', [], null);
-    }
-
-    function runLessonsBulkDownloadChecks() {
-        callDep('runLessonsBulkDownloadChecks', [], null);
-    }
-
-    function showContentShortcutOverridesModal() {
-        callDep('showContentShortcutOverridesModal', [], null);
-    }
-
-    function getAccentThemeId() {
-        return callDep('getAccentThemeId', [], 'dtu_red');
-    }
-
-    function getAccentCustomHex() {
-        return callDep('getAccentCustomHex', [], '');
-    }
-
-    function setAccentThemeId(nextId, opts) {
-        callDep('setAccentThemeId', [nextId, opts], null);
-    }
-
-    function setAccentCustomHex(nextHex, opts) {
-        callDep('setAccentCustomHex', [nextHex, opts], null);
-    }
-
-    function getAccentThemeOrder() {
-        var out = getDepValue('accentThemeOrder', []);
-        return Array.isArray(out) ? out.slice() : [];
-    }
-
-    function getAccentThemes() {
-        return getDepValue('accentThemes', {}) || {};
-    }
-
-    function getAccentCustomDefault() {
-        return getDepValue('accentCustomDefault', '#990000');
-    }
+    var isTopWindow = _settingsBridge.isTopWindow;
+    var isDarkModeEnabled = _settingsBridge.isDarkModeEnabled;
+    var getFeatureKeys = _settingsBridge.getFeatureKeys;
+    var getSettingKeys = _settingsBridge.getSettingKeys;
+    var isFollowingDeviceTheme = _settingsBridge.isFollowingDeviceTheme;
+    var saveDarkModeFollowDevice = _settingsBridge.saveDarkModeFollowDevice;
+    var saveDarkModePreference = _settingsBridge.saveDarkModePreference;
+    var isMojanglesEnabled = _settingsBridge.isMojanglesEnabled;
+    var insertMojanglesText = _settingsBridge.insertMojanglesText;
+    var isBusEnabled = _settingsBridge.isBusEnabled;
+    var isApiQuotaExhausted = _settingsBridge.isApiQuotaExhausted;
+    var showQuotaExhaustedMessage = _settingsBridge.showQuotaExhaustedMessage;
+    var getBusConfig = _settingsBridge.getBusConfig;
+    var showBusConfigModal = _settingsBridge.showBusConfigModal;
+    var stopBusPolling = _settingsBridge.stopBusPolling;
+    var abortInFlightBusRequests = _settingsBridge.abortInFlightBusRequests;
+    var insertBusDisplay = _settingsBridge.insertBusDisplay;
+    var forceBusImmediateRefresh = _settingsBridge.forceBusImmediateRefresh;
+    var isDeadlinesEnabled = _settingsBridge.isDeadlinesEnabled;
+    var insertDeadlinesHomepageWidget = _settingsBridge.insertDeadlinesHomepageWidget;
+    var isSearchWidgetEnabled = _settingsBridge.isSearchWidgetEnabled;
+    var isFeatureFlagEnabled = _settingsBridge.isFeatureFlagEnabled;
+    var setFeatureFlagEnabled = _settingsBridge.setFeatureFlagEnabled;
+    var insertBookFinderLinks = _settingsBridge.insertBookFinderLinks;
+    var insertGPARow = _settingsBridge.insertGPARow;
+    var insertGPASimulator = _settingsBridge.insertGPASimulator;
+    var syncCampusnetActualGradeExclusionControls = _settingsBridge.syncCampusnetActualGradeExclusionControls;
+    var insertKurserGradeStats = _settingsBridge.insertKurserGradeStats;
+    var insertKurserTextbookLinks = _settingsBridge.insertKurserTextbookLinks;
+    var insertKurserCourseEvaluation = _settingsBridge.insertKurserCourseEvaluation;
+    var insertKurserCourseMap = _settingsBridge.insertKurserCourseMap;
+    var insertStudyplanExamSchedule = _settingsBridge.insertStudyplanExamSchedule;
+    var insertKurserExamDate = _settingsBridge.insertKurserExamDate;
+    var scheduleSmartRoomLinkerScan = _settingsBridge.scheduleSmartRoomLinkerScan;
+    var removeSmartRoomLinks = _settingsBridge.removeSmartRoomLinks;
+    var insertContentButtons = _settingsBridge.insertContentButtons;
+    var startContentButtonBootstrap = _settingsBridge.startContentButtonBootstrap;
+    var removeContentButtons = _settingsBridge.removeContentButtons;
+    var insertDTULearnNavResourceLinks = _settingsBridge.insertDTULearnNavResourceLinks;
+    var removeDTULearnNavResourceLinks = _settingsBridge.removeDTULearnNavResourceLinks;
+    var insertParticipantIntelligence = _settingsBridge.insertParticipantIntelligence;
+    var insertLibraryNavDropdown = _settingsBridge.insertLibraryNavDropdown;
+    var removeLibraryNavDropdown = _settingsBridge.removeLibraryNavDropdown;
+    var runLessonsBulkDownloadChecks = _settingsBridge.runLessonsBulkDownloadChecks;
+    var showContentShortcutOverridesModal = _settingsBridge.showContentShortcutOverridesModal;
+    var getAccentThemeId = _settingsBridge.getAccentThemeId;
+    var getAccentCustomHex = _settingsBridge.getAccentCustomHex;
+    var setAccentThemeId = _settingsBridge.setAccentThemeId;
+    var setAccentCustomHex = _settingsBridge.setAccentCustomHex;
+    var getAccentThemeOrder = _settingsBridge.getAccentThemeOrder;
+    var getAccentThemes = _settingsBridge.getAccentThemes;
+    var getAccentCustomDefault = _settingsBridge.getAccentCustomDefault;
+    var applyAfterDarkAdminMenuThemeVars = _settingsBridge.applyAfterDarkAdminMenuThemeVars;
+    var markExt = _settingsBridge.markExt;
+    var showPausedUrlRulesModal = _settingsPause.showPausedUrlRulesModal;
+    var createAfterDarkDisclaimerFooter = _settingsFooter.createAfterDarkDisclaimerFooter;
 
     function applyFeatureToggleImmediately(featureKey, enabled) {
         var featureKeys = getFeatureKeys();
@@ -282,11 +94,17 @@
         if (featureKey === featureKeys.kurserGradeStats && window.location.hostname === 'kurser.dtu.dk') {
             insertKurserGradeStats();
         }
-        if (featureKey === featureKeys.studyplanExamCluster && window.location.hostname === 'studieplan.dtu.dk') {
-            scheduleStudyplanExamCluster(80);
-        }
         if (featureKey === featureKeys.kurserCourseEval && window.location.hostname === 'kurser.dtu.dk') {
             insertKurserCourseEvaluation();
+        }
+        if (featureKey === featureKeys.kurserCourseMap && window.location.hostname === 'kurser.dtu.dk') {
+            insertKurserCourseMap();
+        }
+        if (featureKey === featureKeys.studyplanExamSchedule && window.location.hostname === 'studieplan.dtu.dk') {
+            insertStudyplanExamSchedule();
+        }
+        if (featureKey === featureKeys.studyplanExamSchedule && window.location.hostname === 'kurser.dtu.dk') {
+            insertKurserExamDate();
         }
         if (featureKey === featureKeys.smartRoomLinker) {
             if (enabled) {
@@ -351,508 +169,6 @@
         } catch (e0) { }
     }
 
-    function getAfterDarkDisclaimerText() {
-        return 'DTU After Dark is unofficial and not affiliated with DTU, Arcanic, or any service provider. '
-            + 'Information shown (exam dates, deadlines, grades, bus times) may be inaccurate or outdated. '
-            + 'Always verify critical information through official DTU channels. '
-            + 'The developer(s) accept no responsibility for any consequences arising from the use of this extension.';
-    }
-
-    function getAfterDarkDebugIdeasMailtoHref() {
-        var subject = 'DTU After Dark - Debug/Ideas';
-        var body = 'Hi Daniel,\n\nPage URL:\n\nIdea or issue:\n';
-        return 'mailto:daniel-yttesen@hotmail.com?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
-    }
-
-    function removePausedUrlRulesModal() {
-        var existing = document.querySelector('.dtu-paused-url-rules-modal');
-        if (existing) {
-            if (typeof existing._dtuPausedCleanup === 'function') existing._dtuPausedCleanup();
-            existing.remove();
-        }
-    }
-
-    function showPausedUrlRulesModal(opts) {
-        if (!isTopWindow()) return;
-        opts = opts || {};
-
-        var reopenSettingsOnClose = !!opts.reopenSettingsOnClose;
-        var initialFocus = opts.initialFocus === 'list' ? 'list' : 'add';
-        var isDark = isDarkModeEnabled();
-        var currentUrl = getCurrentUrlWithoutHash();
-        var theme = isDark
-            ? {
-                background: 'rgba(30,30,30,0.94)',
-                text: '#e0e0e0',
-                heading: '#f5f5f5',
-                muted: '#a3a3a3',
-                border: '#404040',
-                softBorder: '#4b5563',
-                shadow: '0 18px 52px rgba(0,0,0,0.45)'
-            }
-            : {
-                background: 'rgba(255,255,255,0.96)',
-                text: '#1f2937',
-                heading: '#111827',
-                muted: '#6b7280',
-                border: '#d1d5db',
-                softBorder: '#cbd5e1',
-                shadow: '0 18px 52px rgba(15,23,42,0.22)'
-            };
-
-        removePausedUrlRulesModal();
-        var previousFocus = document.activeElement;
-        try { hideSettingsModal(); } catch (e0) { }
-
-        var overlay = document.createElement('div');
-        markExt(overlay);
-        overlay.className = 'dtu-paused-url-rules-modal';
-        overlay.tabIndex = -1;
-        overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483001;display:flex;align-items:center;justify-content:center;'
-            + 'padding:18px;background:transparent !important;background-color:transparent !important;'
-            + 'backdrop-filter:blur(4px) !important;-webkit-backdrop-filter:blur(4px) !important;'
-            + 'opacity:0;transition:opacity .2s ease;font-family:sans-serif;';
-
-        var modal = document.createElement('div');
-        markExt(modal);
-        modal.setAttribute('role', 'dialog');
-        modal.setAttribute('aria-modal', 'true');
-        modal.setAttribute('aria-labelledby', 'dtu-paused-urls-title');
-        modal.tabIndex = -1;
-        modal.style.cssText = 'width:min(720px,94vw);max-height:82vh;overflow:auto;border-radius:8px;padding:18px 18px 14px;'
-            + 'background:' + theme.background + ';color:' + theme.text + ';border:1px solid ' + theme.border + ';'
-            + 'box-shadow:' + theme.shadow + ';';
-
-        function applyTextActionStyle(btn, colorValue) {
-            btn.style.cssText = 'display:inline-flex;align-items:center;justify-content:flex-start;appearance:none;-webkit-appearance:none;'
-                + 'margin:0;padding:0;border:0;background:transparent;white-space:nowrap;text-decoration:none;'
-                + 'font-size:12px;font-weight:700;line-height:1.45;cursor:pointer;';
-            try {
-                btn.style.setProperty('color', colorValue || theme.text, 'important');
-                btn.style.setProperty('background', 'transparent', 'important');
-                btn.style.setProperty('background-color', 'transparent', 'important');
-                btn.style.setProperty('background-image', 'none', 'important');
-                btn.style.setProperty('border', '0', 'important');
-                btn.style.setProperty('box-shadow', 'none', 'important');
-                btn.style.setProperty('border-radius', '0', 'important');
-            } catch (e1) { }
-            btn.addEventListener('mouseenter', function () {
-                try { btn.style.textDecoration = 'underline'; } catch (e2) { }
-            });
-            btn.addEventListener('mouseleave', function () {
-                try { btn.style.textDecoration = 'none'; } catch (e3) { }
-            });
-        }
-
-        function closePausedUrlRulesModal(shouldReopenSettings) {
-            removePausedUrlRulesModal();
-            if (shouldReopenSettings) {
-                setTimeout(function () {
-                    try { showSettingsModal(); } catch (e4) { }
-                }, 0);
-            }
-        }
-
-        var header = document.createElement('div');
-        markExt(header);
-        header.style.cssText = 'display:flex;align-items:flex-start;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:12px;';
-
-        var headerCopy = document.createElement('div');
-        markExt(headerCopy);
-        headerCopy.style.cssText = 'min-width:0;flex:1;';
-
-        var title = document.createElement('div');
-        markExt(title);
-        title.id = 'dtu-paused-urls-title';
-        title.textContent = 'Paused URLs';
-        title.style.cssText = 'font-size:18px;font-weight:700;color:' + theme.heading + ';margin-bottom:4px;';
-        headerCopy.appendChild(title);
-
-        var subtitle = document.createElement('div');
-        markExt(subtitle);
-        subtitle.textContent = 'Add or remove URL rules that temporarily pause DTU After Dark on matching pages. Use * as a wildcard.';
-        subtitle.style.cssText = 'font-size:12px;line-height:1.5;color:' + theme.muted + ';';
-        headerCopy.appendChild(subtitle);
-        header.appendChild(headerCopy);
-
-        var closeBtn = document.createElement('button');
-        markExt(closeBtn);
-        closeBtn.type = 'button';
-        closeBtn.textContent = 'Close';
-        applyTextActionStyle(closeBtn, isDark ? '#f3f4f6' : '#334155');
-        closeBtn.addEventListener('click', function () {
-            closePausedUrlRulesModal(reopenSettingsOnClose);
-        });
-        header.appendChild(closeBtn);
-        modal.appendChild(header);
-
-        var body = document.createElement('div');
-        markExt(body);
-        body.style.cssText = 'display:flex;flex-direction:column;gap:12px;';
-
-        var addSection = document.createElement('div');
-        markExt(addSection);
-        addSection.style.cssText = 'padding:2px 0 10px;border:0;background:transparent;';
-
-        var addTitle = document.createElement('div');
-        markExt(addTitle);
-        addTitle.textContent = 'Add paused URL rule';
-        addTitle.style.cssText = 'font-size:13px;font-weight:700;color:' + theme.heading + ';margin-bottom:4px;';
-        addSection.appendChild(addTitle);
-
-        var addHint = document.createElement('div');
-        markExt(addHint);
-        addHint.textContent = 'Examples: an exact lesson URL, a course homepage like https://learn.inside.dtu.dk/d2l/home/296283, or a legacy tool page with ?ou=296283.';
-        addHint.style.cssText = 'font-size:11px;line-height:1.45;color:' + theme.muted + ';margin-bottom:8px;';
-        addSection.appendChild(addHint);
-
-        var inputRow = document.createElement('div');
-        markExt(inputRow);
-        inputRow.style.cssText = 'display:flex;align-items:center;gap:12px;flex-wrap:nowrap;margin:0 0 8px;';
-        addSection.appendChild(inputRow);
-
-        var ruleInput = document.createElement('input');
-        markExt(ruleInput);
-        ruleInput.type = 'text';
-        ruleInput.setAttribute('aria-label', 'URL rule to pause');
-        ruleInput.value = buildSuggestedPausePatternsForCurrentUrl()[0] || normalizeUrlPausePattern(window.location.origin + window.location.pathname + '*');
-        ruleInput.placeholder = 'https://learn.inside.dtu.dk/d2l/home/296283';
-        ruleInput.style.cssText = 'min-width:0;flex:1;box-sizing:border-box;padding:9px 10px;border:1px solid ' + theme.softBorder + ';'
-            + 'background:' + (isDark ? 'rgba(17,17,17,0.92)' : '#ffffff') + ';color:' + theme.text + ';font-size:12px;'
-            + 'line-height:1.4;margin:0;';
-        inputRow.appendChild(ruleInput);
-
-        var saveRuleBtn = document.createElement('button');
-        markExt(saveRuleBtn);
-        saveRuleBtn.type = 'button';
-        saveRuleBtn.textContent = 'Save rule';
-        applyTextActionStyle(saveRuleBtn, 'var(--dtu-ad-accent)');
-        inputRow.appendChild(saveRuleBtn);
-
-        var suggestionWrap = document.createElement('div');
-        markExt(suggestionWrap);
-        suggestionWrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;margin-bottom:8px;';
-        buildSuggestedPausePatternsForCurrentUrl().slice(0, 4).forEach(function (pattern) {
-            var suggestionRow = document.createElement('div');
-            markExt(suggestionRow);
-            suggestionRow.style.cssText = 'display:block;padding:6px 0;border-top:1px solid ' + theme.softBorder + ';';
-
-            var suggestionText = document.createElement('code');
-            markExt(suggestionText);
-            suggestionText.textContent = pattern;
-            suggestionText.style.cssText = 'display:block;font-family:Consolas,Monaco,monospace;font-size:11px;line-height:1.5;color:' + theme.text + ';word-break:break-all;cursor:text;';
-            suggestionRow.appendChild(suggestionText);
-            suggestionRow.addEventListener('click', function () {
-                ruleInput.value = pattern;
-                try { ruleInput.focus(); } catch (e5) { }
-            });
-            suggestionWrap.appendChild(suggestionRow);
-        });
-        addSection.appendChild(suggestionWrap);
-
-        var statusText = document.createElement('div');
-        markExt(statusText);
-        statusText.setAttribute('role', 'status');
-        statusText.style.cssText = 'font-size:11px;line-height:1.45;color:' + theme.muted + ';min-height:16px;';
-        addSection.appendChild(statusText);
-
-        function setStatus(message, tone) {
-            statusText.textContent = message || '';
-            statusText.style.color = tone || theme.muted;
-        }
-
-        body.appendChild(addSection);
-
-        var savedSection = document.createElement('div');
-        markExt(savedSection);
-        savedSection.style.cssText = 'padding:4px 0 0;border:0;background:transparent;';
-
-        var savedHead = document.createElement('div');
-        markExt(savedHead);
-        savedHead.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:8px;';
-
-        var savedTitle = document.createElement('div');
-        markExt(savedTitle);
-        savedTitle.textContent = 'Saved paused URL rules';
-        savedTitle.style.cssText = 'font-size:13px;font-weight:700;color:' + theme.heading + ';';
-        savedHead.appendChild(savedTitle);
-
-        var savedMeta = document.createElement('div');
-        markExt(savedMeta);
-        savedMeta.style.cssText = 'font-size:11px;line-height:1.4;color:' + theme.muted + ';';
-        savedHead.appendChild(savedMeta);
-        savedSection.appendChild(savedHead);
-
-        var ruleList = document.createElement('div');
-        markExt(ruleList);
-        ruleList.style.cssText = 'display:flex;flex-direction:column;';
-        savedSection.appendChild(ruleList);
-        body.appendChild(savedSection);
-
-        function removeRule(pattern) {
-            var existingPatterns = getUrlPausePatterns();
-            var wasMatchingCurrentPage = getMatchingUrlPausePatterns(currentUrl).indexOf(pattern) !== -1;
-            var remaining = existingPatterns.filter(function (entry) {
-                return entry !== pattern;
-            });
-            if (remaining.length === existingPatterns.length) {
-                setStatus('That paused URL rule was already removed.', theme.muted);
-                refreshRuleList();
-                return;
-            }
-            saveUrlPausePatterns(remaining);
-            if (wasMatchingCurrentPage) {
-                closePausedUrlRulesModal(false);
-                window.location.reload();
-                return;
-            }
-            setStatus('Removed paused URL rule.', theme.muted);
-            refreshRuleList();
-        }
-
-        function refreshRuleList() {
-            var patterns = getUrlPausePatterns();
-            var currentMatches = getMatchingUrlPausePatterns(currentUrl);
-            ruleList.innerHTML = '';
-            savedMeta.textContent = patterns.length ? String(patterns.length) + ' saved' : 'No saved rules';
-
-            if (!patterns.length) {
-                var empty = document.createElement('div');
-                markExt(empty);
-                empty.textContent = 'No paused URL rules saved right now.';
-                empty.style.cssText = 'font-size:11px;line-height:1.5;color:' + theme.muted + ';padding:4px 0 2px;';
-                ruleList.appendChild(empty);
-                return;
-            }
-
-            patterns.forEach(function (pattern, index) {
-                var row = document.createElement('div');
-                markExt(row);
-                row.style.cssText = 'display:flex;align-items:flex-start;justify-content:space-between;gap:12px;'
-                    + 'padding:' + (index === 0 ? '0 0 8px' : '8px 0') + ';border-top:' + (index === 0 ? '0' : '1px solid ' + theme.softBorder) + ';';
-
-                var copy = document.createElement('div');
-                markExt(copy);
-                copy.style.cssText = 'min-width:0;flex:1;';
-
-                var patternText = document.createElement('code');
-                markExt(patternText);
-                patternText.textContent = pattern;
-                patternText.style.cssText = 'display:block;font-family:Consolas,Monaco,monospace;font-size:11px;line-height:1.5;color:' + theme.text + ';word-break:break-all;';
-                copy.appendChild(patternText);
-
-                if (currentMatches.indexOf(pattern) !== -1) {
-                    var matchText = document.createElement('div');
-                    markExt(matchText);
-                    matchText.textContent = 'Matches this page';
-                    matchText.style.cssText = 'margin-top:3px;font-size:10px;line-height:1.4;color:var(--dtu-ad-accent-text, var(--dtu-ad-accent));';
-                    copy.appendChild(matchText);
-                }
-
-                row.appendChild(copy);
-
-                var removeBtn = document.createElement('button');
-                markExt(removeBtn);
-                removeBtn.type = 'button';
-                removeBtn.textContent = 'Remove';
-                removeBtn.setAttribute('aria-label', 'Remove paused rule ' + pattern);
-                applyTextActionStyle(removeBtn, '#d14343');
-                removeBtn.addEventListener('click', function () {
-                    removeRule(pattern);
-                });
-                row.appendChild(removeBtn);
-                ruleList.appendChild(row);
-            });
-        }
-
-        function saveRule() {
-            var normalized = normalizeUrlPausePattern(ruleInput.value);
-            if (!normalized) {
-                setStatus('Enter a URL rule to pause first.', '#d14343');
-                return;
-            }
-            if (isPauseProtectedPattern(normalized)) {
-                setStatus('The main DTU Learn home entry stays active so the Settings menu cannot be paused away.', '#d14343');
-                return;
-            }
-            var patterns = getUrlPausePatterns();
-            if (patterns.indexOf(normalized) !== -1) {
-                setStatus('That URL rule is already paused.', theme.muted);
-                refreshRuleList();
-                return;
-            }
-            patterns.push(normalized);
-            saveUrlPausePatterns(patterns);
-            if (getMatchingUrlPausePatterns(currentUrl).indexOf(normalized) !== -1) {
-                closePausedUrlRulesModal(false);
-                window.location.reload();
-                return;
-            }
-            setStatus('Saved paused URL rule.', 'var(--dtu-ad-accent)');
-            refreshRuleList();
-        }
-
-        saveRuleBtn.addEventListener('click', saveRule);
-        ruleInput.addEventListener('keydown', function (e6) {
-            if (e6.key === 'Enter') {
-                e6.preventDefault();
-                saveRule();
-            }
-        });
-
-        modal.appendChild(body);
-        overlay.appendChild(modal);
-
-        overlay.addEventListener('click', function (e7) {
-            if (e7.target === overlay) closePausedUrlRulesModal(reopenSettingsOnClose);
-        });
-        var pausedKeyHandler = function (e8) {
-            if (e8.key === 'Escape') {
-                e8.preventDefault();
-                e8.stopPropagation();
-                closePausedUrlRulesModal(reopenSettingsOnClose);
-                return;
-            }
-            if (e8.key !== 'Tab') return;
-            var controls = Array.prototype.filter.call(
-                modal.querySelectorAll('a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'),
-                function (el) { return el.getClientRects().length > 0 || el === document.activeElement; }
-            );
-            if (!controls.length) { e8.preventDefault(); modal.focus(); return; }
-            var first = controls[0];
-            var last = controls[controls.length - 1];
-            var active = document.activeElement;
-            if (!modal.contains(active) || (e8.shiftKey && (active === first || active === modal)) || (!e8.shiftKey && active === last)) {
-                e8.preventDefault();
-                (e8.shiftKey ? last : first).focus();
-            }
-        };
-        var previousOverflow = { html: document.documentElement.style.overflow, body: document.body.style.overflow };
-        document.documentElement.style.overflow = 'hidden';
-        document.body.style.overflow = 'hidden';
-        document.addEventListener('keydown', pausedKeyHandler, true);
-        overlay._dtuPausedCleanup = function () {
-            document.removeEventListener('keydown', pausedKeyHandler, true);
-            document.documentElement.style.overflow = previousOverflow.html;
-            document.body.style.overflow = previousOverflow.body;
-            var focusTarget = previousFocus && previousFocus.isConnected ? previousFocus : document.querySelector('.dtu-settings-nav-item button');
-            if (focusTarget) { try { focusTarget.focus({ preventScroll: true }); } catch (eFocus) { } }
-        };
-
-        document.body.appendChild(overlay);
-        refreshRuleList();
-
-        requestAnimationFrame(function () {
-            overlay.style.opacity = '1';
-            try { overlay.focus(); } catch (e9) { }
-            try {
-                if (initialFocus === 'list') {
-                    var firstRemove = ruleList.querySelector('button');
-                    if (firstRemove) firstRemove.focus();
-                    else ruleInput.focus();
-                } else {
-                    ruleInput.focus();
-                    ruleInput.select();
-                }
-            } catch (e10) { }
-        });
-    }
-
-    function createAfterDarkDisclaimerFooter() {
-        var disclaimerFooter = document.createElement('div');
-        markExt(disclaimerFooter);
-        disclaimerFooter.style.cssText = 'padding:12px 18px 14px;font-size:10.5px;line-height:1.45;color:var(--dtu-am-muted);border-top:1px solid var(--dtu-am-border);margin-top:auto;';
-
-        var textNode = document.createElement('span');
-        markExt(textNode);
-        textNode.textContent = getAfterDarkDisclaimerText();
-        disclaimerFooter.appendChild(textNode);
-
-        var actionRow = document.createElement('div');
-        markExt(actionRow);
-        actionRow.style.cssText = 'display:flex;align-items:center;gap:18px;flex-wrap:nowrap;overflow-x:auto;margin-top:10px;padding-bottom:2px;';
-
-        function applyFooterActionTextStyle(btn) {
-            btn.style.cssText = 'display:inline-flex;align-items:center;justify-content:flex-start;'
-                + 'appearance:none;-webkit-appearance:none;margin:0;padding:0;border:0;background:transparent;'
-                + 'color:var(--dtu-am-active-text);font-size:11px;font-weight:700;line-height:1.45;cursor:pointer;'
-                + 'white-space:nowrap;text-decoration:none;';
-            try {
-                btn.style.setProperty('background', 'transparent', 'important');
-                btn.style.setProperty('background-color', 'transparent', 'important');
-                btn.style.setProperty('background-image', 'none', 'important');
-                btn.style.setProperty('border', '0', 'important');
-                btn.style.setProperty('box-shadow', 'none', 'important');
-            } catch (e00) { }
-            btn.addEventListener('mouseenter', function () {
-                try {
-                    btn.style.textDecoration = 'underline';
-                    btn.style.setProperty('background', 'transparent', 'important');
-                    btn.style.setProperty('background-color', 'transparent', 'important');
-                    btn.style.setProperty('box-shadow', 'none', 'important');
-                } catch (e0) { }
-            });
-            btn.addEventListener('mouseleave', function () {
-                try {
-                    btn.style.textDecoration = 'none';
-                    btn.style.setProperty('background', 'transparent', 'important');
-                    btn.style.setProperty('background-color', 'transparent', 'important');
-                    btn.style.setProperty('box-shadow', 'none', 'important');
-                } catch (e1) { }
-            });
-            btn.addEventListener('mousedown', function () {
-                try {
-                    btn.style.setProperty('background', 'transparent', 'important');
-                    btn.style.setProperty('background-color', 'transparent', 'important');
-                    btn.style.setProperty('box-shadow', 'none', 'important');
-                } catch (e2) { }
-            });
-            btn.addEventListener('mouseup', function () {
-                try {
-                    btn.style.setProperty('background', 'transparent', 'important');
-                    btn.style.setProperty('background-color', 'transparent', 'important');
-                    btn.style.setProperty('box-shadow', 'none', 'important');
-                } catch (e3) { }
-            });
-            btn.addEventListener('focus', function () {
-                try {
-                    btn.style.setProperty('background', 'transparent', 'important');
-                    btn.style.setProperty('background-color', 'transparent', 'important');
-                    btn.style.setProperty('box-shadow', 'none', 'important');
-                } catch (e4) { }
-            });
-        }
-
-        var debugIdeasBtn = document.createElement('button');
-        markExt(debugIdeasBtn);
-        debugIdeasBtn.type = 'button';
-        debugIdeasBtn.textContent = 'Send feedback or bug report';
-        debugIdeasBtn.setAttribute('aria-label', 'Send feedback or bug report by email');
-        applyFooterActionTextStyle(debugIdeasBtn);
-        debugIdeasBtn.addEventListener('click', function (e) {
-            try { if (e) e.preventDefault(); } catch (e0) { }
-            try { if (e) e.stopPropagation(); } catch (e1) { }
-            try { window.location.href = getAfterDarkDebugIdeasMailtoHref(); } catch (e2) { }
-        });
-        actionRow.appendChild(debugIdeasBtn);
-
-        var pausedUrlsBtn = document.createElement('button');
-        markExt(pausedUrlsBtn);
-        pausedUrlsBtn.type = 'button';
-        pausedUrlsBtn.textContent = 'Paused URLs...';
-        pausedUrlsBtn.setAttribute('aria-label', 'Manage paused URL rules');
-        applyFooterActionTextStyle(pausedUrlsBtn);
-        pausedUrlsBtn.addEventListener('click', function (e) {
-            try { if (e) e.preventDefault(); } catch (e0) { }
-            try { if (e) e.stopPropagation(); } catch (e1) { }
-            showPausedUrlRulesModal({ reopenSettingsOnClose: true, initialFocus: 'add' });
-        });
-        actionRow.appendChild(pausedUrlsBtn);
-
-        disclaimerFooter.appendChild(actionRow);
-        return disclaimerFooter;
-    }
-
     function showSettingsModal() {
         if (!isTopWindow()) return;
         hideSettingsModal();
@@ -862,10 +178,6 @@
         var settingKeys = getSettingKeys();
 
         var toggleHandlers = {
-            'dark-mode-toggle': {
-                getState: function () { return isDarkModeEnabled(); },
-                onChange: function (checked) { Promise.resolve(saveDarkModePreference(checked)).then(function () { location.reload(); }); }
-            },
             'mojangles-toggle': {
                 getState: function () { return isMojanglesEnabled(); },
                 onChange: function (checked) {
@@ -924,6 +236,7 @@
             { id: 'library-dropdown-toggle', key: featureKeys.libraryDropdown },
             { id: 'feature-lessons-bulk-download-toggle', key: featureKeys.learnLessonsBulkDownload },
             { id: 'feature-campusnet-gpa-tools-toggle', key: featureKeys.campusnetGpaTools },
+            { id: 'feature-studyplan-exam-schedule-toggle', key: featureKeys.studyplanExamSchedule },
             { id: 'feature-participant-intel-toggle', key: featureKeys.participantIntel },
             { id: 'feature-participant-intel-demographics-toggle', key: featureKeys.participantIntelDemographics },
             { id: 'feature-participant-intel-shared-history-toggle', key: featureKeys.participantIntelSharedHistory },
@@ -931,6 +244,7 @@
             { id: 'feature-kurser-grade-stats-toggle', key: featureKeys.kurserGradeStats },
             { id: 'feature-textbook-links-toggle', key: featureKeys.textbookLinks },
             { id: 'feature-kurser-course-eval-toggle', key: featureKeys.kurserCourseEval },
+            { id: 'feature-kurser-course-map-toggle', key: featureKeys.kurserCourseMap },
             { id: 'feature-smart-room-linker-toggle', key: featureKeys.smartRoomLinker }
         ].forEach(function (ft) {
             if (!ft.key) return;
@@ -954,7 +268,7 @@
         var categories = [
             {
                 id: 'appearance', label: 'Appearance', desc: 'Theme and visual settings', items: [
-                    { tid: 'dark-mode-toggle', title: 'Dark Mode', desc: 'Global dark theme for all DTU sites' },
+                    { kind: 'theme-mode', title: 'Dark Mode' },
                     { kind: 'accent-theme', title: 'Accent Color', desc: 'Official DTU color presets plus custom (default: DTU Corporate Red)' },
                     { tid: 'mojangles-toggle', title: 'Mojangles Splash', desc: 'Tilted Minecraft-style "DTU After Dark" text beside the DTU Learn logo' }
                 ]
@@ -978,6 +292,7 @@
             {
                 id: 'study-tools', label: 'Study Tools', desc: 'Academic planning features', items: [
                     { tid: 'feature-campusnet-gpa-tools-toggle', title: 'GPA Calculator', desc: 'Weighted grade average on CampusNet' },
+                    { tid: 'feature-studyplan-exam-schedule-toggle', title: 'Exam Schedule', desc: 'A button in the Study Planner tab row that lists your exam dates and the days between them, and an Exam date row on kurser.dtu.dk course pages' },
                 ]
             },
             {
@@ -985,14 +300,15 @@
                     { tid: 'feature-participant-intel-toggle', title: 'Participant Intelligence', desc: 'Optional local-only insights from CampusNet participant lists' },
                     { tid: 'feature-participant-intel-demographics-toggle', title: 'Course Composition', desc: 'Program breakdown on CampusNet participant pages', subToggleOf: 'feature-participant-intel-toggle' },
                     { tid: 'feature-participant-intel-shared-history-toggle', title: 'Shared Course History', desc: 'Shows courses you have previously shared with each student', subToggleOf: 'feature-participant-intel-toggle' },
-                    { tid: 'feature-participant-intel-retention-toggle', title: 'Retention Radar', desc: 'Tracks course enrollment changes across visits', subToggleOf: 'feature-participant-intel-toggle' }
+                    { tid: 'feature-participant-intel-retention-toggle', title: 'Retention', desc: 'Tracks course enrollment changes across visits', subToggleOf: 'feature-participant-intel-toggle' }
                 ]
             },
             {
                 id: 'course-catalog', label: 'Course Catalog', desc: 'Enhancements for kurser.dtu.dk and course resource pages', items: [
                     { tid: 'feature-kurser-grade-stats-toggle', title: 'Grade Statistics', desc: 'Show pass rates and grade histograms' },
                     { tid: 'feature-textbook-links-toggle', title: 'Textbook Links', desc: 'Textbook source links on DTU Learn and kurser.dtu.dk' },
-                    { tid: 'feature-kurser-course-eval-toggle', title: 'Course Evaluation', desc: 'Show evaluation scores on course pages' }
+                    { tid: 'feature-kurser-course-eval-toggle', title: 'Course Evaluation', desc: 'Show evaluation scores on course pages' },
+                    { tid: 'feature-kurser-course-map-toggle', title: 'Course Map', desc: 'A row under Academic prerequisites that maps earlier and later courses' }
                 ]
             }
         ];
@@ -1067,6 +383,14 @@
             + '.dtu-am-color::-webkit-color-swatch{border:none;border-radius:7px}'
             + '.dtu-am-color::-moz-color-swatch{border:none;border-radius:7px}'
             + '.dtu-am-color::-moz-focus-inner{border:0;padding:0}'
+            + '.dtu-seg{display:inline-flex;gap:2px;padding:3px;border-radius:10px;'
+            + 'background:var(--dtu-am-input-bg) !important;border:1px solid var(--dtu-am-border) !important}'
+            + '.dtu-seg label{position:relative;display:block}'
+            + '.dtu-seg input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}'
+            + '.dtu-seg span{display:block;padding:5px 12px;border-radius:7px;font-size:12px;font-weight:700;'
+            + 'color:var(--dtu-am-muted) !important}'
+            + '.dtu-seg input:checked+span{background:var(--dtu-am-accent) !important;color:#fff !important}'
+            + '.dtu-seg input:focus-visible+span{outline:2px solid var(--dtu-am-text);outline-offset:1px}'
             + '.dtu-tog{position:relative;display:inline-block;width:40px;height:22px;flex-shrink:0}'
             + '.dtu-tog input{opacity:0;width:0;height:0;position:absolute}'
             + '.dtu-tog-sl{position:absolute;cursor:pointer;inset:0;'
@@ -1208,6 +532,67 @@
             panel.appendChild(panelDesc);
 
             cat.items.forEach(function (item) {
+                if (item && item.kind === 'theme-mode') {
+                    // One setting, three values: Light, Dark, or Auto (follow the device).
+                    var rowT = document.createElement('div');
+                    markExt(rowT);
+                    rowT.className = 'dtu-set-row';
+                    var infoT = document.createElement('div');
+                    markExt(infoT);
+                    infoT.className = 'dtu-am-info';
+                    var titleT = document.createElement('div');
+                    markExt(titleT);
+                    titleT.textContent = item.title;
+                    titleT.className = 'dtu-am-title';
+                    var descT = document.createElement('div');
+                    markExt(descT);
+                    descT.className = 'dtu-am-desc';
+                    var deviceDark = false;
+                    try { deviceDark = window.matchMedia('(prefers-color-scheme: dark)').matches; } catch (eMq) { }
+                    var modeNow = isFollowingDeviceTheme() ? 'auto' : (isDarkModeEnabled() ? 'dark' : 'light');
+                    var modeDesc = {
+                        dark: 'Always dark on all DTU sites',
+                        light: 'Always light on all DTU sites',
+                        auto: 'Following your device, currently ' + (deviceDark ? 'dark' : 'light')
+                    };
+                    descT.textContent = modeDesc[modeNow];
+                    infoT.appendChild(titleT);
+                    infoT.appendChild(descT);
+                    var actionsT = document.createElement('div');
+                    markExt(actionsT);
+                    actionsT.className = 'dtu-am-actions';
+                    var segT = document.createElement('div');
+                    markExt(segT);
+                    segT.className = 'dtu-seg';
+                    segT.setAttribute('role', 'radiogroup');
+                    segT.setAttribute('aria-label', 'Dark Mode');
+                    [['light', 'Light'], ['dark', 'Dark'], ['auto', 'Auto']].forEach(function (opt) {
+                        var lab = document.createElement('label');
+                        markExt(lab);
+                        var radio = document.createElement('input');
+                        radio.type = 'radio';
+                        radio.name = 'dtu-dark-mode-mode';
+                        radio.id = 'dark-mode-mode-' + opt[0];
+                        radio.value = opt[0];
+                        radio.checked = opt[0] === modeNow;
+                        var face = document.createElement('span');
+                        markExt(face);
+                        face.textContent = opt[1];
+                        radio.addEventListener('change', function () {
+                            if (!radio.checked || opt[0] === modeNow) return;
+                            var saved = opt[0] === 'auto' ? saveDarkModeFollowDevice(true) : saveDarkModePreference(opt[0] === 'dark');
+                            Promise.resolve(saved).then(function () { location.reload(); });
+                        });
+                        lab.appendChild(radio);
+                        lab.appendChild(face);
+                        segT.appendChild(lab);
+                    });
+                    actionsT.appendChild(segT);
+                    rowT.appendChild(infoT);
+                    rowT.appendChild(actionsT);
+                    panel.appendChild(rowT);
+                    return;
+                }
                 if (item && item.kind === 'accent-theme') {
                     var row0 = document.createElement('div');
                     markExt(row0);
@@ -1253,6 +638,7 @@
                     var sel = document.createElement('select');
                     markExt(sel);
                     sel.className = 'dtu-am-select';
+                    sel.setAttribute('aria-label', item.title);
                     sel.setAttribute('data-dtu-accent-theme-select', '1');
 
                     var ordered = getAccentThemeOrder();
@@ -1278,6 +664,7 @@
                     markExt(color);
                     color.type = 'color';
                     color.className = 'dtu-am-color';
+                    color.setAttribute('aria-label', 'Custom accent colour');
                     color.setAttribute('data-dtu-accent-custom-input', '1');
                     try { color.value = getAccentCustomHex() || getAccentCustomDefault(); } catch (eC0) { }
                     color.style.display = (getAccentThemeId() === 'custom') ? '' : 'none';
@@ -1336,6 +723,7 @@
                 var input = document.createElement('input');
                 input.type = 'checkbox';
                 input.id = item.tid + '-modal';
+                input.setAttribute('aria-label', item.title);
                 input.checked = handler.getState();
                 renderedToggleInputByTid[item.tid] = input;
                 var slider = document.createElement('span');

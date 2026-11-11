@@ -1,17 +1,63 @@
 ﻿// Dark mode script to inject styles into Shadow DOM elements
 (function () {
     'use strict';
+    var markExt = globalThis.DTUAfterDarkDom.markExt;
+    var normalizeWhitespace = globalThis.DTUAfterDarkDom.normalizeWhitespace;
+
+    const __urlPause = globalThis.DTUAfterDarkUrlPause;
+    if (!__urlPause) throw new Error('darkmode.js loaded before darkmode.url-pause.js');
+    const __featureFlags = globalThis.DTUAfterDarkFeatureFlags;
+    if (!__featureFlags) throw new Error('darkmode.js loaded before darkmode.feature-flags.js');
+    const __accentTheme = globalThis.DTUAfterDarkAccentTheme;
+    if (!__accentTheme) throw new Error('darkmode.js loaded before darkmode.accent-theme.js');
+    const __participantIntelBridge = globalThis.DTUAfterDarkParticipantIntelBridge;
+    if (!__participantIntelBridge) throw new Error('darkmode.js loaded before darkmode.participant-intel-bridge.js');
 
     // ===== DARK MODE TOGGLE =====
     const DARK_MODE_KEY = 'dtuDarkModeEnabled';
-    const URL_PAUSE_PATTERNS_KEY = 'dtuAfterDarkUrlPausePatterns';
-    const IS_TOP_WINDOW = (() => {
-        try {
-            return window === window.top;
-        } catch (e) {
-            return false;
-        }
-    })();
+    const DARK_MODE_FOLLOW_KEY = 'dtuDarkModeFollowDevice';
+    const IS_TOP_WINDOW = __urlPause.isTopWindow;
+    const getCurrentUrlWithoutHash = __urlPause.getCurrentUrlWithoutHash;
+    const normalizeUrlPausePattern = __urlPause.normalizeUrlPausePattern;
+    const isPauseProtectedPattern = __urlPause.isPauseProtectedPattern;
+    const getUrlPausePatterns = __urlPause.getUrlPausePatterns;
+    const saveUrlPausePatterns = __urlPause.saveUrlPausePatterns;
+    const getMatchingUrlPausePatterns = __urlPause.getMatchingUrlPausePatterns;
+    const buildSuggestedPausePatternsForCurrentUrl = __urlPause.buildSuggestedPausePatternsForCurrentUrl;
+    const FEATURE_KURSER_GRADE_STATS_KEY = __featureFlags.FEATURE_KURSER_GRADE_STATS_KEY;
+    const FEATURE_TEXTBOOK_LINKS_KEY = __featureFlags.FEATURE_TEXTBOOK_LINKS_KEY;
+    const FEATURE_CONTENT_SHORTCUT_KEY = __featureFlags.FEATURE_CONTENT_SHORTCUT_KEY;
+    const FEATURE_CAMPUSNET_GPA_TOOLS_KEY = __featureFlags.FEATURE_CAMPUSNET_GPA_TOOLS_KEY;
+    const FEATURE_KURSER_COURSE_EVAL_KEY = __featureFlags.FEATURE_KURSER_COURSE_EVAL_KEY;
+    const FEATURE_KURSER_COURSE_MAP_KEY = __featureFlags.FEATURE_KURSER_COURSE_MAP_KEY;
+    const FEATURE_STUDYPLAN_EXAM_SCHEDULE_KEY = __featureFlags.FEATURE_STUDYPLAN_EXAM_SCHEDULE_KEY;
+    const FEATURE_SMART_ROOM_LINKER_KEY = __featureFlags.FEATURE_SMART_ROOM_LINKER_KEY;
+    const FEATURE_LEARN_NAV_RESOURCE_LINKS_KEY = __featureFlags.FEATURE_LEARN_NAV_RESOURCE_LINKS_KEY;
+    const FEATURE_PARTICIPANT_INTEL_KEY = __featureFlags.FEATURE_PARTICIPANT_INTEL_KEY;
+    const FEATURE_PARTICIPANT_INTEL_DEMOGRAPHICS_KEY = __featureFlags.FEATURE_PARTICIPANT_INTEL_DEMOGRAPHICS_KEY;
+    const FEATURE_PARTICIPANT_INTEL_SHARED_HISTORY_KEY = __featureFlags.FEATURE_PARTICIPANT_INTEL_SHARED_HISTORY_KEY;
+    const FEATURE_PARTICIPANT_INTEL_RETENTION_KEY = __featureFlags.FEATURE_PARTICIPANT_INTEL_RETENTION_KEY;
+    const FEATURE_LIBRARY_DROPDOWN_KEY = __featureFlags.FEATURE_LIBRARY_DROPDOWN_KEY;
+    const FEATURE_LEARN_LESSONS_BULK_DOWNLOAD_KEY = __featureFlags.FEATURE_LEARN_LESSONS_BULK_DOWNLOAD_KEY;
+    const loadFeatureFlags = __featureFlags.loadFeatureFlags;
+    const isFeatureFlagEnabled = __featureFlags.isFeatureFlagEnabled;
+    const setFeatureFlagEnabled = __featureFlags.setFeatureFlagEnabled;
+    const subscribeFeatureFlagStorageChanges = __featureFlags.subscribeFeatureFlagStorageChanges;
+    const ACCENT_THEMES = __accentTheme.ACCENT_THEMES;
+    const ACCENT_THEME_ORDER = __accentTheme.ACCENT_THEME_ORDER;
+    const ACCENT_CUSTOM_DEFAULT = __accentTheme.ACCENT_CUSTOM_DEFAULT;
+    const getContrastTextForHex = __accentTheme.getContrastTextForHex;
+    const rgbaFromHex = __accentTheme.rgbaFromHex;
+    const getResolvedAccent = __accentTheme.getResolvedAccent;
+    const getResolvedAccentDeep = __accentTheme.getResolvedAccentDeep;
+    const getAccentThemeById = __accentTheme.getAccentThemeById;
+    const getAccentThemeId = __accentTheme.getAccentThemeId;
+    const getAccentCustomHex = __accentTheme.getAccentCustomHex;
+    const applyAfterDarkAdminMenuThemeVars = __accentTheme.applyAfterDarkAdminMenuThemeVars;
+    const setAccentCustomHex = __accentTheme.setAccentCustomHex;
+    const setAccentThemeId = __accentTheme.setAccentThemeId;
+    const replaceLogoImage = __accentTheme.replaceLogoImage;
+    const insertParticipantIntelligence = __participantIntelBridge.insertParticipantIntelligence;
     // Dev-only feature: hard-disabled in repository/release code.
     // Keep false unless explicitly enabling in a private local dev build.
     const ENABLE_CONTEXT_CAPTURE_DEV_TOOL = false;
@@ -28,7 +74,20 @@
     clearLegacyDarkModeCookie();
 
     // Check dark mode preference: localStorage -> default true
+    function deviceThemeQuery() {
+        try { return window.matchMedia('(prefers-color-scheme: dark)'); } catch (e) { return null; }
+    }
+
+    function isFollowingDeviceTheme() {
+        return localStorage.getItem(DARK_MODE_FOLLOW_KEY) === 'true';
+    }
+
+    // Effective theme: the device's setting while Auto is on, otherwise the manual choice.
     function isDarkModeEnabled() {
+        if (isFollowingDeviceTheme()) {
+            var query = deviceThemeQuery();
+            if (query) return query.matches;
+        }
         const stored = localStorage.getItem(DARK_MODE_KEY);
         if (stored !== null) return stored === 'true';
         return true;
@@ -51,16 +110,37 @@
     // Save preference to all available stores (localStorage + extension storage).
     // Resolves once extension storage has the value, so callers can reload without
     // losing the write (a lost write makes the next load flip the toggle back).
+    // A manual choice ends Auto (device theme).
     function saveDarkModePreference(enabled) {
         localStorage.setItem(DARK_MODE_KEY, String(enabled));
+        localStorage.removeItem(DARK_MODE_FOLLOW_KEY);
+        var storage = getExtensionStorageArea();
+        if (!storage) return Promise.resolve();
+        var values = { [DARK_MODE_KEY]: enabled, [DARK_MODE_FOLLOW_KEY]: false };
+        return new Promise(function (resolve) {
+            try {
+                if (storage.api === 'browser') {
+                    storage.area.set(values).then(resolve, resolve);
+                } else {
+                    storage.area.set(values, function () { resolve(); });
+                }
+            } catch (e) {
+                resolve();
+            }
+        });
+    }
+
+    // "Match device theme": while on, the device's light/dark setting decides, not the manual toggle.
+    function saveDarkModeFollowDevice(enabled) {
+        localStorage.setItem(DARK_MODE_FOLLOW_KEY, String(enabled));
         var storage = getExtensionStorageArea();
         if (!storage) return Promise.resolve();
         return new Promise(function (resolve) {
             try {
                 if (storage.api === 'browser') {
-                    storage.area.set({ [DARK_MODE_KEY]: enabled }).then(resolve, resolve);
+                    storage.area.set({ [DARK_MODE_FOLLOW_KEY]: enabled }).then(resolve, resolve);
                 } else {
-                    storage.area.set({ [DARK_MODE_KEY]: enabled }, function () { resolve(); });
+                    storage.area.set({ [DARK_MODE_FOLLOW_KEY]: enabled }, function () { resolve(); });
                 }
             } catch (e) {
                 resolve();
@@ -82,165 +162,6 @@
         return path;
     }
 
-    function getCurrentUrlWithoutHash() {
-        try {
-            var u = new URL(window.location.href);
-            u.hash = '';
-            return u.toString();
-        } catch (e) {
-            return String(window.location.href || '').split('#')[0];
-        }
-    }
-
-    function normalizeWhitespace(text) {
-        return String(text || '').replace(/\s+/g, ' ').trim();
-    }
-
-    function normalizeUrlPausePattern(pattern) {
-        var value = String(pattern || '').trim();
-        if (!value) return '';
-        value = value.replace(/\s+/g, '');
-        if (value.charAt(0) === '/') value = window.location.origin + value;
-        value = value.split('#')[0];
-        return value;
-    }
-
-    function isPauseProtectedUrl(url) {
-        try {
-            var parsed = new URL(String(url || getCurrentUrlWithoutHash()), window.location.origin);
-            if (parsed.hostname !== 'learn.inside.dtu.dk') return false;
-            return /^\/d2l\/home\/?$/i.test(parsed.pathname || '');
-        } catch (e) {
-            var value = String(url || '');
-            return /learn\.inside\.dtu\.dk\/d2l\/home\/?$/i.test(value);
-        }
-    }
-
-    function isPauseProtectedPattern(pattern) {
-        var normalized = normalizeUrlPausePattern(pattern);
-        if (!normalized) return false;
-        if (!/learn\.inside\.dtu\.dk/i.test(normalized)) return false;
-        return /learn\.inside\.dtu\.dk\/d2l\/home(?:\/)?(?:\?.*)?$/i.test(normalized);
-    }
-
-    function getUrlPausePatterns() {
-        try {
-            var raw = localStorage.getItem(URL_PAUSE_PATTERNS_KEY);
-            if (!raw) return [];
-            var parsed = JSON.parse(raw);
-            if (!Array.isArray(parsed)) return [];
-            var out = [];
-            var seen = Object.create(null);
-            parsed.forEach(function (entry) {
-                var normalized = normalizeUrlPausePattern(entry);
-                if (!normalized || seen[normalized]) return;
-                seen[normalized] = true;
-                out.push(normalized);
-            });
-            return out;
-        } catch (e) {
-            return [];
-        }
-    }
-
-    function saveUrlPausePatterns(patterns) {
-        try {
-            localStorage.setItem(URL_PAUSE_PATTERNS_KEY, JSON.stringify(patterns || []));
-        } catch (e) { }
-    }
-
-    function wildcardPatternToRegExp(pattern) {
-        var escaped = String(pattern || '').replace(/[|\\{}()[\]^$+?.]/g, '\\$&');
-        escaped = escaped.replace(/\*/g, '.*');
-        return new RegExp('^' + escaped + '$', 'i');
-    }
-
-    function getMatchingUrlPausePatterns(url) {
-        var currentUrl = String(url || getCurrentUrlWithoutHash());
-        if (isPauseProtectedUrl(currentUrl)) return [];
-        var patterns = getUrlPausePatterns();
-        return patterns.filter(function (pattern) {
-            try {
-                return wildcardPatternToRegExp(pattern).test(currentUrl);
-            } catch (e) {
-                return false;
-            }
-        });
-    }
-
-    function buildSuggestedPausePatternsForCurrentUrl() {
-        var suggestions = [];
-        var seen = Object.create(null);
-        function add(value) {
-            var normalized = normalizeUrlPausePattern(value);
-            if (!normalized || seen[normalized] || isPauseProtectedPattern(normalized)) return;
-            seen[normalized] = true;
-            suggestions.push(normalized);
-        }
-
-        var origin = window.location.origin;
-        var pathname = window.location.pathname || '/';
-        var search = window.location.search || '';
-        add(origin + pathname + search);
-
-        if (/^\/d2l\/home\/\d+\/?$/i.test(pathname)) {
-            add(origin + pathname.replace(/\/?$/, '*'));
-        }
-
-        if (/^\/d2l\/lms\/[^/]+\//i.test(pathname)) {
-            var parts = pathname.split('/').filter(Boolean);
-            if (parts.length >= 4) {
-                add(origin + '/' + parts.slice(0, 3).join('/') + '/*');
-            }
-        }
-
-        var ou = '';
-        try { ou = new URL(window.location.href).searchParams.get('ou') || ''; } catch (e) { ou = ''; }
-        if (ou) {
-            add(origin + '/d2l/*?ou=' + ou + '*');
-            add(origin + pathname + '?ou=' + ou + '*');
-            add(origin + '/d2l/home/' + ou + '*');
-        }
-
-        if (!suggestions.length) add(origin + pathname + '*');
-        return suggestions;
-    }
-
-    function showUrlPausedBanner(matchingPatterns) {
-        if (!IS_TOP_WINDOW) return;
-        if (document.getElementById('dtu-after-dark-paused-banner')) return;
-
-        var mount = document.documentElement || document.body;
-        if (!mount) return;
-
-        var wrap = document.createElement('div');
-        wrap.id = 'dtu-after-dark-paused-banner';
-        wrap.style.cssText = 'position:fixed;top:12px;right:12px;z-index:2147483647;display:flex;align-items:center;gap:8px;'
-            + 'padding:10px 12px;border-radius:10px;background:rgba(26,26,26,0.96);border:1px solid rgba(255,255,255,0.18);'
-            + 'color:#f0f0f0;font:12px/1.35 -apple-system,BlinkMacSystemFont,\"Segoe UI\",sans-serif;box-shadow:0 10px 24px rgba(0,0,0,0.35);';
-
-        var text = document.createElement('span');
-        text.textContent = 'DTU After Dark is paused on this URL.';
-        text.title = (matchingPatterns || []).join('\n');
-
-        var resumeBtn = document.createElement('button');
-        resumeBtn.type = 'button';
-        resumeBtn.textContent = 'Resume';
-        resumeBtn.style.cssText = 'appearance:none;border:1px solid rgba(255,255,255,0.18);background:#2d2d2d;color:#ffffff;'
-            + 'padding:4px 10px;border-radius:999px;font:inherit;font-weight:700;cursor:pointer;';
-        resumeBtn.addEventListener('click', function () {
-            var allPatterns = getUrlPausePatterns();
-            var remaining = allPatterns.filter(function (pattern) {
-                return (matchingPatterns || []).indexOf(pattern) === -1;
-            });
-            saveUrlPausePatterns(remaining);
-            window.location.reload();
-        });
-
-        wrap.appendChild(text);
-        wrap.appendChild(resumeBtn);
-        mount.appendChild(wrap);
-    }
 
     // Inject the dark mode CSS stylesheet via <link> element
     function injectDarkCSS() {
@@ -374,20 +295,23 @@
                 outline: 2px solid currentColor !important;
                 outline-offset: 2px !important;
             }
+            /* Reduce motion (OS setting): our own fades, slides and pulses finish at once. */
+            @media (prefers-reduced-motion: reduce) {
+                [data-dtu-ext], [data-dtu-ext] *, [data-dtu-ext]::before, [data-dtu-ext]::after,
+                [class^="dtu-"], [class*=" dtu-"] {
+                    transition-duration: 0.01ms !important;
+                    animation-duration: 0.01ms !important;
+                    animation-iteration-count: 1 !important;
+                    scroll-behavior: auto !important;
+                }
+            }
         `;
         (document.head || document.documentElement).appendChild(style);
     }
 
     // Always inject accent overrides (even in light mode)
-    var _matchingUrlPausePatterns = getMatchingUrlPausePatterns();
+    var _matchingUrlPausePatterns = __urlPause.init();
     if (_matchingUrlPausePatterns.length) {
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', function () {
-                showUrlPausedBanner(_matchingUrlPausePatterns);
-            }, { once: true });
-        } else {
-            showUrlPausedBanner(_matchingUrlPausePatterns);
-        }
         return;
     }
 
@@ -400,7 +324,10 @@
         document.addEventListener('DOMContentLoaded', injectDarkCSS, { once: true });
     }
 
-    function applyStoredDarkModeValue(storedEnabled) {
+    function applyStoredDarkModeValue(storedEnabled, storedFollow) {
+        // Unset follow means off. Cache it before the effective value is recomputed.
+        if (typeof storedFollow === 'boolean') localStorage.setItem(DARK_MODE_FOLLOW_KEY, String(storedFollow));
+        else if (storedFollow === undefined) localStorage.removeItem(DARK_MODE_FOLLOW_KEY);
         // Extension storage is the one copy every DTU site shares; each site's localStorage
         // is only a fast-start cache of it. Unset there means the default (on): a site that
         // cached "false" long ago (localStorage outlives an extension reinstall) otherwise
@@ -409,7 +336,7 @@
         // Only booleans are ever written; anything else would reload on every load.
         if (typeof storedEnabled !== 'boolean') return;
         localStorage.setItem(DARK_MODE_KEY, String(storedEnabled));
-        if (storedEnabled !== darkModeEnabled && window === window.top) {
+        if (isDarkModeEnabled() !== darkModeEnabled && window === window.top) {
             location.reload();
         }
     }
@@ -418,13 +345,13 @@
     var extensionStorage = getExtensionStorageArea();
     if (extensionStorage) {
         if (extensionStorage.api === 'browser') {
-            extensionStorage.area.get(DARK_MODE_KEY).then(function (result) {
-                applyStoredDarkModeValue(result[DARK_MODE_KEY]);
+            extensionStorage.area.get([DARK_MODE_KEY, DARK_MODE_FOLLOW_KEY]).then(function (result) {
+                applyStoredDarkModeValue(result[DARK_MODE_KEY], result[DARK_MODE_FOLLOW_KEY]);
             }).catch(function () { });
         } else {
-            extensionStorage.area.get([DARK_MODE_KEY], function (result) {
+            extensionStorage.area.get([DARK_MODE_KEY, DARK_MODE_FOLLOW_KEY], function (result) {
                 if (chrome && chrome.runtime && chrome.runtime.lastError) return;
-                applyStoredDarkModeValue(result ? result[DARK_MODE_KEY] : undefined);
+                applyStoredDarkModeValue(result ? result[DARK_MODE_KEY] : undefined, result ? result[DARK_MODE_FOLLOW_KEY] : undefined);
             });
         }
     }
@@ -433,10 +360,18 @@
         var onChanged = function (changes, areaName) {
             if (!IS_TOP_WINDOW) return;
             if (areaName && areaName !== 'local') return;
-            if (!changes || !changes[DARK_MODE_KEY]) return;
-            var next = changes[DARK_MODE_KEY].newValue;
-            if (typeof next !== 'boolean') return;
-            if (next !== darkModeEnabled) {
+            if (!changes || (!changes[DARK_MODE_KEY] && !changes[DARK_MODE_FOLLOW_KEY])) return;
+            if (changes[DARK_MODE_FOLLOW_KEY]) {
+                var follow = changes[DARK_MODE_FOLLOW_KEY].newValue;
+                if (follow === true) localStorage.setItem(DARK_MODE_FOLLOW_KEY, 'true');
+                else localStorage.removeItem(DARK_MODE_FOLLOW_KEY);
+            }
+            if (changes[DARK_MODE_KEY]) {
+                var next = changes[DARK_MODE_KEY].newValue;
+                if (typeof next !== 'boolean') return;
+                localStorage.setItem(DARK_MODE_KEY, String(next));
+            }
+            if (isDarkModeEnabled() !== darkModeEnabled) {
                 location.reload();
             }
         };
@@ -455,47 +390,21 @@
     }
     subscribeDarkModeStorageChanges();
 
+    // Device switched light/dark while following it: reload into the new theme.
+    (function followDeviceThemeChanges() {
+        var query = deviceThemeQuery();
+        if (!query || !IS_TOP_WINDOW) return;
+        var onDeviceThemeChange = function () {
+            if (isFollowingDeviceTheme() && isDarkModeEnabled() !== darkModeEnabled) location.reload();
+        };
+        if (query.addEventListener) query.addEventListener('change', onDeviceThemeChange);
+        else if (query.addListener) query.addListener(onDeviceThemeChange);
+    })();
+
     // Dark mode toggle for light mode (re-enable): inserted via runFeatureChecks below
 
     // ===== FEATURE FLAGS (extension-wide) =====
     // These toggles live in extension storage so they apply across all DTU domains.
-    const FEATURE_KURSER_GRADE_STATS_KEY = 'dtuAfterDarkFeatureKurserGradeStats';
-    const FEATURE_TEXTBOOK_LINKS_KEY = 'dtuAfterDarkFeatureKurserTextbookLinker';
-    const FEATURE_CONTENT_SHORTCUT_KEY = 'dtuAfterDarkFeatureContentShortcut';
-    const FEATURE_CAMPUSNET_GPA_TOOLS_KEY = 'dtuAfterDarkFeatureCampusnetGpaTools';
-    const FEATURE_STUDYPLAN_EXAM_CLUSTER_KEY = 'dtuAfterDarkFeatureStudyplanExamCluster';
-    const FEATURE_KURSER_COURSE_EVAL_KEY = 'dtuAfterDarkFeatureKurserCourseEval';
-    const FEATURE_SMART_ROOM_LINKER_KEY = 'dtuAfterDarkFeatureSmartRoomLinker';
-    const FEATURE_LEARN_NAV_RESOURCE_LINKS_KEY = 'dtuAfterDarkFeatureLearnNavResourceLinks';
-    const FEATURE_PARTICIPANT_INTEL_KEY = 'dtuAfterDarkFeatureParticipantIntel';
-    const FEATURE_PARTICIPANT_INTEL_DEMOGRAPHICS_KEY = 'dtuAfterDarkFeatureParticipantIntelDemographics';
-    const FEATURE_PARTICIPANT_INTEL_SHARED_HISTORY_KEY = 'dtuAfterDarkFeatureParticipantIntelSharedHistory';
-    const FEATURE_PARTICIPANT_INTEL_RETENTION_KEY = 'dtuAfterDarkFeatureParticipantIntelRetention';
-    const FEATURE_LIBRARY_DROPDOWN_KEY = 'dtuAfterDarkFeatureLibraryDropdown';
-    const FEATURE_LEARN_LESSONS_BULK_DOWNLOAD_KEY = 'dtuAfterDarkFeatureLearnLessonsBulkDownload';
-    const PARTICIPANT_INTEL_STORAGE_KEY = 'dtuParticipantIntel';
-    const PARTICIPANT_INTEL_MAX_STUDENTS = 5000;
-    const PARTICIPANT_INTEL_MAX_RETENTION = 20;
-
-    const FEATURE_FLAG_DEFAULTS = {
-        [FEATURE_KURSER_GRADE_STATS_KEY]: true,
-        [FEATURE_TEXTBOOK_LINKS_KEY]: true,
-        [FEATURE_CONTENT_SHORTCUT_KEY]: true,
-        [FEATURE_CAMPUSNET_GPA_TOOLS_KEY]: true,
-        [FEATURE_STUDYPLAN_EXAM_CLUSTER_KEY]: false,
-        [FEATURE_KURSER_COURSE_EVAL_KEY]: true,
-        [FEATURE_SMART_ROOM_LINKER_KEY]: true,
-        [FEATURE_LEARN_NAV_RESOURCE_LINKS_KEY]: true,
-        [FEATURE_PARTICIPANT_INTEL_KEY]: false,
-        [FEATURE_PARTICIPANT_INTEL_DEMOGRAPHICS_KEY]: false,
-        [FEATURE_PARTICIPANT_INTEL_SHARED_HISTORY_KEY]: false,
-        [FEATURE_PARTICIPANT_INTEL_RETENTION_KEY]: false,
-        [FEATURE_LIBRARY_DROPDOWN_KEY]: true,
-        [FEATURE_LEARN_LESSONS_BULK_DOWNLOAD_KEY]: true
-    };
-
-    let _featureFlags = Object.assign({}, FEATURE_FLAG_DEFAULTS);
-    let _featureFlagsLoaded = false;
 
     function storageLocalGet(defaults, cb) {
         var storage = getExtensionStorageArea();
@@ -538,638 +447,36 @@
         }
     }
 
-    // ===== ACCENT THEME (extension-wide) =====
-    // Stored in extension storage so it applies across all DTU domains.
-    const ACCENT_THEME_KEY = 'dtuAfterDarkAccentThemeV1';
-    const ACCENT_CUSTOM_HEX_KEY = 'dtuAfterDarkAccentCustomHexV1';
-    const ACCENT_THEME_DEFAULT = 'dtu_red';
-    const ACCENT_CUSTOM_DEFAULT = '#990000';
-    const ACCENT_THEMES = {
-        dtu_red: {
-            label: 'DTU Corporate Red',
-            accent: '#990000',
-            accentHover: '#b30000',
-            accentDeep: '#7d0000',
-            accentDeepHover: '#990000',
-            accentSoft: '#ff6b6b',
-            accentBorder: '#7d0000'
-        },
-        dtu_blue: {
-            label: 'DTU Blue',
-            accent: '#2f3eea',
-            accentHover: '#4d5af0',
-            accentDeep: '#1f2bb5',
-            accentDeepHover: '#2f3eea',
-            accentSoft: '#9ca5ff',
-            accentBorder: '#1f2bb5'
-        },
-        dtu_bright_green: {
-            label: 'DTU Bright Green',
-            accent: '#1fd082',
-            accentHover: '#3ddd97',
-            accentDeep: '#138a55',
-            accentDeepHover: '#1aa66a',
-            accentSoft: '#8cf0c5',
-            accentBorder: '#12784b'
-        },
-        dtu_navy_blue: {
-            label: 'DTU Navy Blue',
-            accent: '#030f4f',
-            accentHover: '#0c1e75',
-            accentDeep: '#020a37',
-            accentDeepHover: '#030f4f',
-            accentSoft: '#7e8bc8',
-            accentBorder: '#020a37'
-        },
-        dtu_yellow: {
-            label: 'DTU Yellow',
-            accent: '#f6d04d',
-            accentHover: '#ffe073',
-            accentDeep: '#c89f14',
-            accentDeepHover: '#d8b12a',
-            accentSoft: '#ffebad',
-            accentBorder: '#b88f00'
-        },
-        dtu_orange: {
-            label: 'DTU Orange',
-            accent: '#fc7634',
-            accentHover: '#ff914f',
-            accentDeep: '#cc5519',
-            accentDeepHover: '#e16526',
-            accentSoft: '#ffc3a3',
-            accentBorder: '#b84a13'
-        },
-        dtu_pink: {
-            label: 'DTU Pink',
-            accent: '#f7bbb1',
-            accentHover: '#ffd0c8',
-            accentDeep: '#c9857b',
-            accentDeepHover: '#dea198',
-            accentSoft: '#ffe7e2',
-            accentBorder: '#b6736a'
-        },
-        dtu_grey: {
-            label: 'DTU Grey',
-            accent: '#dadada',
-            accentHover: '#ececec',
-            accentDeep: '#9f9f9f',
-            accentDeepHover: '#b7b7b7',
-            accentSoft: '#f4f4f4',
-            accentBorder: '#8f8f8f'
-        },
-        dtu_red_secondary: {
-            label: 'DTU Red',
-            accent: '#e83f48',
-            accentHover: '#ef636b',
-            accentDeep: '#b3202a',
-            accentDeepHover: '#cf2f38',
-            accentSoft: '#ff9fa4',
-            accentBorder: '#9e1d25'
-        },
-        dtu_green: {
-            label: 'DTU Green',
-            accent: '#008835',
-            accentHover: '#12a24a',
-            accentDeep: '#006125',
-            accentDeepHover: '#00752d',
-            accentSoft: '#79d39a',
-            accentBorder: '#00531f'
-        },
-        dtu_purple: {
-            label: 'DTU Purple',
-            accent: '#79238e',
-            accentHover: '#9440a8',
-            accentDeep: '#5a1a6a',
-            accentDeepHover: '#6b1f80',
-            accentSoft: '#c78ed6',
-            accentBorder: '#4f175d'
-        },
-        custom: {
-            label: 'Custom',
-            // Values are computed dynamically from ACCENT_CUSTOM_HEX_KEY.
-            accent: '#990000',
-            accentHover: '#b30000',
-            accentDeep: '#7d0000',
-            accentDeepHover: '#990000',
-            accentSoft: '#ff6b6b',
-            accentBorder: '#7d0000'
-        }
-    };
-    // Official DTU palette presets + Custom (custom does not count as a preset).
-    const ACCENT_THEME_ORDER = [
-        'dtu_red',
-        'dtu_blue',
-        'dtu_navy_blue',
-        'dtu_bright_green',
-        'dtu_green',
-        'dtu_yellow',
-        'dtu_orange',
-        'dtu_pink',
-        'dtu_purple',
-        'dtu_grey',
-        'dtu_red_secondary',
-        'custom'
-    ];
-    const STATUS_THEME = {
-        info: '#2f3eea',
-        success: '#008835',
-        warning: '#f6d04d',
-        warningStrong: '#fc7634',
-        danger: '#e83f48'
+    // A feature whose DTU page element is gone (DTU changed the page) says so once in the
+    // console instead of vanishing without a trace. DTU pages draw parts after load, so
+    // it checks again 5 s later and warns only if stillMissing() is still true.
+    var _warnedMissingAnchors = {};
+    globalThis.DTUAfterDarkWarnMissingAnchor = function (feature, selector, stillMissing) {
+        var key = feature + '|' + selector;
+        if (_warnedMissingAnchors[key]) return;
+        _warnedMissingAnchors[key] = true;
+        setTimeout(function () {
+            try { if (!stillMissing()) return; } catch (e) { }
+            console.warn('[DTU After Dark] ' + feature + ': page element not found (' + selector + '); DTU may have changed the page.');
+        }, 5000);
     };
 
-    let _accentThemeId = ACCENT_THEME_DEFAULT;
-    let _accentThemeLoaded = false;
-    let _accentThemeStorageSubscribed = false;
-    let _accentCustomHex = ACCENT_CUSTOM_DEFAULT;
+    globalThis.DTUAfterDarkAccentThemeRuntime = {
+        isDarkModeEnabled: function () { return !!darkModeEnabled; },
+        storageLocalGet: storageLocalGet,
+        storageLocalSet: storageLocalSet,
+        getExtensionUrl: getExtensionUrl
+    };
+    __accentTheme.init();
 
-    function normalizeAccentThemeId(id) {
-        var v = String(id || '').trim();
-        var aliasMap = {
-            // Backward compatibility for older preset ids.
-            ocean_blue: 'dtu_blue',
-            emerald_green: 'dtu_green',
-            amber_orange: 'dtu_orange',
-            royal_purple: 'dtu_purple',
-            teal: 'dtu_bright_green'
-        };
-        if (Object.prototype.hasOwnProperty.call(aliasMap, v)) v = aliasMap[v];
-        if (v && Object.prototype.hasOwnProperty.call(ACCENT_THEMES, v)) return v;
-        return ACCENT_THEME_DEFAULT;
-    }
-
-    function parseHexColorToRgb(hex) {
-        var s = String(hex || '').trim();
-        if (!s) return null;
-        if (s[0] === '#') s = s.slice(1);
-        if (s.length === 3) s = s[0] + s[0] + s[1] + s[1] + s[2] + s[2];
-        if (!/^[0-9a-fA-F]{6}$/.test(s)) return null;
-        var r = parseInt(s.slice(0, 2), 16);
-        var g = parseInt(s.slice(2, 4), 16);
-        var b = parseInt(s.slice(4, 6), 16);
-        return { r: r, g: g, b: b };
-    }
-
-    function clampByte(v) {
-        var n = Math.round(Number(v || 0));
-        if (n < 0) return 0;
-        if (n > 255) return 255;
-        return n;
-    }
-
-    function rgbToHex(rgb, fallback) {
-        if (!rgb) return fallback || ACCENT_CUSTOM_DEFAULT;
-        var r = clampByte(rgb.r), g = clampByte(rgb.g), b = clampByte(rgb.b);
-        var s = (r << 16) | (g << 8) | b;
-        var hex = s.toString(16).padStart(6, '0');
-        return ('#' + hex).toLowerCase();
-    }
-
-    function mixRgb(a, b, t) {
-        if (!a || !b) return a || b || { r: 198, g: 40, b: 40 };
-        var tt = Math.max(0, Math.min(1, Number(t || 0)));
-        return {
-            r: a.r + (b.r - a.r) * tt,
-            g: a.g + (b.g - a.g) * tt,
-            b: a.b + (b.b - a.b) * tt
-        };
-    }
-
-    function lightenHex(hex, amt, fallbackHex) {
-        var rgb = parseHexColorToRgb(hex);
-        if (!rgb) rgb = parseHexColorToRgb(fallbackHex || ACCENT_CUSTOM_DEFAULT);
-        return rgbToHex(mixRgb(rgb, { r: 255, g: 255, b: 255 }, amt), fallbackHex || ACCENT_CUSTOM_DEFAULT);
-    }
-
-    function darkenHex(hex, amt, fallbackHex) {
-        var rgb = parseHexColorToRgb(hex);
-        if (!rgb) rgb = parseHexColorToRgb(fallbackHex || ACCENT_CUSTOM_DEFAULT);
-        return rgbToHex(mixRgb(rgb, { r: 0, g: 0, b: 0 }, amt), fallbackHex || ACCENT_CUSTOM_DEFAULT);
-    }
-
-    function normalizeHexColor(hex, fallbackHex) {
-        var rgb = parseHexColorToRgb(hex);
-        if (!rgb) return (fallbackHex || null);
-        return rgbToHex(rgb, fallbackHex || ACCENT_CUSTOM_DEFAULT);
-    }
-
-    function relativeLuminanceFromRgb(rgb) {
-        if (!rgb) return 0;
-        function toLinear(v) {
-            var c = clampByte(v) / 255;
-            return c <= 0.04045 ? (c / 12.92) : Math.pow((c + 0.055) / 1.055, 2.4);
-        }
-        var r = toLinear(rgb.r);
-        var g = toLinear(rgb.g);
-        var b = toLinear(rgb.b);
-        return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    }
-
-    // Pick black/white foreground for best contrast on a given background hex.
-    function getContrastTextForHex(bgHex, lightText, darkText) {
-        var light = lightText || '#ffffff';
-        var dark = darkText || '#000000';
-        var rgb = parseHexColorToRgb(bgHex);
-        if (!rgb) return light;
-        var lum = relativeLuminanceFromRgb(rgb);
-        var contrastWithWhite = 1.05 / (lum + 0.05);
-        var contrastWithBlack = (lum + 0.05) / 0.05;
-        return contrastWithBlack >= contrastWithWhite ? dark : light;
-    }
-
-    // Text on accent bars/headers/badges: DTU's look is white text, so keep white
-    // unless it drops below 4:1, then use black if that reads better. Keeps Orange
-    // and Bright Green white (4.3/4.4) and flips Yellow, Grey and Pink (2.5 to 3.0).
-    function getAccentBarTextForHex(bgHex) {
-        var rgb = parseHexColorToRgb(bgHex);
-        if (!rgb) return '#ffffff';
-        var lum = relativeLuminanceFromRgb(rgb);
-        var contrastWithWhite = 1.05 / (lum + 0.05);
-        var contrastWithBlack = (lum + 0.05) / 0.05;
-        if (contrastWithWhite >= 4 || contrastWithWhite >= contrastWithBlack) return '#ffffff';
-        return '#000000';
-    }
-
-    // Accent used as text (links, course codes, counters): nudge it toward black
-    // on light pages or toward white on dark ones until it reaches 4.5:1, so light
-    // presets like Yellow stay readable. Colours that already pass are unchanged.
-    function getReadableAccentTextHex(hex, pageBgHex) {
-        var rgb = parseHexColorToRgb(hex);
-        var bg = parseHexColorToRgb(pageBgHex);
-        if (!rgb || !bg) return normalizeHexColor(hex, ACCENT_CUSTOM_DEFAULT) || ACCENT_CUSTOM_DEFAULT;
-        var bgLum = relativeLuminanceFromRgb(bg);
-        var toward = bgLum > 0.18 ? { r: 0, g: 0, b: 0 } : { r: 255, g: 255, b: 255 };
-        function ratio(c) {
-            var l = relativeLuminanceFromRgb(c);
-            return (Math.max(l, bgLum) + 0.05) / (Math.min(l, bgLum) + 0.05);
-        }
-        for (var step = 0; step <= 20; step++) {
-            var candidate = mixRgb(rgb, toward, step * 0.05);
-            candidate = { r: clampByte(candidate.r), g: clampByte(candidate.g), b: clampByte(candidate.b) };
-            if (ratio(candidate) >= 4.5) return rgbToHex(candidate);
-        }
-        return rgbToHex(toward);
-    }
-
-    // Accent for marks and labels drawn on a fixed surface, whichever mode is active. The
-    // accent itself when it already reads (4.5:1); otherwise the preset's own shade for that
-    // surface (soft on dark, deep on light), nudged to 4.5:1. Nudging a dark accent like
-    // Navy straight toward white would drain it to grey instead.
-    function getAccentForSurfaceHex(theme, surfaceHex) {
-        var rgb = parseHexColorToRgb(theme && theme.accent);
-        var bg = parseHexColorToRgb(surfaceHex);
-        if (rgb && bg) {
-            var l1 = relativeLuminanceFromRgb(rgb);
-            var l2 = relativeLuminanceFromRgb(bg);
-            if ((Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05) >= 4.5) return normalizeHexColor(theme.accent, theme.accent);
-        }
-        var darkSurface = bg ? relativeLuminanceFromRgb(bg) <= 0.18 : true;
-        var shade = darkSurface ? (theme && theme.accentSoft) : (theme && theme.accentDeep);
-        return getReadableAccentTextHex(shade || (theme && theme.accent), surfaceHex);
-    }
-
-    function hexToRgbTriplet(hex, fallbackTriplet) {
-        var rgb = parseHexColorToRgb(hex);
-        if (!rgb) return fallbackTriplet || '198,40,40';
-        return rgb.r + ',' + rgb.g + ',' + rgb.b;
-    }
-
-    function rgbaFromHex(hex, alpha, fallbackHex) {
-        var rgb = parseHexColorToRgb(hex);
-        if (!rgb) rgb = parseHexColorToRgb(fallbackHex || '#990000');
-        if (!rgb) return 'rgba(153,0,0,' + String(alpha || 0) + ')';
-        return 'rgba(' + rgb.r + ',' + rgb.g + ',' + rgb.b + ',' + String(alpha || 0) + ')';
-    }
-
-    function getAccentCustomHexFromLocalStorage() {
-        try {
-            return localStorage.getItem(ACCENT_CUSTOM_HEX_KEY);
-        } catch (e) {
-            return null;
-        }
-    }
-
-    function computeCustomAccentTheme(hex) {
-        var base = normalizeHexColor(hex, ACCENT_CUSTOM_DEFAULT) || ACCENT_CUSTOM_DEFAULT;
-        // Pragmatic palette: strong primary, deeper bar, lighter "soft" for text on dark UI.
-        // Keep it deterministic so it works cross-site with our existing CSS variables.
-        return {
-            label: 'Custom',
-            accent: base,
-            accentHover: lightenHex(base, 0.12, base),
-            accentDeep: darkenHex(base, 0.38, base),
-            accentDeepHover: darkenHex(base, 0.24, base),
-            accentSoft: lightenHex(base, 0.45, base),
-            accentBorder: darkenHex(base, 0.28, base)
-        };
-    }
-
-    function getAccentThemeById(id) {
-        var key = normalizeAccentThemeId(id);
-        if (key === 'custom') return computeCustomAccentTheme(_accentCustomHex || ACCENT_CUSTOM_DEFAULT);
-        return ACCENT_THEMES[key] || ACCENT_THEMES[ACCENT_THEME_DEFAULT];
-    }
-
-    function applyAccentThemeVars(theme) {
-        var root = document.documentElement;
-        if (!root || !root.style || !theme) return;
-        var accentOn = getContrastTextForHex(theme.accent, '#ffffff', '#000000');
-
-        root.style.setProperty('--dtu-ad-accent', theme.accent);
-        root.style.setProperty('--dtu-ad-accent-hover', theme.accentHover);
-        root.style.setProperty('--dtu-ad-accent-rgb', hexToRgbTriplet(theme.accent, '153,0,0'));
-        root.style.setProperty('--dtu-ad-accent-on', accentOn);
-
-        root.style.setProperty('--dtu-ad-accent-deep', theme.accentDeep);
-        root.style.setProperty('--dtu-ad-accent-deep-hover', theme.accentDeepHover || theme.accentHover);
-        root.style.setProperty('--dtu-ad-accent-deep-rgb', hexToRgbTriplet(theme.accentDeep, '125,0,0'));
-        root.style.setProperty('--dtu-ad-accent-deep-on', getAccentBarTextForHex(theme.accentDeep));
-        var textPageBg = darkModeEnabled ? '#2d2d2d' : '#ffffff';
-        root.style.setProperty('--dtu-ad-accent-text', getReadableAccentTextHex(theme.accent, textPageBg));
-        root.style.setProperty('--dtu-ad-accent-text-hover', getReadableAccentTextHex(theme.accentHover || theme.accent, textPageBg));
-        // Light-mode links on CampusNet/kurser use the deep shade; keep it, made readable on white.
-        root.style.setProperty('--dtu-ad-accent-deep-text', getReadableAccentTextHex(theme.accentDeep, '#ffffff'));
-        // Hover keeps the resting text colour so text never flips under the mouse.
-        root.style.setProperty('--dtu-ad-accent-deep-hover-on', getAccentBarTextForHex(theme.accentDeep));
-
-        root.style.setProperty('--dtu-ad-accent-soft', theme.accentSoft || theme.accent);
-        // Independent of the current mode, so a widget can pick by its own data-theme.
-        root.style.setProperty('--dtu-ad-accent-mark-dark', getAccentForSurfaceHex(theme, '#2d2d2d'));
-        root.style.setProperty('--dtu-ad-accent-mark-light', getAccentForSurfaceHex(theme, '#ffffff'));
-        root.style.setProperty('--dtu-ad-accent-border', theme.accentBorder || theme.accentDeep);
-
-        // Semantic status colors (stable DTU palette, independent of selected accent).
-        root.style.setProperty('--dtu-ad-status-info', STATUS_THEME.info);
-        root.style.setProperty('--dtu-ad-status-info-rgb', hexToRgbTriplet(STATUS_THEME.info, '47,62,234'));
-
-        root.style.setProperty('--dtu-ad-status-success', STATUS_THEME.success);
-        root.style.setProperty('--dtu-ad-status-success-rgb', hexToRgbTriplet(STATUS_THEME.success, '0,136,53'));
-
-        root.style.setProperty('--dtu-ad-status-warning', STATUS_THEME.warning);
-        root.style.setProperty('--dtu-ad-status-warning-rgb', hexToRgbTriplet(STATUS_THEME.warning, '246,208,77'));
-        root.style.setProperty('--dtu-ad-status-warning-strong', STATUS_THEME.warningStrong);
-        root.style.setProperty('--dtu-ad-status-warning-strong-rgb', hexToRgbTriplet(STATUS_THEME.warningStrong, '252,118,52'));
-
-        root.style.setProperty('--dtu-ad-status-danger', STATUS_THEME.danger);
-        root.style.setProperty('--dtu-ad-status-danger-rgb', hexToRgbTriplet(STATUS_THEME.danger, '232,63,72'));
-    }
-
-    function getAccentThemeIdFromLocalStorage() {
-        try {
-            return localStorage.getItem(ACCENT_THEME_KEY);
-        } catch (e) {
-            return null;
-        }
-    }
-
-    function applyAfterDarkAdminMenuThemeVars(rootEl) {
-        if (!rootEl || !rootEl.style) return;
-        var isDark = !!darkModeEnabled;
-        var theme = getAccentThemeById(_accentThemeId);
-        var deep = theme.accentDeep || '#990000';
-        var soft = theme.accentSoft || deep;
-
-        rootEl.style.setProperty('--dtu-am-sidebar-bg', isDark ? '#2d2d2d' : '#f3f4f6');
-        rootEl.style.setProperty('--dtu-am-content-bg', isDark ? '#2d2d2d' : '#ffffff');
-        rootEl.style.setProperty('--dtu-am-text', isDark ? '#e0e0e0' : '#1f2937');
-        rootEl.style.setProperty('--dtu-am-muted', isDark ? '#a3a3a3' : '#5f6673');
-        rootEl.style.setProperty('--dtu-am-border', isDark ? '#333' : '#e5e7eb');
-        rootEl.style.setProperty('--dtu-am-hover', isDark ? '#333' : '#e5e7eb');
-        rootEl.style.setProperty('--dtu-am-action', isDark ? '#93c5fd' : '#1565c0');
-        rootEl.style.setProperty('--dtu-am-toggle-off', isDark ? '#555' : '#ccc');
-        rootEl.style.setProperty('--dtu-am-height', '600px');
-
-        rootEl.style.setProperty('--dtu-am-accent', deep);
-        rootEl.style.setProperty('--dtu-am-active-text', isDark ? soft : getReadableAccentTextHex(deep, '#f3f4f6'));
-        rootEl.style.setProperty('--dtu-am-active-bg', isDark ? rgbaFromHex(deep, 0.13) : rgbaFromHex(deep, 0.07));
-        rootEl.style.setProperty('--dtu-am-input-bg', isDark ? '#1a1a1a' : '#f9fafb');
-        rootEl.style.setProperty('--dtu-am-accent-ring', isDark ? rgbaFromHex(deep, 0.28) : rgbaFromHex(deep, 0.18));
-    }
-
-    function syncAccentThemeUi() {
-        try {
-            document.querySelectorAll('[data-dtu-accent-theme-select]').forEach(function (sel) {
-                if (!sel) return;
-                try { sel.value = _accentThemeId; } catch (e0) { }
-            });
-        } catch (e) { }
-
-        try {
-            document.querySelectorAll('[data-dtu-accent-custom-input]').forEach(function (inp) {
-                if (!inp) return;
-                try { inp.value = normalizeHexColor(_accentCustomHex, ACCENT_CUSTOM_DEFAULT) || ACCENT_CUSTOM_DEFAULT; } catch (e0) { }
-                try { inp.style.display = (_accentThemeId === 'custom') ? '' : 'none'; } catch (e1) { }
-            });
-        } catch (e1) { }
-
-        // Keep any open settings UI in sync.
-        try {
-            document.querySelectorAll('.dtu-am-root').forEach(function (rootEl) {
-                try { applyAfterDarkAdminMenuThemeVars(rootEl); } catch (e1) { }
-            });
-        } catch (e2) { }
-    }
-
-    function setAccentCustomHex(nextHex, opts) {
-        var normalized = normalizeHexColor(nextHex, null);
-        if (!normalized) return;
-        _accentCustomHex = normalized;
-        try { localStorage.setItem(ACCENT_CUSTOM_HEX_KEY, normalized); } catch (e0) { }
-
-        if (_accentThemeId === 'custom') {
-            applyAccentThemeVars(getAccentThemeById('custom'));
-            syncAccentThemeUi();
-            try { replaceLogoImage(); } catch (eLogoCustom) { }
-        }
-
-        if (opts && opts.noStorage) return;
-        storageLocalSet({ [ACCENT_CUSTOM_HEX_KEY]: normalized });
-    }
-
-    function setAccentThemeId(nextId, opts) {
-        var id = normalizeAccentThemeId(nextId);
-        _accentThemeId = id;
-        try { localStorage.setItem(ACCENT_THEME_KEY, id); } catch (e0) { }
-
-        applyAccentThemeVars(getAccentThemeById(id));
-        syncAccentThemeUi();
-        try { replaceLogoImage(); } catch (eLogoTheme) { }
-
-        if (opts && opts.noStorage) return;
-        storageLocalSet({ [ACCENT_THEME_KEY]: id });
-    }
-
-    function loadAccentTheme(cb) {
-        if (_accentThemeLoaded) {
-            if (cb) cb(_accentThemeId);
-            return;
-        }
-        storageLocalGet({
-            [ACCENT_THEME_KEY]: ACCENT_THEME_DEFAULT,
-            [ACCENT_CUSTOM_HEX_KEY]: ACCENT_CUSTOM_DEFAULT
-        }, function (result) {
-            _accentThemeLoaded = true;
-            var storedTheme = result ? result[ACCENT_THEME_KEY] : null;
-            var storedCustom = result ? result[ACCENT_CUSTOM_HEX_KEY] : null;
-
-            // Load custom first so selecting "custom" immediately uses the stored color.
-            if (typeof storedCustom === 'string' && storedCustom) {
-                var normCustom = normalizeHexColor(storedCustom, ACCENT_CUSTOM_DEFAULT) || ACCENT_CUSTOM_DEFAULT;
-                _accentCustomHex = normCustom;
-                try { localStorage.setItem(ACCENT_CUSTOM_HEX_KEY, normCustom); } catch (e0) { }
-            }
-
-            if (typeof storedTheme === 'string' && storedTheme) {
-                var normalized = normalizeAccentThemeId(storedTheme);
-                if (normalized !== _accentThemeId) setAccentThemeId(normalized, { noStorage: true });
-                else {
-                    // Re-apply in case custom changed and the current theme depends on it.
-                    applyAccentThemeVars(getAccentThemeById(_accentThemeId));
-                    syncAccentThemeUi();
-                }
-            } else {
-                // Theme wasn't stored; still apply custom if we're currently on "custom".
-                applyAccentThemeVars(getAccentThemeById(_accentThemeId));
-                syncAccentThemeUi();
-            }
-            if (cb) cb(_accentThemeId);
-        });
-    }
-
-    function subscribeAccentThemeStorageChanges() {
-        if (_accentThemeStorageSubscribed) return;
-        _accentThemeStorageSubscribed = true;
-
-        var onChanged = function (changes, areaName) {
-            if (areaName && areaName !== 'local') return;
-            if (!changes) return;
-
-            if (changes[ACCENT_THEME_KEY]) {
-                var next = changes[ACCENT_THEME_KEY] ? changes[ACCENT_THEME_KEY].newValue : undefined;
-                if (typeof next === 'string' && next) setAccentThemeId(next, { noStorage: true });
-            }
-
-            if (changes[ACCENT_CUSTOM_HEX_KEY]) {
-                var nextHex = changes[ACCENT_CUSTOM_HEX_KEY] ? changes[ACCENT_CUSTOM_HEX_KEY].newValue : undefined;
-                if (typeof nextHex === 'string' && nextHex) setAccentCustomHex(nextHex, { noStorage: true });
-            }
-        };
-
-        try {
-            if (typeof browser !== 'undefined' && browser.storage && browser.storage.onChanged) {
-                browser.storage.onChanged.addListener(onChanged);
-                return;
-            }
-        } catch (e) { }
-        try {
-            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
-                chrome.storage.onChanged.addListener(onChanged);
-            }
-        } catch (e2) { }
-    }
-
-    // Apply sync value immediately for faster first paint.
-    _accentThemeId = normalizeAccentThemeId(getAccentThemeIdFromLocalStorage());
-    _accentCustomHex = normalizeHexColor(getAccentCustomHexFromLocalStorage(), ACCENT_CUSTOM_DEFAULT) || ACCENT_CUSTOM_DEFAULT;
-    applyAccentThemeVars(getAccentThemeById(_accentThemeId));
-    // Then sync from extension storage (cross-domain).
-    loadAccentTheme(function () { });
-    subscribeAccentThemeStorageChanges();
-
-    function loadFeatureFlags(cb) {
-        if (_featureFlagsLoaded) {
-            if (cb) cb(_featureFlags);
-            return;
-        }
-        try {
-            var _twinCleanupStorage = getExtensionStorageArea();
-            if (_twinCleanupStorage) {
-                _twinCleanupStorage.area.remove([
-                    'dtuAfterDarkFeatureParticipantIntelSemesterTwins',
-                    'dtuAfterDarkSemesterTwinPrefsV1',
-                    'dtuAfterDarkFeatureKurserRoomFinder',
-                    'dtuAfterDarkFeatureKurserScheduleAnnotation',
-                    'dtuAfterDarkFeatureKurserMyLineBadges',
-                    'cache_myline_me'
-                ]);
-            }
-        } catch (eTwinCleanup) { }
-        storageLocalGet({ dtuAfterDarkFeatureBookFinder: null }, function (legacyBf) {
-            if (legacyBf && legacyBf.dtuAfterDarkFeatureBookFinder === false) {
-                setFeatureFlagEnabled(FEATURE_TEXTBOOK_LINKS_KEY, false);
-            }
-            try {
-                var _bfCleanupStorage = getExtensionStorageArea();
-                if (_bfCleanupStorage) _bfCleanupStorage.area.remove('dtuAfterDarkFeatureBookFinder');
-            } catch (eBfCleanup) { }
-        });
-        storageLocalGet(FEATURE_FLAG_DEFAULTS, function (flags) {
-            _featureFlags = Object.assign({}, FEATURE_FLAG_DEFAULTS);
-            Object.keys(FEATURE_FLAG_DEFAULTS).forEach(function (key) {
-                if (flags && typeof flags[key] === 'boolean') _featureFlags[key] = flags[key];
-            });
-            _featureFlagsLoaded = true;
-            if (cb) cb(_featureFlags);
-        });
-    }
-
-    function isFeatureFlagEnabled(key) {
-        if (!key) return true;
-        if (_featureFlagsLoaded) return !!_featureFlags[key];
-        if (Object.prototype.hasOwnProperty.call(FEATURE_FLAG_DEFAULTS, key)) return !!FEATURE_FLAG_DEFAULTS[key];
-        return true;
-    }
-
-    function setFeatureFlagEnabled(key, enabled) {
-        if (!key) return;
-        _featureFlags[key] = !!enabled;
-        storageLocalSet({ [key]: !!enabled });
-    }
-
-    var _featureFlagStorageSubscribed = false;
-    var _featureFlagStorageChangeTimer = null;
-    function subscribeFeatureFlagStorageChanges() {
-        if (_featureFlagStorageSubscribed) return;
-        _featureFlagStorageSubscribed = true;
-
-        var onChanged = function (changes, areaName) {
-            if (areaName && areaName !== 'local') return;
-            if (!changes) return;
-
-            var touched = false;
-            Object.keys(changes).forEach(function (key) {
-                if (!Object.prototype.hasOwnProperty.call(FEATURE_FLAG_DEFAULTS, key)) return;
-                var next = changes[key] ? changes[key].newValue : undefined;
-                if (typeof next !== 'boolean') return;
-                _featureFlags[key] = next;
-                touched = true;
-            });
-
-            if (!touched) return;
-            if (_featureFlagStorageChangeTimer) return;
-            _featureFlagStorageChangeTimer = setTimeout(function () {
-                _featureFlagStorageChangeTimer = null;
-                if (IS_TOP_WINDOW) {
-                    try { syncAfterDarkFeatureToggleStates(); } catch (e1) { }
-                    try { runTopWindowFeatureChecks(null, false); } catch (e2) { }
-                } else {
-                    try { runFrameFeatureChecks(null); } catch (e3) { }
-                }
-            }, 120);
-        };
-
-        try {
-            if (typeof browser !== 'undefined' && browser.storage && browser.storage.onChanged) {
-                browser.storage.onChanged.addListener(onChanged);
-                return;
-            }
-        } catch (e) { }
-        try {
-            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
-                chrome.storage.onChanged.addListener(onChanged);
-            }
-        } catch (e2) { }
-    }
+    globalThis.DTUAfterDarkFeatureFlagsRuntime = {
+        getExtensionStorageArea: getExtensionStorageArea,
+        storageLocalGet: storageLocalGet,
+        storageLocalSet: storageLocalSet,
+        isTopWindow: IS_TOP_WINDOW,
+        runTopWindowFeatureChecks: runTopWindowFeatureChecks,
+        runFrameFeatureChecks: runFrameFeatureChecks
+    };
 
     // Load feature flags early so cross-domain toggles work without a full refresh cycle.
     // Note: some pages (Brightspace Content) render inside same-origin iframes; we still
@@ -1205,14 +512,10 @@
         }
     `;
 
-    function getResolvedAccentDeep() {
-        var theme = getAccentThemeById(_accentThemeId);
-        return (theme && theme.accentDeep) || '#7d0000';
-    }
 
     function forceDtuRedBackgroundDark2(el) {
         if (!el || !el.style) return;
-        var color = getResolvedAccentDeep();
+        var color = 'var(--dtu-ad-accent-deep, ' + getResolvedAccentDeep() + ')';
         var styleAttr = (el.getAttribute && el.getAttribute('style')) || '';
         var currentBg = (styleAttr.match(/background-color\s*:\s*([^;!]+)/i) || [])[1];
         if (currentBg && currentBg.trim() === color) return;
@@ -1410,6 +713,8 @@
             deepQueryAll: deepQueryAll,
             markExt: markExt,
             saveDarkModePreference: saveDarkModePreference,
+            isFollowingDeviceTheme: isFollowingDeviceTheme,
+            saveDarkModeFollowDevice: saveDarkModeFollowDevice,
             showSettingsModal: showSettingsModal,
             hideSettingsModal: hideSettingsModal,
             isLibraryEnabled: function () { return isFeatureFlagEnabled(FEATURE_LIBRARY_DROPDOWN_KEY); },
@@ -1457,10 +762,7 @@
             normalizeWhitespace: normalizeWhitespace,
             sendRuntimeMessage: sendRuntimeMessage,
             getAdminToolsPlaceholder: getAdminToolsPlaceholder,
-            getAfterDarkAdminToolsList: getAfterDarkAdminToolsList,
-            formatIsoDateForDisplay: formatIsoDateForDisplay,
-            startOfTodayUtcTs: startOfTodayUtcTs,
-            diffDaysUtc: diffDaysUtc
+            getAfterDarkAdminToolsList: getAfterDarkAdminToolsList
         };
     } catch (eDeadlinesDeps) { }
 
@@ -1511,10 +813,7 @@
         var learnNavApi = getLearnNavUiApi();
         if (learnNavApi && typeof learnNavApi.insertLibraryNavItem === 'function') {
             learnNavApi.insertLibraryNavItem();
-            return;
         }
-        var api = getLibraryUiApi();
-        if (api && typeof api.insertLibraryNavDropdown === 'function') api.insertLibraryNavDropdown();
     }
 
     function removeLibraryNavDropdown() {
@@ -1549,8 +848,9 @@
                     campusnetGpaTools: FEATURE_CAMPUSNET_GPA_TOOLS_KEY,
                     kurserGradeStats: FEATURE_KURSER_GRADE_STATS_KEY,
                     textbookLinks: FEATURE_TEXTBOOK_LINKS_KEY,
-                    studyplanExamCluster: FEATURE_STUDYPLAN_EXAM_CLUSTER_KEY,
                     kurserCourseEval: FEATURE_KURSER_COURSE_EVAL_KEY,
+                    kurserCourseMap: FEATURE_KURSER_COURSE_MAP_KEY,
+                    studyplanExamSchedule: FEATURE_STUDYPLAN_EXAM_SCHEDULE_KEY,
                     smartRoomLinker: FEATURE_SMART_ROOM_LINKER_KEY,
                     contentShortcut: FEATURE_CONTENT_SHORTCUT_KEY,
                     learnNavResourceLinks: FEATURE_LEARN_NAV_RESOURCE_LINKS_KEY,
@@ -1570,6 +870,8 @@
                 };
             },
             saveDarkModePreference: saveDarkModePreference,
+            isFollowingDeviceTheme: isFollowingDeviceTheme,
+            saveDarkModeFollowDevice: saveDarkModeFollowDevice,
             isMojanglesEnabled: isMojanglesEnabled,
             insertMojanglesText: insertMojanglesText,
             isBusEnabled: isBusEnabled,
@@ -1593,8 +895,10 @@
             syncCampusnetActualGradeExclusionControls: syncCampusnetActualGradeExclusionControls,
             insertKurserGradeStats: insertKurserGradeStats,
             insertKurserTextbookLinks: insertKurserTextbookLinks,
-            scheduleStudyplanExamCluster: scheduleStudyplanExamCluster,
             insertKurserCourseEvaluation: insertKurserCourseEvaluation,
+            insertKurserCourseMap: insertKurserCourseMap,
+            insertKurserExamDate: insertKurserExamDate,
+            insertStudyplanExamSchedule: insertStudyplanExamSchedule,
             scheduleSmartRoomLinkerScan: scheduleSmartRoomLinkerScan,
             removeSmartRoomLinks: removeSmartRoomLinks,
             insertContentButtons: insertContentButtons,
@@ -1607,8 +911,8 @@
             removeLibraryNavDropdown: removeLibraryNavDropdown,
             runLessonsBulkDownloadChecks: runLessonsBulkDownloadChecks,
             showContentShortcutOverridesModal: showContentShortcutOverridesModal,
-            getAccentThemeId: function () { return _accentThemeId; },
-            getAccentCustomHex: function () { return _accentCustomHex; },
+            getAccentThemeId: function () { return getAccentThemeId(); },
+            getAccentCustomHex: function () { return getAccentCustomHex(); },
             setAccentThemeId: setAccentThemeId,
             setAccentCustomHex: setAccentCustomHex,
             accentThemeOrder: ACCENT_THEME_ORDER,
@@ -1631,11 +935,6 @@
         } catch (e0) { }
     }
 
-    function showPausedUrlRulesModal(opts) {
-        var api = getSettingsUiApi();
-        if (api && typeof api.showPausedUrlRulesModal === 'function') api.showPausedUrlRulesModal(opts);
-    }
-
     function showSettingsModal() {
         var api = getSettingsUiApi();
         if (api && typeof api.showSettingsModal === 'function') {
@@ -1649,136 +948,6 @@
     }
 
     // Load and visibility handlers are managed by unified scheduling section below
-
-    // ===== LOGO REPLACEMENT =====
-    // Replace the "My Home" logo with accent-colored DTU logos.
-    // Uses SVG template styling:
-    // - Dark mode: accent fill
-    // - Light mode: accent fill + black outline border
-    var _accentLogoSvgTemplate = null;
-    var _accentLogoSvgLoadPromise = null;
-    var _accentLogoDataUrlCache = {};
-
-    function getResolvedAccent() {
-        var theme = getAccentThemeById(_accentThemeId);
-        return (theme && theme.accent) || '#990000';
-    }
-
-    function buildAccentLogoDataUrl(svgText, accentHex, lightModeOutline) {
-        if (!svgText || !/<svg[\s>]/i.test(svgText)) return '';
-        var cleanSvg = String(svgText).replace(/<\?xml[^>]*>\s*/i, '');
-        var styleTag = '<style>path{fill:' + accentHex + ' !important;stroke:none !important;}</style>';
-        cleanSvg = cleanSvg.replace(/<\/svg>\s*$/i, styleTag + '</svg>');
-        return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(cleanSvg);
-    }
-
-    function ensureAccentLogoSvgLoaded(svgUrl) {
-        if (_accentLogoSvgTemplate || _accentLogoSvgLoadPromise) return;
-        _accentLogoSvgLoadPromise = Promise.resolve()
-            .then(function () { return fetch(svgUrl); })
-            .then(function (resp) { return (resp && resp.ok) ? resp.text() : ''; })
-            .then(function (text) {
-                if (text && /<svg[\s>]/i.test(text)) {
-                    _accentLogoSvgTemplate = text;
-                }
-            })
-            .catch(function () { })
-            .finally(function () {
-                _accentLogoSvgLoadPromise = null;
-                try { replaceLogoImage(); } catch (e0) { }
-            });
-    }
-
-    function getAccentLogoSrc() {
-        var accentHex = normalizeHexColor(getResolvedAccent(), '#990000') || '#990000';
-        var modeKey = darkModeEnabled ? 'dark' : 'light';
-        var cacheKey = modeKey + '|' + accentHex;
-        if (Object.prototype.hasOwnProperty.call(_accentLogoDataUrlCache, cacheKey)) {
-            return _accentLogoDataUrlCache[cacheKey];
-        }
-
-        var svgUrl = getExtensionUrl('images/Corp_White_Transparent.svg');
-        if (_accentLogoSvgTemplate) {
-            var dataUrl = buildAccentLogoDataUrl(_accentLogoSvgTemplate, accentHex, !darkModeEnabled);
-            if (dataUrl) {
-                _accentLogoDataUrlCache[cacheKey] = dataUrl;
-                return dataUrl;
-            }
-        }
-
-        ensureAccentLogoSvgLoaded(svgUrl);
-        // Fallback while SVG template is loading.
-        return svgUrl;
-    }
-
-    function replaceLogoImage(rootNode) {
-        // Keep student.dtu.dk native identity/logo SVG untouched.
-        // The student portal header uses its own branded inline SVG sprite.
-        if (window.location.hostname === 'student.dtu.dk') return;
-
-        const newSrc = getAccentLogoSrc();
-
-        function replaceHostLogosInRoot(root) {
-            if (!root || !root.querySelectorAll) return;
-            const hostLogos = root.querySelectorAll(
-                'd2l-labs-navigation-link-image.d2l-navigation-s-logo, '
-                + 'd2l-labs-navigation-link-image[text="My Home"], '
-                + 'd2l-labs-navigation-link-image[href*="/d2l/lp/ouHome/"]'
-            );
-            hostLogos.forEach(host => {
-                if (!host.dataset.darkModeReplaced || host.getAttribute('src') !== newSrc) {
-                    host.setAttribute('src', newSrc);
-                    host.src = newSrc;
-                    host.dataset.darkModeReplaced = 'true';
-                }
-            });
-        }
-
-        // Helper function to replace logo in a given root
-        function replaceInRoot(root) {
-            if (!root) return;
-            const logoImages = root.querySelectorAll(
-                'img[src*="/d2l/lp/navbars/"][src*="/theme/viewimage/"], '
-                + 'img[alt="My Home"], '
-                + 'img.websitelogoright__link-image, '
-                + 'img[src*="dtulogo2_colour.png"], '
-                + 'img[src*="dtulogo_colour.png"], '
-                + 'img.header__logo, '
-                + 'img[src*="DTULogo_Corp_Red_RGB.png"]'
-            );
-            logoImages.forEach(img => {
-                // Re-apply if the host page swaps the src back after load.
-                if (!img.dataset.darkModeReplaced || img.src !== newSrc) {
-                    img.src = newSrc;
-                    img.dataset.darkModeReplaced = 'true';
-                    // Resize the sites.dtu.dk DTU logo
-                    if (img.classList.contains('websitelogoright__link-image') || img.getAttribute('src')?.includes('dtulogo2_colour') || img.classList.contains('logo-img')) {
-                        img.style.setProperty('max-height', '60px', 'important');
-                        img.style.setProperty('width', 'auto', 'important');
-                    }
-                }
-            });
-        }
-
-        const baseRoot = (rootNode && rootNode.nodeType === 1) ? rootNode : document;
-        replaceHostLogosInRoot(baseRoot);
-        replaceInRoot(baseRoot);
-
-        // Check all shadow roots recursively
-        function checkShadowRoots(root) {
-            if (!root) return;
-            const elements = root.querySelectorAll('*');
-            elements.forEach(el => {
-                if (el.shadowRoot) {
-                    replaceHostLogosInRoot(el.shadowRoot);
-                    replaceInRoot(el.shadowRoot);
-                    checkShadowRoots(el.shadowRoot);
-                }
-            });
-        }
-
-        checkShadowRoots(baseRoot);
-    }
 
     // Run logo replacement
     replaceLogoImage();
@@ -1925,7 +1094,6 @@
             isTopWindow: function () { return IS_TOP_WINDOW; },
             isFeatureEnabled: function () { return isFeatureFlagEnabled(FEATURE_CAMPUSNET_GPA_TOOLS_KEY); },
             isDarkMode: function () { return !!darkModeEnabled; },
-            getSuppressHeavyWork: function () { return !!_suppressHeavyWork; },
             setSuppressHeavyWork: function (value) { _suppressHeavyWork = !!value; }
         };
     } catch (eGpaDeps) { }
@@ -1951,460 +1119,15 @@
         }
     }
 
-    // ===== PARTICIPANT INTELLIGENCE (campusnet.dtu.dk) =====
-    // Scrapes participant lists locally to build demographics, shared-history
-    // badges and retention tracking.
-    // All data stays in browser.storage.local -- nothing leaves the browser.
-    var _participantIntelAnnotateTimer = null;
-
-    function getParticipantIntelHostApi() {
-        try { return globalThis.DTUAfterDarkParticipantIntelHost || null; } catch (e0) { return null; }
-    }
-
-    try {
-        globalThis.DTUAfterDarkParticipantIntelHostDeps = {
-            normalizeWhitespace: normalizeWhitespace
-        };
-    } catch (eParticipantIntelHostDeps) { }
-
-    function normalizeIntelCourseCode(code) {
-        var api = getParticipantIntelHostApi();
-        if (!api || typeof api.normalizeIntelCourseCode !== 'function') return '';
-        return api.normalizeIntelCourseCode(code);
-    }
-
-    function normalizeIntelCourseSemester(semester) {
-        var api = getParticipantIntelHostApi();
-        if (!api || typeof api.normalizeIntelCourseSemester !== 'function') return '';
-        return api.normalizeIntelCourseSemester(semester);
-    }
-
-    function detectCampusnetSelfSNumberFromHeader() {
-        var api = getParticipantIntelHostApi();
-        if (!api || typeof api.detectCampusnetSelfSNumberFromHeader !== 'function') return '';
-        return api.detectCampusnetSelfSNumberFromHeader();
-    }
-
-    function getParticipantIntelCoreApi() {
-        return globalThis.DTUAfterDarkParticipantIntelCore || null;
-    }
-
-    globalThis.DTUAfterDarkParticipantIntelCoreDeps = {
-        isFeatureFlagEnabled: isFeatureFlagEnabled,
-        featureParticipantIntelKey: FEATURE_PARTICIPANT_INTEL_KEY,
+    globalThis.DTUAfterDarkParticipantIntelBridgeRuntime = {
         normalizeWhitespace: normalizeWhitespace,
-        normalizeIntelCourseCode: normalizeIntelCourseCode,
-        normalizeIntelCourseSemester: normalizeIntelCourseSemester,
-        isCampusnetLikelyAcademicCourse: isCampusnetLikelyAcademicCourse,
-        getCampusnetUsersParticipantElements: getCampusnetUsersParticipantElements,
-        getCampusnetUsersCountFromPage: getCampusnetUsersCountFromPage,
-        getCampusnetParticipantSNumber: getCampusnetParticipantSNumber,
-        getCampusnetCourseCodeFromPage: getCampusnetCourseCodeFromPage,
-        getCampusnetSemesterFromPage: getCampusnetSemesterFromPage,
-        getCampusnetCourseNameFromPage: getCampusnetCourseNameFromPage,
-        normalizeProgramLabel: normalizeProgramLabel,
-        readParticipantProgram: readParticipantProgram,
-        isCampusnetParticipantPage: isCampusnetParticipantPage,
+        markExt: markExt,
         storageLocalGet: storageLocalGet,
         storageLocalSet: storageLocalSet,
-        participantIntelStorageKey: PARTICIPANT_INTEL_STORAGE_KEY,
-        participantIntelMaxStudents: PARTICIPANT_INTEL_MAX_STUDENTS
-    };
-
-    function dedupeIntelCourseList(courses) {
-        var api = getParticipantIntelCoreApi();
-        if (!api || typeof api.dedupeIntelCourseList !== 'function') return { list: [], changed: true };
-        return api.dedupeIntelCourseList(courses);
-    }
-
-    function collapseCourseEntriesByCode(courses) {
-        var api = getParticipantIntelCoreApi();
-        if (!api || typeof api.collapseCourseEntriesByCode !== 'function') return [];
-        return api.collapseCourseEntriesByCode(courses);
-    }
-
-    function loadParticipantIntel(cb) {
-        var api = getParticipantIntelCoreApi();
-        if (!api || typeof api.loadParticipantIntel !== 'function') {
-            if (cb) cb({ self: null, students: {}, retention: {}, courseNames: {}, backfill: { scanned: {}, autoWeekly: false, lastRunTs: 0 } });
-            return;
-        }
-        return api.loadParticipantIntel(cb);
-    }
-
-    function saveParticipantIntel(data) {
-        var api = getParticipantIntelCoreApi();
-        if (!api || typeof api.saveParticipantIntel !== 'function') return;
-        return api.saveParticipantIntel(data);
-    }
-
-    // -- Page detection helpers --
-
-    function isCampusnetParticipantPage() {
-        var api = getParticipantIntelHostApi();
-        if (!api || typeof api.isCampusnetParticipantPage !== 'function') return false;
-        return api.isCampusnetParticipantPage();
-    }
-
-    function isCampusnetProfilePage() {
-        var api = getParticipantIntelHostApi();
-        if (!api || typeof api.isCampusnetProfilePage !== 'function') return false;
-        return api.isCampusnetProfilePage();
-    }
-
-    function isCampusnetFrontpageDTU() {
-        var api = getParticipantIntelHostApi();
-        if (!api || typeof api.isCampusnetFrontpageDTU !== 'function') return false;
-        return api.isCampusnetFrontpageDTU();
-    }
-
-    function isCampusnetGroupArchivePage() {
-        var api = getParticipantIntelHostApi();
-        if (!api || typeof api.isCampusnetGroupArchivePage !== 'function') return false;
-        return api.isCampusnetGroupArchivePage();
-    }
-
-    function getCurrentDTUSemester() {
-        var api = getParticipantIntelHostApi();
-        if (!api || typeof api.getCurrentDTUSemester !== 'function') return '';
-        return api.getCurrentDTUSemester();
-    }
-
-    function parseDTUSemesterFromText(text) {
-        var api = getParticipantIntelHostApi();
-        if (!api || typeof api.parseDTUSemesterFromText !== 'function') return null;
-        return api.parseDTUSemesterFromText(text);
-    }
-
-    function getCampusnetExplicitSemesterFromPage(rootDoc) {
-        var api = getParticipantIntelHostApi();
-        if (!api || typeof api.getCampusnetExplicitSemesterFromPage !== 'function') return null;
-        return api.getCampusnetExplicitSemesterFromPage(rootDoc);
-    }
-
-    function getCampusnetSemesterFromPage(rootDoc) {
-        var api = getParticipantIntelHostApi();
-        if (!api || typeof api.getCampusnetSemesterFromPage !== 'function') return '';
-        return api.getCampusnetSemesterFromPage(rootDoc);
-    }
-
-    function getCampusnetCourseCodeFromPage(rootDoc) {
-        var api = getParticipantIntelHostApi();
-        if (!api || typeof api.getCampusnetCourseCodeFromPage !== 'function') return null;
-        return api.getCampusnetCourseCodeFromPage(rootDoc);
-    }
-
-    function isCampusnetNonCourseTitle(text) {
-        var api = getParticipantIntelHostApi();
-        if (!api || typeof api.isCampusnetNonCourseTitle !== 'function') return false;
-        return api.isCampusnetNonCourseTitle(text);
-    }
-
-    function isCampusnetLikelyAcademicCourse(courseCode, courseName, opts) {
-        var api = getParticipantIntelHostApi();
-        if (!api || typeof api.isCampusnetLikelyAcademicCourse !== 'function') return false;
-        return api.isCampusnetLikelyAcademicCourse(courseCode, courseName, opts);
-    }
-
-    function getCampusnetCourseNameFromPage(courseCode, rootDoc) {
-        var api = getParticipantIntelHostApi();
-        if (!api || typeof api.getCampusnetCourseNameFromPage !== 'function') return null;
-        return api.getCampusnetCourseNameFromPage(courseCode, rootDoc);
-    }
-
-    function normalizeProgramLabel(raw) {
-        var api = getParticipantIntelHostApi();
-        if (!api || typeof api.normalizeProgramLabel !== 'function') return '';
-        return api.normalizeProgramLabel(raw);
-    }
-
-    function readParticipantProgram(infoDiv) {
-        var api = getParticipantIntelHostApi();
-        if (!api || typeof api.readParticipantProgram !== 'function') return '';
-        return api.readParticipantProgram(infoDiv);
-    }
-
-    function getCampusnetRetentionKey() {
-        var api = getParticipantIntelHostApi();
-        if (!api || typeof api.getCampusnetRetentionKey !== 'function') return '';
-        return api.getCampusnetRetentionKey();
-    }
-
-    function getCampusnetParticipantCategoryMeta(labelRegex) {
-        var api = getParticipantIntelHostApi();
-        if (!api || typeof api.getCampusnetParticipantCategoryMeta !== 'function') return null;
-        return api.getCampusnetParticipantCategoryMeta(labelRegex);
-    }
-
-    function getCampusnetUsersCategoryMeta() {
-        var api = getParticipantIntelHostApi();
-        if (!api || typeof api.getCampusnetUsersCategoryMeta !== 'function') return null;
-        return api.getCampusnetUsersCategoryMeta();
-    }
-
-    function getCampusnetUsersCountFromPage(rootDoc) {
-        var api = getParticipantIntelHostApi();
-        if (!api || typeof api.getCampusnetUsersCountFromPage !== 'function') return null;
-        return api.getCampusnetUsersCountFromPage(rootDoc);
-    }
-
-    function getCampusnetUsersAnchorElement() {
-        var api = getParticipantIntelHostApi();
-        if (!api || typeof api.getCampusnetUsersAnchorElement !== 'function') return null;
-        return api.getCampusnetUsersAnchorElement();
-    }
-
-    function getCampusnetParticipantsListRoot() {
-        var api = getParticipantIntelHostApi();
-        if (!api || typeof api.getCampusnetParticipantsListRoot !== 'function') return null;
-        return api.getCampusnetParticipantsListRoot();
-    }
-
-    function getCampusnetUsersParticipantElements(rootDoc) {
-        var api = getParticipantIntelHostApi();
-        if (!api || typeof api.getCampusnetUsersParticipantElements !== 'function') return [];
-        return api.getCampusnetUsersParticipantElements(rootDoc);
-    }
-
-    function getCampusnetParticipantSNumber(item) {
-        var api = getParticipantIntelHostApi();
-        if (!api || typeof api.getCampusnetParticipantSNumber !== 'function') return '';
-        return api.getCampusnetParticipantSNumber(item);
-    }
-
-    // -- Participant list parser --
-
-    function parseParticipantList() {
-        var api = getParticipantIntelCoreApi();
-        if (!api || typeof api.parseParticipantList !== 'function') return [];
-        return api.parseParticipantList();
-    }
-
-    function getFullParticipantList(cb) {
-        var api = getParticipantIntelCoreApi();
-        if (!api || typeof api.getFullParticipantList !== 'function') {
-            cb(parseParticipantList(), { complete: false, total: 0 });
-            return;
-        }
-        return api.getFullParticipantList(cb);
-    }
-
-    // -- Data collection & self-detection --
-
-    function collectParticipantData() {
-        var api = getParticipantIntelCoreApi();
-        if (!api || typeof api.collectParticipantData !== 'function') return;
-        return api.collectParticipantData();
-    }
-
-    function detectAndStoreSelf(intel, participants, courseCode, semester) {
-        var api = getParticipantIntelCoreApi();
-        if (!api || typeof api.detectAndStoreSelf !== 'function') return;
-        return api.detectAndStoreSelf(intel, participants, courseCode, semester);
-    }
-
-    // ---- Feature 1: Room Intelligence (Demographics) ----
-
-    function getParticipantIntelUiApi() {
-        return globalThis.DTUAfterDarkParticipantIntelUi || null;
-    }
-
-    globalThis.DTUAfterDarkParticipantIntelUiDeps = {
-        isTopWindow: IS_TOP_WINDOW,
-        isFeatureFlagEnabled: isFeatureFlagEnabled,
-        featureParticipantIntelKey: FEATURE_PARTICIPANT_INTEL_KEY,
-        featureParticipantIntelDemographicsKey: FEATURE_PARTICIPANT_INTEL_DEMOGRAPHICS_KEY,
-        featureParticipantIntelSharedHistoryKey: FEATURE_PARTICIPANT_INTEL_SHARED_HISTORY_KEY,
-        featureParticipantIntelRetentionKey: FEATURE_PARTICIPANT_INTEL_RETENTION_KEY,
-        isCampusnetParticipantPage: isCampusnetParticipantPage,
-        isCampusnetProfilePage: isCampusnetProfilePage,
         isDarkMode: function () { return !!darkModeEnabled; },
-        markExt: markExt,
-        parseParticipantList: parseParticipantList,
-        getFullParticipantList: getFullParticipantList,
-        getCampusnetUsersCountFromPage: getCampusnetUsersCountFromPage,
-        loadParticipantIntel: loadParticipantIntel,
-        normalizeProgramLabel: normalizeProgramLabel,
-        readParticipantProgram: readParticipantProgram,
-        getCampusnetCourseCodeFromPage: getCampusnetCourseCodeFromPage,
-        getCampusnetSemesterFromPage: getCampusnetSemesterFromPage,
-        getCampusnetRetentionKey: getCampusnetRetentionKey,
-        getCampusnetUsersParticipantElements: getCampusnetUsersParticipantElements,
-        getCampusnetParticipantSNumber: getCampusnetParticipantSNumber,
-        normalizeIntelCourseCode: normalizeIntelCourseCode,
-        normalizeIntelCourseSemester: normalizeIntelCourseSemester,
-        detectCampusnetSelfSNumberFromHeader: detectCampusnetSelfSNumberFromHeader,
-        dedupeIntelCourseList: dedupeIntelCourseList,
-        collapseCourseEntriesByCode: collapseCourseEntriesByCode,
-        normalizeWhitespace: normalizeWhitespace,
-        isCampusnetLikelyAcademicCourse: isCampusnetLikelyAcademicCourse,
-        getCampusnetUsersAnchorElement: getCampusnetUsersAnchorElement,
-        getCampusnetParticipantsListRoot: getCampusnetParticipantsListRoot,
-        saveParticipantIntel: saveParticipantIntel,
-        participantIntelMaxRetention: PARTICIPANT_INTEL_MAX_RETENTION
+        isTopWindow: IS_TOP_WINDOW
     };
-
-    function insertParticipantDemographics() {
-        var api = getParticipantIntelUiApi();
-        if (!api || typeof api.insertParticipantDemographics !== 'function') return;
-        return api.insertParticipantDemographics();
-    }
-
-    // ---- Feature 3: Contextual Memory ("Where do I know you from?") ----
-
-    function annotateParticipantHistory() {
-        var api = getParticipantIntelUiApi();
-        if (!api || typeof api.annotateParticipantHistory !== 'function') return;
-        return api.annotateParticipantHistory();
-    }
-
-    function annotateProfileHistory() {
-        var api = getParticipantIntelUiApi();
-        if (!api || typeof api.annotateProfileHistory !== 'function') return;
-        return api.annotateProfileHistory();
-    }
-
-    // ---- Feature 4: Retention Radar ----
-
-    function recordRetentionSnapshot() {
-        var api = getParticipantIntelUiApi();
-        if (!api || typeof api.recordRetentionSnapshot !== 'function') return;
-        return api.recordRetentionSnapshot();
-    }
-
-    function getParticipantIntelBackfillApi() {
-        return globalThis.DTUAfterDarkParticipantIntelBackfill || null;
-    }
-
-    globalThis.DTUAfterDarkParticipantIntelBackfillDeps = {
-        normalizeWhitespace: normalizeWhitespace,
-        parseDTUSemesterFromText: parseDTUSemesterFromText,
-        isCampusnetLikelyAcademicCourse: isCampusnetLikelyAcademicCourse,
-        normalizeIntelCourseCode: normalizeIntelCourseCode,
-        normalizeIntelCourseSemester: normalizeIntelCourseSemester,
-        getCampusnetCourseCodeFromPage: getCampusnetCourseCodeFromPage,
-        getCampusnetExplicitSemesterFromPage: getCampusnetExplicitSemesterFromPage,
-        getCampusnetCourseNameFromPage: getCampusnetCourseNameFromPage,
-        normalizeProgramLabel: normalizeProgramLabel,
-        readParticipantProgram: readParticipantProgram,
-        saveParticipantIntel: saveParticipantIntel,
-        loadParticipantIntel: loadParticipantIntel,
-        isCampusnetGroupArchivePage: isCampusnetGroupArchivePage,
-        isFeatureFlagEnabled: isFeatureFlagEnabled,
-        featureParticipantIntelKey: FEATURE_PARTICIPANT_INTEL_KEY,
-        featureParticipantIntelSharedHistoryKey: FEATURE_PARTICIPANT_INTEL_SHARED_HISTORY_KEY,
-        markExt: markExt,
-        isDarkMode: function () { return !!darkModeEnabled; },
-        participantIntelMaxStudents: PARTICIPANT_INTEL_MAX_STUDENTS
-    };
-
-    function fetchAndParseArchivedElements() {
-        var api = getParticipantIntelBackfillApi();
-        if (!api || typeof api.fetchAndParseArchivedElements !== 'function') {
-            return Promise.reject(new Error('archive_backfill_unavailable'));
-        }
-        return api.fetchAndParseArchivedElements();
-    }
-
-    function runCampusnetArchiveBackfill(queue, intel) {
-        var api = getParticipantIntelBackfillApi();
-        if (!api || typeof api.runCampusnetArchiveBackfill !== 'function') return;
-        return api.runCampusnetArchiveBackfill(queue, intel);
-    }
-
-    function stopCampusnetArchiveBackfill() {
-        var api = getParticipantIntelBackfillApi();
-        if (!api || typeof api.stopCampusnetArchiveBackfill !== 'function') return;
-        return api.stopCampusnetArchiveBackfill();
-    }
-
-    function insertCampusnetArchiveBackfillWidget() {
-        var api = getParticipantIntelBackfillApi();
-        if (!api || typeof api.insertCampusnetArchiveBackfillWidget !== 'function') return;
-        return api.insertCampusnetArchiveBackfillWidget();
-    }
-
-    function isCampusnetArchiveBackfillRunning() {
-        var api = getParticipantIntelBackfillApi();
-        return !!(api && typeof api.isRunning === 'function' && api.isRunning());
-    }
-
-    function getCampusnetArchiveBackfillProgress() {
-        var api = getParticipantIntelBackfillApi();
-        if (!api || typeof api.getProgress !== 'function') return null;
-        return api.getProgress();
-    }
-
-    // ---- Optional: Archive backfill (CampusNet group archive) ----
-    // Lets you populate Participant Intelligence by scanning archived course participant pages.
-    // Runs locally and stores derived data in browser.storage.local.
-    // ---- Master bootstrap function ----
-
-    function scheduleAnnotateParticipantHistory(delayMs) {
-        if (!isFeatureFlagEnabled(FEATURE_PARTICIPANT_INTEL_KEY) || !isFeatureFlagEnabled(FEATURE_PARTICIPANT_INTEL_SHARED_HISTORY_KEY)) return;
-        if (_participantIntelAnnotateTimer) return;
-        _participantIntelAnnotateTimer = setTimeout(function () {
-            _participantIntelAnnotateTimer = null;
-            annotateParticipantHistory();
-        }, delayMs || 260);
-    }
-
-    function insertParticipantIntelligence() {
-        if (!IS_TOP_WINDOW) return;
-        if (!isFeatureFlagEnabled(FEATURE_PARTICIPANT_INTEL_KEY)) {
-            if (_participantIntelAnnotateTimer) {
-                clearTimeout(_participantIntelAnnotateTimer);
-                _participantIntelAnnotateTimer = null;
-            }
-            document.querySelectorAll(
-                '[data-dtu-participant-demographics],[data-dtu-shared-history],'
-                + '[data-dtu-retention-indicator],[data-dtu-profile-history],[data-dtu-archive-backfill]'
-            ).forEach(function (el) { el.remove(); });
-            return;
-        }
-
-        var demographicsEnabled = isFeatureFlagEnabled(FEATURE_PARTICIPANT_INTEL_DEMOGRAPHICS_KEY);
-        var sharedHistoryEnabled = isFeatureFlagEnabled(FEATURE_PARTICIPANT_INTEL_SHARED_HISTORY_KEY);
-        var retentionEnabled = isFeatureFlagEnabled(FEATURE_PARTICIPANT_INTEL_RETENTION_KEY);
-
-        if (isCampusnetParticipantPage()) {
-            // Fast cleanup when sub-features are toggled off.
-            if (!demographicsEnabled) {
-                var oldDemo = document.querySelector('[data-dtu-participant-demographics]');
-                if (oldDemo) oldDemo.remove();
-            }
-            if (!sharedHistoryEnabled) {
-                if (_participantIntelAnnotateTimer) {
-                    clearTimeout(_participantIntelAnnotateTimer);
-                    _participantIntelAnnotateTimer = null;
-                }
-                document.querySelectorAll('[data-dtu-shared-history]').forEach(function (el) { el.remove(); });
-            }
-            if (!retentionEnabled) {
-                var oldRet = document.querySelector('[data-dtu-retention-indicator]');
-                if (oldRet) oldRet.remove();
-            }
-
-            if (sharedHistoryEnabled) collectParticipantData();
-            if (demographicsEnabled) insertParticipantDemographics();
-            if (sharedHistoryEnabled) {
-                // Delay slightly so the storage write from collectParticipantData has time to settle.
-                scheduleAnnotateParticipantHistory(320);
-            }
-            if (retentionEnabled) recordRetentionSnapshot();
-        }
-
-        if (isCampusnetProfilePage()) {
-            annotateProfileHistory();
-        }
-
-        if (isCampusnetGroupArchivePage()) {
-            insertCampusnetArchiveBackfillWidget();
-        } else {
-            var oldBackfill = document.querySelector('[data-dtu-archive-backfill]');
-            if (oldBackfill) oldBackfill.remove();
-        }
-    }
+    __participantIntelBridge.init();
 
     // ===== CONTENT SHORTCUT BUTTON =====
     // Adds a small "Content" button to each course card on the homepage
@@ -2718,11 +1441,6 @@
         if (api && typeof api.showBusConfigModal === 'function') api.showBusConfigModal();
     }
 
-    function insertBusToggle() {
-        var api = getBusApi();
-        if (api && typeof api.insertBusToggle === 'function') api.insertBusToggle();
-    }
-
     const DEADLINES_ENABLED_KEY = 'dtuDarkModeDeadlinesEnabled';
 
     function isDeadlinesEnabled() {
@@ -2732,9 +1450,9 @@
 
     const SEARCH_WIDGET_ENABLED_KEY = 'dtuDarkModeSearchWidgetEnabled';
 
+    // Off until the student turns it on.
     function isSearchWidgetEnabled() {
-        const stored = localStorage.getItem(SEARCH_WIDGET_ENABLED_KEY);
-        return stored === null ? true : stored === 'true';
+        return localStorage.getItem(SEARCH_WIDGET_ENABLED_KEY) === 'true';
     }
 
 
@@ -2749,15 +1467,6 @@
         return window.location.hostname === 'learn.inside.dtu.dk'
             && /^\/d2l\/(home|le)\/\d+/.test(window.location.pathname);
     }
-
-    // ISBN regex: matches "ISBN: 978-...", "ISBN-13: ...", "ISBN:978...", etc.
-    const ISBN_REGEX = /\bISBN[-\s]?(?:1[03])?[\s:]*\s*([\dXx][\d\s-]{8,}[\dXx])\b/gi;
-    // Bare ISBN-13 starting with 978/979 without "ISBN" prefix
-    const BARE_ISBN13_REGEX = /\b(97[89][\d-]{10,})\b/g;
-    // Keywords that signal a book reference nearby (English + Danish)
-    const BOOK_KEYWORDS = /\b(textbook|text\s*book|course\s*book|required\s*reading|recommended\s*reading|suggested\s*reading|book|reading\s*list|literature|edition|ed\.|bog|l\u00e6rebog|kursus\s*bog|anbefalet\s*l\u00e6sning|litteratur|pensum)\b/i;
-    // Quoted Title Case strings (supports straight and curly quotes)
-    const QUOTED_TITLE_REGEX = /["\u201C\u201D]([A-Z][A-Za-z]*(?:\s+(?:[A-Z][A-Za-z]*|and|the|of|in|for|to|a|an|with|&)){2,})["\u201C\u201D]/g;
 
     function normalizeISBN(raw) {
         return raw.replace(/[\s-]/g, '').replace(/x$/i, 'X');
@@ -2901,9 +1610,6 @@
         if (cb) cb(null);
     }
 
-    function markExt(el) {
-        if (el && el.setAttribute) el.setAttribute('data-dtu-ext', '1');
-    }
 
     // The extension's own DTU Learn nav items, in the order they must appear
     // after the anchor item. Each module used to assert its own rule -- Settings
@@ -3064,6 +1770,53 @@
         }
     }
 
+    // ===== COURSE MAP (kurser.dtu.dk prerequisite map) =====
+    try {
+        globalThis.DTUAfterDarkCourseMapDeps = {
+            markExt: markExt,
+            isTopWindow: function () { return IS_TOP_WINDOW; },
+            isFeatureFlagEnabled: isFeatureFlagEnabled,
+            isKurserCoursePage: isKurserCoursePage,
+            getKurserCourseCode: getKurserCourseCode,
+            getExtensionUrl: getExtensionUrl,
+            featureKurserCourseMapKey: FEATURE_KURSER_COURSE_MAP_KEY
+        };
+    } catch (eCourseMapDeps) { }
+
+    function insertKurserCourseMap() {
+        var api = null;
+        try { api = globalThis.DTUAfterDarkCourseMap || null; } catch (e0) { }
+        if (api && typeof api.insertKurserCourseMap === 'function') api.insertKurserCourseMap();
+    }
+
+    // ===== EXAM SCHEDULE (studieplan.dtu.dk period button and panel) =====
+    try {
+        globalThis.DTUAfterDarkExamScheduleDeps = {
+            markExt: markExt,
+            isTopWindow: function () { return IS_TOP_WINDOW; },
+            isFeatureFlagEnabled: isFeatureFlagEnabled,
+            isDarkModeEnabled: isDarkModeEnabled,
+            sendRuntimeMessage: sendRuntimeMessage,
+            storageLocalGet: storageLocalGet,
+            storageLocalSet: storageLocalSet,
+            isKurserCoursePage: isKurserCoursePage,
+            getKurserCourseCode: getKurserCourseCode,
+            featureStudyplanExamScheduleKey: FEATURE_STUDYPLAN_EXAM_SCHEDULE_KEY
+        };
+    } catch (eExamScheduleDeps) { }
+
+    function insertStudyplanExamSchedule() {
+        var api = null;
+        try { api = globalThis.DTUAfterDarkExamSchedule || null; } catch (e0) { }
+        if (api && typeof api.insertStudyplanExamScheduleButtons === 'function') api.insertStudyplanExamScheduleButtons();
+    }
+
+    function insertKurserExamDate() {
+        var api = null;
+        try { api = globalThis.DTUAfterDarkKurserExamDate || null; } catch (e0) { }
+        if (api && typeof api.insertKurserExamDate === 'function') api.insertKurserExamDate();
+    }
+
     /* ===================================================================
      *  Smart Room Linker (MazeMap)
      *  Detects building/room mentions site-wide and turns them into MazeMap
@@ -3085,14 +1838,6 @@
             featureSmartRoomLinkerKey: FEATURE_SMART_ROOM_LINKER_KEY
         };
     } catch (eSmartRoomDeps) { }
-
-    function createMazemapSmartLink(building, room, labelText) {
-        var api = getSmartRoomLinkerApi();
-        if (api && typeof api.createMazemapSmartLink === 'function') {
-            return api.createMazemapSmartLink(building, room, labelText);
-        }
-        return null;
-    }
 
     function scheduleSmartRoomLinkerScan(rootNode, delayMs) {
         var api = getSmartRoomLinkerApi();
@@ -3146,7 +1891,7 @@
         isDarkModeEnabled: function () { return !!darkModeEnabled; },
         getResolvedAccentDeep: getResolvedAccentDeep,
         getAccentThemeById: getAccentThemeById,
-        getAccentThemeId: function () { return _accentThemeId; }
+        getAccentThemeId: function () { return getAccentThemeId(); }
     };
 
     function fixEvalueringResultCharts() {
@@ -3173,220 +1918,6 @@
         if (!api || typeof api.applyKurserAccentElements !== 'function') return;
         return api.applyKurserAccentElements();
     }
-
-    // ===== EXAM CLUSTER OUTLOOK (STUDYPLAN) =====
-    // Study Planner exam parsing/timeline runtime now lives in darkmode.studyplan-runtime.js.
-
-    function getStudyplanRuntimeApi() {
-        try { return globalThis.DTUAfterDarkStudyplanRuntime || null; } catch (e0) { return null; }
-    }
-
-    try {
-        globalThis.DTUAfterDarkStudyplanRuntimeDeps = {
-            isTopWindow: function () { return IS_TOP_WINDOW; },
-            isDarkMode: function () { return !!darkModeEnabled; },
-            markExt: markExt,
-            sendRuntimeMessage: sendRuntimeMessage,
-            isFeatureFlagEnabled: isFeatureFlagEnabled,
-            featureStudyplanExamClusterKey: FEATURE_STUDYPLAN_EXAM_CLUSTER_KEY
-        };
-    } catch (eStudyplanRuntimeDeps) { }
-
-    function normalizeExamClusterText(text) {
-        var api = getStudyplanRuntimeApi();
-        if (!api || typeof api.normalizeExamClusterText !== 'function') return (text || '').replace(/ /g, ' ').replace(/s+/g, ' ').trim();
-        return api.normalizeExamClusterText(text);
-    }
-
-    function getStoredStudyplanExamChoices() {
-        var api = getStudyplanRuntimeApi();
-        if (!api || typeof api.getStoredStudyplanExamChoices !== 'function') return {};
-        return api.getStoredStudyplanExamChoices();
-    }
-
-    function saveStoredStudyplanExamChoices(choices) {
-        var api = getStudyplanRuntimeApi();
-        if (api && typeof api.saveStoredStudyplanExamChoices === 'function') api.saveStoredStudyplanExamChoices(choices);
-    }
-
-    function buildStudyplanExamChoiceCourseKey(course) {
-        var api = getStudyplanRuntimeApi();
-        if (!api || typeof api.buildStudyplanExamChoiceCourseKey !== 'function') return '';
-        return api.buildStudyplanExamChoiceCourseKey(course);
-    }
-
-    function buildStudyplanExamChoiceOptionKey(candidate) {
-        var api = getStudyplanRuntimeApi();
-        if (!api || typeof api.buildStudyplanExamChoiceOptionKey !== 'function') return '';
-        return api.buildStudyplanExamChoiceOptionKey(candidate);
-    }
-
-    function setStoredStudyplanExamChoice(courseKey, optionKey) {
-        var api = getStudyplanRuntimeApi();
-        if (api && typeof api.setStoredStudyplanExamChoice === 'function') api.setStoredStudyplanExamChoice(courseKey, optionKey);
-    }
-
-    function getStoredStudyplanExamTimelineOverrides() {
-        var api = getStudyplanRuntimeApi();
-        if (!api || typeof api.getStoredStudyplanExamTimelineOverrides !== 'function') return { edits: {}, deleted: {}, custom: [] };
-        return api.getStoredStudyplanExamTimelineOverrides();
-    }
-
-    function saveStoredStudyplanExamTimelineOverrides(overrides) {
-        var api = getStudyplanRuntimeApi();
-        if (api && typeof api.saveStoredStudyplanExamTimelineOverrides === 'function') api.saveStoredStudyplanExamTimelineOverrides(overrides);
-    }
-
-    function buildStudyplanExamTimelineBaseKey(item) {
-        var api = getStudyplanRuntimeApi();
-        if (!api || typeof api.buildStudyplanExamTimelineBaseKey !== 'function') return '';
-        return api.buildStudyplanExamTimelineBaseKey(item);
-    }
-
-    function buildStudyplanExamTimelineCustomId() {
-        var api = getStudyplanRuntimeApi();
-        if (!api || typeof api.buildStudyplanExamTimelineCustomId !== 'function') return '';
-        return api.buildStudyplanExamTimelineCustomId();
-    }
-
-    function formatIsoDateForDisplay(iso) {
-        var api = getStudyplanRuntimeApi();
-        if (!api || typeof api.formatIsoDateForDisplay !== 'function') return iso || '';
-        return api.formatIsoDateForDisplay(iso);
-    }
-
-    function formatStudyplanExamEditDate(iso) {
-        var api = getStudyplanRuntimeApi();
-        if (!api || typeof api.formatStudyplanExamEditDate !== 'function') return '';
-        return api.formatStudyplanExamEditDate(iso);
-    }
-
-    function parseStudyplanExamEditDate(text) {
-        var api = getStudyplanRuntimeApi();
-        if (!api || typeof api.parseStudyplanExamEditDate !== 'function') return '';
-        return api.parseStudyplanExamEditDate(text);
-    }
-
-    function parseIsoToUtcTs(iso) {
-        var api = getStudyplanRuntimeApi();
-        if (!api || typeof api.parseIsoToUtcTs !== 'function') return null;
-        return api.parseIsoToUtcTs(iso);
-    }
-
-    function startOfTodayUtcTs() {
-        var api = getStudyplanRuntimeApi();
-        if (!api || typeof api.startOfTodayUtcTs !== 'function') {
-            var now = new Date();
-            return Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-        }
-        return api.startOfTodayUtcTs();
-    }
-
-    function diffDaysUtc(fromTs, toTs) {
-        var api = getStudyplanRuntimeApi();
-        if (!api || typeof api.diffDaysUtc !== 'function') return Math.round((toTs - fromTs) / (24 * 60 * 60 * 1000));
-        return api.diffDaysUtc(fromTs, toTs);
-    }
-
-    function buildExamClusterWarnings(mapped) {
-        var api = getStudyplanRuntimeApi();
-        if (!api || typeof api.buildExamClusterWarnings !== 'function') return [];
-        return api.buildExamClusterWarnings(mapped);
-    }
-
-    function summarizeExamClusterWarnings(warnings) {
-        var api = getStudyplanRuntimeApi();
-        if (!api || typeof api.summarizeExamClusterWarnings !== 'function') return { level: null, sameDay: 0, oneDay: 0, dense: null };
-        return api.summarizeExamClusterWarnings(warnings);
-    }
-
-    function clearNodeChildren(node) {
-        var api = getStudyplanRuntimeApi();
-        if (api && typeof api.clearNodeChildren === 'function') return api.clearNodeChildren(node);
-        while (node && node.firstChild) node.removeChild(node.firstChild);
-    }
-
-    function ensureStudyplanExamClusterContainer() {
-        var api = getStudyplanRuntimeApi();
-        if (!api || typeof api.ensureStudyplanExamClusterContainer !== 'function') return null;
-        return api.ensureStudyplanExamClusterContainer();
-    }
-
-    function renderExamClusterStatus(body, text, isWarn) {
-        var api = getStudyplanRuntimeApi();
-        if (api && typeof api.renderExamClusterStatus === 'function') return api.renderExamClusterStatus(body, text, isWarn);
-    }
-
-    function formatExamClusterShortDate(ts) {
-        var api = getStudyplanRuntimeApi();
-        if (!api || typeof api.formatExamClusterShortDate !== 'function') return '';
-        return api.formatExamClusterShortDate(ts);
-    }
-
-    function getStudyplanExamsApi() {
-        return globalThis.DTUAfterDarkStudyplanExamsUi || null;
-    }
-
-    globalThis.DTUAfterDarkStudyplanExamsDeps = {
-        isTopWindow: IS_TOP_WINDOW,
-        isDarkMode: function () { return !!darkModeEnabled; },
-        markExt: markExt,
-        formatExamClusterShortDate: formatExamClusterShortDate,
-        buildStudyplanExamChoiceOptionKey: buildStudyplanExamChoiceOptionKey,
-        setStoredStudyplanExamChoice: setStoredStudyplanExamChoice,
-        getStoredStudyplanExamTimelineOverrides: getStoredStudyplanExamTimelineOverrides,
-        saveStoredStudyplanExamTimelineOverrides: saveStoredStudyplanExamTimelineOverrides,
-        formatStudyplanExamEditDate: formatStudyplanExamEditDate,
-        parseStudyplanExamEditDate: parseStudyplanExamEditDate,
-        parseIsoToUtcTs: parseIsoToUtcTs,
-        buildStudyplanExamTimelineBaseKey: buildStudyplanExamTimelineBaseKey,
-        buildStudyplanExamTimelineCustomId: buildStudyplanExamTimelineCustomId,
-        buildExamClusterWarnings: buildExamClusterWarnings,
-        summarizeExamClusterWarnings: summarizeExamClusterWarnings,
-        clearNodeChildren: clearNodeChildren,
-        ensureStudyplanExamClusterContainer: ensureStudyplanExamClusterContainer,
-        renderExamClusterStatus: renderExamClusterStatus,
-        requestRender: function () { insertStudyplanExamCluster(); },
-        getState: function () {
-            var api = getStudyplanRuntimeApi();
-            if (!api || typeof api.getState !== 'function') return { choiceEditorOpen: false, lastRenderedSig: '' };
-            return api.getState() || { choiceEditorOpen: false, lastRenderedSig: '' };
-        },
-        setState: function (patch) {
-            var api = getStudyplanRuntimeApi();
-            if (api && typeof api.setState === 'function') api.setState(patch);
-        }
-    };
-
-    function removeStudyplanExamEditorModal() {
-        var api = getStudyplanRuntimeApi();
-        if (api && typeof api.removeStudyplanExamEditorModal === 'function') return api.removeStudyplanExamEditorModal();
-        var existing = document.querySelector('.dtu-studyplan-exam-editor-modal');
-        if (existing) existing.remove();
-    }
-
-    function renderStudyplanExamCluster(courses, mapped, baseMapped, response, errorText, choicePrompts, allChoicePrompts) {
-        var api = getStudyplanExamsApi();
-        if (!api || typeof api.renderStudyplanExamCluster !== 'function') return;
-        return api.renderStudyplanExamCluster(courses, mapped, baseMapped, response, errorText, choicePrompts, allChoicePrompts);
-    }
-
-    function injectGradeCountdowns(mapped) {
-        var api = getStudyplanExamsApi();
-        if (!api || typeof api.injectGradeCountdowns !== 'function') return;
-        return api.injectGradeCountdowns(mapped);
-    }
-
-    function insertStudyplanExamCluster() {
-        var api = getStudyplanRuntimeApi();
-        if (api && typeof api.insertStudyplanExamCluster === 'function') return api.insertStudyplanExamCluster();
-    }
-
-    function scheduleStudyplanExamCluster(delayMs) {
-        var api = getStudyplanRuntimeApi();
-        if (api && typeof api.scheduleStudyplanExamCluster === 'function') return api.scheduleStudyplanExamCluster(delayMs);
-    }
-
 
     function getStudyplannerShellApi() {
         return globalThis.DTUAfterDarkStudyplannerShell || null;
@@ -3417,7 +1948,6 @@
         isLegacyHeavyPage: isDTULearnLegacyHeavyCourseToolPage,
         getDarkText: getDarkText,
         getDarkBorder: getDarkBorder,
-        deepRoots: collectDeepRoots,
         deepQueryAll: deepQueryAll
     };
 
@@ -3540,11 +2070,13 @@
             insertParticipantIntelligence();
         }
         if (host === 'studieplan.dtu.dk') {
-            scheduleStudyplanExamCluster(refreshBus ? 260 : 760);
+            insertStudyplanExamSchedule();
         }
         if (host === 'kurser.dtu.dk') {
             insertKurserGradeStats();
             insertKurserCourseEvaluation();
+            insertKurserCourseMap();
+            insertKurserExamDate();
             scheduleKurserTextbookLinker(refreshBus ? 240 : 620);
         }
 
@@ -3609,7 +2141,7 @@
 
             var done = false;
             if (host === 'studieplan.dtu.dk') {
-                done = !!document.querySelector('[data-dtu-exam-cluster]');
+                done = !!document.querySelector('[data-dtu-exam-schedule]');
             } else if (host === 'kurser.dtu.dk') {
                 done = !!document.querySelector('[data-dtu-grade-stats]')
                     || !!document.querySelector('[data-dtu-course-eval]')
@@ -3641,7 +2173,7 @@
             _hostLightRefreshTimer = null;
             var host = window.location.hostname;
             if (host === 'studieplan.dtu.dk') {
-                scheduleStudyplanExamCluster(110);
+                insertStudyplanExamSchedule();
                 // Studieplan can re-render its header/logo after initial load; re-apply logo override.
                 try { replaceLogoImage(); } catch (eLogo1) { }
                 return;
@@ -3649,6 +2181,8 @@
             if (host === 'kurser.dtu.dk') {
                 insertKurserGradeStats();
                 insertKurserCourseEvaluation();
+                insertKurserCourseMap();
+                insertKurserExamDate();
                 scheduleKurserTextbookLinker(110);
                 // Kurser can also swap logos late; keep it stable in dark mode.
                 try { replaceLogoImage(); } catch (eLogo2) { }
@@ -3720,8 +2254,9 @@
 
     function enqueueMutationRoot(node) {
         if (!node || node.nodeType !== 1 || !node.isConnected) return;
-        if (node.hasAttribute && node.hasAttribute('data-dtu-ext')) return;
-        if (node.closest && node.closest('[data-dtu-ext]')) return;
+        // Our own writes (marked nodes, Book Finder bars) are not page changes.
+        if (node.hasAttribute && (node.hasAttribute('data-dtu-ext') || node.hasAttribute('data-book-finder-bar'))) return;
+        if (node.closest && node.closest('[data-dtu-ext], [data-book-finder-bar]')) return;
         if (_mutationQueueOverflow) return;
         if (_pendingMutationRootSet.has(node)) return;
         _pendingMutationRootSet.add(node);
@@ -3886,6 +2421,11 @@
                     try {
                         roots.forEach(function (r) { replaceLogoImage(r); });
                     } catch (eLogoM) { }
+                }
+                // The feature pass gets the last root; room links need every changed root
+                // (the scheduler queues them all in one timer).
+                if (isFeatureFlagEnabled(FEATURE_SMART_ROOM_LINKER_KEY)) {
+                    roots.slice(0, -1).forEach(function (r) { scheduleSmartRoomLinkerScan(r, 720); });
                 }
                 runTopWindowFeatureChecks(roots[roots.length - 1] || null, false);
                 try { runLessonsBulkDownloadChecks(); } catch (eLbd1) { }

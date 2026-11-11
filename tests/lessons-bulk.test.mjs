@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import zlib from 'node:zlib';
-import { loadModuleInternals, makeLocation } from './_harness.mjs';
+import { extractFunctions, loadModulesInternals, makeLocation, plain } from './_harness.mjs';
 
 // A non-Learn host keeps the module's page-load init from running.
 const location = makeLocation('https://learn.inside.dtu.dk/d2l/le/lessons/123');
-const { api } = loadModuleInternals('darkmode.lessons-bulk.js', [
+const { api } = loadModulesInternals(['darkmode.lessons-bulk.zip.js', 'darkmode.lessons-bulk.tree.js', 'darkmode.lessons-bulk.fetch.js', 'darkmode.lessons-bulk.js'], [
     'toAbsoluteSamePageUrl',
     'decodeEscapedUrlText',
     'isLikelyDownloadUrl',
@@ -28,7 +28,7 @@ const { api } = loadModuleInternals('darkmode.lessons-bulk.js', [
 ], { location: { ...location, hostname: 'not-learn.test' } });
 
 // The URL checks compare against the page host, so give them the real one.
-const learnModule = loadModuleInternals('darkmode.lessons-bulk.js', [
+const learnModule = loadModulesInternals(['darkmode.lessons-bulk.zip.js', 'darkmode.lessons-bulk.tree.js', 'darkmode.lessons-bulk.fetch.js', 'darkmode.lessons-bulk.js'], [
     'isLikelyDownloadUrl',
     'isStrictFileDownloadUrl',
     'classifyTopicFromTocIndex'
@@ -254,12 +254,23 @@ async function runnerFixture({ legacy = false } = {}) {
     let enabled = true, lessonsPage = true;
     const { api } = extractFunctions('darkmode.lessons-bulk.js', [
         'runLessonsBulkDownload', 'cancelLessonsBulkRun', 'resetLessonsBulkState',
-        'throwIfLessonsBulkAborted', 'isLessonsBulkRunAborted', 'getLessonsBulkStateRefs'
+        'throwIfLessonsBulkAborted', 'isLessonsBulkRunAborted', 'getLessonsBulkStateRefs',
+        'describeLessonsBulkEmptyResult'
     ], {
-        prelude: `let _lessonsBulkRunAbort = null, _lessonsBulkZipPartsSaved = 0;
-            let _lessonsBulkUiState = { sections: [], running: false };
-            let _lessonsBulkUrlNameHints = new Map();
-            let _lessonsLegacyApiSectionsCache = {}, _lessonsLegacyModuleStructureCache = new Map(), _lessonsLegacyBackgroundResolveState = { resolvedKeys: new Set() };
+        prelude: `let _lessonsBulkState = {
+                uiState: { sections: [], running: false },
+                urlNameHints: new Map(),
+                legacyApiSectionsCache: { orgUnitId: '', sections: [], loading: false, promise: null, ts: 0, lastAttemptTs: 0, source: '' },
+                legacyModuleStructureCache: new Map(),
+                legacyBackgroundResolveState: { orgUnitId: '', running: false, token: 0, resolvedKeys: new Set() },
+                runAbort: null,
+                zipPartsSaved: 0
+            };
+            let _lessonsBulkUiState = _lessonsBulkState.uiState;
+            let _lessonsBulkUrlNameHints = _lessonsBulkState.urlNameHints;
+            let _lessonsLegacyApiSectionsCache = _lessonsBulkState.legacyApiSectionsCache;
+            let _lessonsLegacyModuleStructureCache = _lessonsBulkState.legacyModuleStructureCache;
+            let _lessonsLegacyBackgroundResolveState = _lessonsBulkState.legacyBackgroundResolveState;
             const LESSONS_BULK_SCAN_CONCURRENCY = 4;`,
         globals: {
             AbortController, document: {},
@@ -270,14 +281,21 @@ async function runnerFixture({ legacy = false } = {}) {
             legacySectionHasOnlyUnitUrls: s => !!s.key,
             resolveLegacySectionUnitUrlsViaHiddenFrame: () => new Promise(resolve => legacyPending.push(resolve)),
             applyResolvedUrlsToLegacySections() {},
+            buildLegacySectionsViaHiddenFrame: async () => [],
+            parseLegacySectionObjectId: s => String(s && s.objectId || ''),
             sanitizeLessonsSectionUnitUrls: a => a,
             logLessonsBulkDebug() {},
             setLessonsBulkControlsDisabled() {},
             updateLessonsBulkRunButton() {},
             setLessonsBulkStatus: (root, text) => statuses.push(text),
             getCurrentLessonsOrgUnitId: () => '123',
+            parseLessonsTopicIds: () => null,
             loadLessonsTocIndex: () => new Promise(resolve => pending.push(resolve)),
             fetchLessonsUnitDownloadResult: async () => ({ links: [], notFile: true }),
+            getTopicLabelHintFromTopicUrl: () => '',
+            collectTopicFileUrlsInCurrentPage: async () => [],
+            downloadSingleBundledZipFromUrls: async () => ({ ok: false }),
+            lessonsBulkDelay: async () => {},
             isStrictFileDownloadUrl: () => false
         }
     });
@@ -363,4 +381,66 @@ test('duplicate download clicks cannot overlap legacy preflight', async () => {
     const count = f.legacyPending.length;
     await settleLegacyPreflight(f, [first, second]);
     assert.equal(count, 1); assert.equal(f.pending.length, 1);
+});
+
+test('a lesson page that could not be fetched is reported as unread, not as empty', async () => {
+    const topic = LEARN + '/d2l/le/lessons/123/topics/456';
+    const load = (fetch) => loadModulesInternals(['darkmode.lessons-bulk.zip.js', 'darkmode.lessons-bulk.tree.js', 'darkmode.lessons-bulk.fetch.js', 'darkmode.lessons-bulk.js'],
+        ['fetchLessonsUnitDownloadResult', 'describeLessonsBulkEmptyResult'],
+        { location: { ...location, hostname: 'not-learn.test' }, fetch }).api;
+
+    const offline = load(async () => { throw new Error('network down'); });
+    assert.equal((await offline.fetchLessonsUnitDownloadResult(topic)).unread, true);
+    const denied = load(async () => ({ ok: false, status: 403, url: topic, text: async () => '' }));
+    assert.equal((await denied.fetchLessonsUnitDownloadResult(topic)).unread, true);
+    const empty = load(async (url) => ({ ok: true, status: 200, url: String(url), text: async () => '<p>No files</p>', json: async () => ({}) }));
+    const read = await empty.fetchLessonsUnitDownloadResult(topic);
+    assert.equal(read.unread, false);
+    assert.equal(read.links.length, 0);
+
+    assert.equal(empty.describeLessonsBulkEmptyResult([{ links: [] }, { links: [] }]),
+        'No downloadable files found in selected sections.');
+    assert.equal(empty.describeLessonsBulkEmptyResult([{ links: [], unread: true }, { links: [] }, { links: [], unread: true }]),
+        'Could not read 2 of 3 lesson pages. Try again.');
+});
+
+test('the legacy module tree reads topics and child modules from the structure API', async () => {
+    const structure = { Modules: [{ Id: 50009, Title: 'Week 2' }], Topics: [{ TopicId: 40041, Title: 'Slides' }] };
+    const { api } = loadModulesInternals(['darkmode.lessons-bulk.zip.js', 'darkmode.lessons-bulk.tree.js', 'darkmode.lessons-bulk.fetch.js', 'darkmode.lessons-bulk.js'],
+        ['buildLegacyModuleTreeViaApi'],
+        {
+            location: { ...location, hostname: 'not-learn.test' },
+            fetch: async (url) => ({ ok: true, json: async () => (/\/modules\/50005\//.test(String(url)) ? structure : {}) })
+        });
+    const tree = await api.buildLegacyModuleTreeViaApi('123', '50005', 'Week 1', 0, new Set());
+    assert.equal(tree.id, '50005');
+    assert.deepEqual(Array.from(tree.topicIds), ['40041']);
+    assert.deepEqual(Array.from(tree.children, (c) => c.id), ['50009']);
+});
+
+test('the hidden-frame scanner moves to the next URL on an empty tree read, then resolves and removes its frame', async () => {
+    const treeDoc = { querySelector: (sel) => (/navigation-item/.test(sel) ? {} : null), querySelectorAll: () => [] };
+    let removed = 0;
+    const iframe = {
+        style: {}, setAttribute() {}, remove() { removed++; },
+        set src(url) { this._src = url; this.contentDocument = treeDoc; setTimeout(() => this.onload(), 0); },
+        get src() { return this._src; }
+    };
+    const hostDoc = { createElement: () => iframe, body: { appendChild() {} } };
+    const { api } = extractFunctions('darkmode.lessons-bulk.tree.js', ['findLegacyTreeDocFromRoot', 'scanLegacyTreeInHiddenFrame'], {
+        globals: { markExt() {}, lessonsBulkDelay: async () => {}, setTimeout, clearTimeout }
+    });
+    const reads = [];
+    let logged = null;
+    const out = await api.scanLegacyTreeInHiddenFrame(hostDoc, ['https://a/1', 'https://a/2'], 5000, async (doc, url) => {
+        reads.push(url);
+        return url.endsWith('2') ? ['unit'] : [];
+    }, (list, url, attempts) => { logged = [list.length, url, attempts]; });
+    assert.deepEqual(plain(out), ['unit']);
+    assert.deepEqual(reads, ['https://a/1', 'https://a/2']);
+    assert.deepEqual(logged, [1, 'https://a/2', 2]);
+    assert.equal(removed, 1);
+
+    const failed = await api.scanLegacyTreeInHiddenFrame(hostDoc, ['https://a/1'], 5000, async () => { throw new Error('x'); });
+    assert.deepEqual(plain(failed), [], 'a failing read on the last URL gives an empty list, not a rejection');
 });

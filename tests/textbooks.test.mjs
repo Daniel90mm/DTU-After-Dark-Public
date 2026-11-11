@@ -10,7 +10,9 @@ const isbn = extractFunctions('darkmode.js', [
     'isNotesOnlyLiterature'
 ]).api;
 
-const { api } = loadModuleInternals('darkmode.textbooks.js', [
+const textbookFiles = ['darkmode.textbooks.core.js', 'darkmode.textbooks.kurser.js', 'darkmode.textbooks.js'];
+
+const { api } = loadModuleInternals(textbookFiles, [
     'extractISBNFromCitationLine',
     'splitKurserLiteratureText',
     'parseKurserCitationLine',
@@ -106,7 +108,7 @@ test('Book Finder title candidates skip generic resource phrases', () => {
 
 test('disabling textbook links cancels queued Learn scans and removes existing bars',async()=>{
  const {extractFunctions}=await import('./_harness.mjs');let removed=0,cleared=0;
- const {api:ui}=loadModuleInternals('darkmode.textbooks.js',['insertBookFinderLinks'],{globals:{},document:{querySelectorAll:s=>s==='[data-book-finder-bar]'?[{remove:()=>removed++}]:s==='[data-book-finder-injected]'?[{removeAttribute:()=>cleared++}]:[]},DTUAfterDarkTextbooksDeps:{isTopWindow:()=>true,isDTULearnCoursePage:()=>true,isFeatureFlagEnabled:()=>false,featureTextbookLinksKey:'books'}});
+ const {api:ui}=loadModuleInternals(textbookFiles,['insertBookFinderLinks'],{globals:{},document:{querySelectorAll:s=>s==='[data-book-finder-bar]'?[{remove:()=>removed++}]:s==='[data-book-finder-injected]'?[{removeAttribute:()=>cleared++}]:[]},DTUAfterDarkTextbooksDeps:{isTopWindow:()=>true,isDTULearnCoursePage:()=>true,isFeatureFlagEnabled:()=>false,featureTextbookLinksKey:'books'}});
  let cancelled=0;const {api:schedule}=extractFunctions('darkmode.js',['scheduleBookFinderScan'],{prelude:'let _bookFinderTimer=123;const IS_TOP_WINDOW=true,FEATURE_TEXTBOOK_LINKS_KEY="books";',globals:{isDTULearnCoursePage:()=>true,isFeatureFlagEnabled:()=>false,clearTimeout:()=>cancelled++,insertBookFinderLinks:ui.insertBookFinderLinks}});
  schedule.scheduleBookFinderScan();assert.equal(cancelled,1);assert.equal(removed,1);assert.equal(cleared,1);
 });

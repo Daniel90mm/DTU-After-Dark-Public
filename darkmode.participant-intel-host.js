@@ -1,17 +1,11 @@
 (function () {
     'use strict';
+    var normalizeWhitespace = globalThis.DTUAfterDarkDom.normalizeWhitespace;
 
     function getDeps() {
         try { return globalThis.DTUAfterDarkParticipantIntelHostDeps || null; } catch (e0) { return null; }
     }
 
-    function normalizeWhitespace(text) {
-        var deps = getDeps();
-        if (deps && typeof deps.normalizeWhitespace === 'function') {
-            return deps.normalizeWhitespace(text);
-        }
-        return String(text || '').replace(/\s+/g, ' ').trim();
-    }
 
     function normalizeIntelCourseCode(code) {
         var rawText = String(code || '');
@@ -297,22 +291,52 @@
         return p;
     }
 
+    // CampusNet labels most programs "Master of Science in X" or "Bachelor
+    // program in X", but newer masters and the BEng programs by name only.
+    // Masters: DTU's MSc list (dtu.dk/english/education/graduate/msc-programmes,
+    // 2026-11-08) minus names a BSc or BEng also uses. BEng: bare labels seen on
+    // CampusNet next to a master (survey of 12106, 34032, 34034, 2026-11-08).
+    var NAME_ONLY_MASTERS = [
+        'applied chemistry', 'autonomous systems', 'bioinformatics',
+        'biomaterial engineering for medicine', 'business administration and bioentrepreneurship',
+        'business analytics', 'communication technologies and system design',
+        'computer science and engineering', 'engineering acoustics', 'engineering light',
+        'food technology', 'human-centered artificial intelligence',
+        'industrial engineering and management', 'materials and manufacturing engineering',
+        'mathematical modelling and computation', 'ocean engineering',
+        'pharmaceutical design and engineering', 'quantum information science',
+        'sustainable energy systems', 'sustainable energy technologies',
+        'sustainable fisheries and aquaculture', 'technology entrepreneurship', 'wind energy'
+    ];
+    var NAME_ONLY_BENG = [
+        'architectural engineering', 'civil engineering', 'computer engineering',
+        'electronics engineering', 'health care technology'
+    ];
+    // Enrolments that are not a degree program: single courses, open
+    // education, access course, guests. They count only when nothing else is listed.
+    var NON_DEGREE_RE = /^(?:enkeltfag|aben udd\.?|adgangskursus|g(?:ae|æ)st (?:dk|udl\.?)|exchange student|-)$/;
+
     // Rank of a CampusNet education label, so a student listed with both a
     // finished bachelor and a current master counts under the master.
     function getProgramLevel(label) {
-        var t = String(label || '').toLowerCase();
+        var t = normalizeWhitespace(String(label || '')).toLowerCase();
         try { t = t.normalize('NFD').replace(/[̀-ͯ]/g, ''); } catch (eNorm) { }
+        // NFD does not split ø or æ.
+        t = t.replace(/ø/g, 'o').replace(/æ/g, 'ae');
         if (/\bph\.?\s*d\b/.test(t)) return 4;
         if (/\b(?:master|msc|m\.sc|kandidat|civilingenior)/.test(t)) return 3;
-        if (/\b(?:bachelor|bsc|b\.sc|b\.eng|diplom)/.test(t)) return 2;
+        if (/\b(?:bachelor|bsc|b\.sc|b\.?\s*eng\b|diplom)/.test(t)) return 2;
+        if (NAME_ONLY_MASTERS.indexOf(t) !== -1) return 3;
+        if (NAME_ONLY_BENG.indexOf(t) !== -1) return 2;
+        if (NON_DEGREE_RE.test(t)) return 0;
         return 1;
     }
 
     // Several listed programs: the highest degree wins, and between equals the
-    // one listed last, which is the most recent enrolment.
+    // one listed last. CampusNet's order is not the order of enrolment.
     function pickParticipantProgram(labels) {
         var best = '';
-        var bestLevel = 0;
+        var bestLevel = -1;
         (labels || []).forEach(function (raw) {
             var label = normalizeProgramLabel(raw);
             if (!label) return;
@@ -323,6 +347,22 @@
             }
         });
         return best;
+    }
+
+    // CampusNet's participant export joins a student's programs with ", ". A
+    // degree abbreviation after a comma ("Process and Innovation, B. Eng.")
+    // belongs to the label before it.
+    function splitExportEducation(text) {
+        var out = [];
+        String(text || '').split(/,\s+/).forEach(function (part) {
+            if (out.length && /^[bm]\.\s?(?:eng|sc)\.?$/i.test(part.trim())) out[out.length - 1] += ', ' + part;
+            else out.push(part);
+        });
+        return out;
+    }
+
+    function readExportProgram(text) {
+        return pickParticipantProgram(splitExportEducation(text));
     }
 
     // The education infobox lists one <p> per program. Older markup puts the
@@ -348,8 +388,9 @@
         for (var i = 0; i < headings.length; i++) {
             var txt = normalizeWhitespace(headings[i].textContent);
             if (!labelRegex.test(txt)) continue;
-            var m = txt.match(/\((\d+)\)/);
-            var count = m ? parseInt(m[1], 10) : null;
+            // "Users (1 234)": thousands may be grouped with a space, nbsp, dot or comma.
+            var m = txt.match(/\((\d{1,3}(?:[\s .,]\d{3})*)\)/);
+            var count = m ? parseInt(m[1].replace(/\D/g, ''), 10) : null;
             return {
                 headingEl: headings[i],
                 barEl: headings[i].closest('.ui-participant-categorybar'),
@@ -369,6 +410,11 @@
         return meta ? meta.count : null;
     }
 
+    function getCampusnetUsersHeadingElement() {
+        var meta = getCampusnetUsersCategoryMeta();
+        return meta ? meta.headingEl : null;
+    }
+
     function getCampusnetUsersAnchorElement() {
         var meta = getCampusnetUsersCategoryMeta();
         if (!meta) return document.querySelector('.ui-participants-list-category');
@@ -385,7 +431,16 @@
         return null;
     }
 
+    // CampusNet's own Users entries. Entries the study line filter copied in
+    // from other list pages (data-dtu-pi-borrowed) are left out, so nothing
+    // counts, parses or stores them as part of this page.
     function getCampusnetUsersParticipantElements(rootDoc) {
+        return findCampusnetUsersParticipantElements(rootDoc).filter(function (el) {
+            return !el.hasAttribute('data-dtu-pi-borrowed');
+        });
+    }
+
+    function findCampusnetUsersParticipantElements(rootDoc) {
         var doc = rootDoc || document;
         var meta = getCampusnetUsersCategoryMeta(doc);
         if (meta && meta.containerEl) {
@@ -414,6 +469,16 @@
             if (items.length) return items;
         }
 
+        // No Users heading (the Roles view): the list is paged in its last
+        // category, so the entries after the last heading are the students.
+        var bars = doc.querySelectorAll('.ui-participant-categorybar');
+        if (bars.length > 1) {
+            var last = bars[bars.length - 1];
+            var tail = Array.from(doc.querySelectorAll('.ui-participant')).filter(function (p) {
+                return !!(last.compareDocumentPosition(p) & 4); // DOCUMENT_POSITION_FOLLOWING
+            });
+            if (tail.length) return tail;
+        }
         return Array.from(doc.querySelectorAll('.ui-participant'));
     }
 
@@ -459,10 +524,12 @@
             normalizeProgramLabel: normalizeProgramLabel,
             pickParticipantProgram: pickParticipantProgram,
             readParticipantProgram: readParticipantProgram,
+            readExportProgram: readExportProgram,
             getCampusnetParticipantCategoryMeta: getCampusnetParticipantCategoryMeta,
             getCampusnetUsersCategoryMeta: getCampusnetUsersCategoryMeta,
             getCampusnetUsersCountFromPage: getCampusnetUsersCountFromPage,
             getCampusnetUsersAnchorElement: getCampusnetUsersAnchorElement,
+            getCampusnetUsersHeadingElement: getCampusnetUsersHeadingElement,
             getCampusnetParticipantsListRoot: getCampusnetParticipantsListRoot,
             getCampusnetUsersParticipantElements: getCampusnetUsersParticipantElements,
             getCampusnetParticipantSNumber: getCampusnetParticipantSNumber

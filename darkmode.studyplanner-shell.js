@@ -1,14 +1,12 @@
 (function () {
     'use strict';
+    var isTopWindow = globalThis.DTUAfterDarkDom.isTopWindow;
+    var normalizeWhitespace = globalThis.DTUAfterDarkDom.normalizeWhitespace;
 
     function getDeps() {
         try { return globalThis.DTUAfterDarkStudyplannerShellDeps || null; } catch (e0) { return null; }
     }
 
-    function isTopWindow() {
-        var deps = getDeps();
-        return !!(deps && typeof deps.isTopWindow === 'function' && deps.isTopWindow());
-    }
 
     function getResolvedAccentDeep() {
         var deps = getDeps();
@@ -18,13 +16,6 @@
         return 'var(--dtu-ad-accent-deep)';
     }
 
-    function normalizeWhitespace(value) {
-        var deps = getDeps();
-        if (deps && typeof deps.normalizeWhitespace === 'function') {
-            return deps.normalizeWhitespace(value);
-        }
-        return String(value || '').replace(/\s+/g, ' ').trim();
-    }
 
     function isDarkModeEnabled() {
         var deps = getDeps();
@@ -54,7 +45,7 @@
 
     function styleStudyPlannerTabLink(anchor) {
         if (!anchor || !anchor.style) return;
-        var color = getResolvedAccentDeep();
+        var color = 'var(--dtu-ad-accent-deep, ' + getResolvedAccentDeep() + ')';
         anchor.style.setProperty('background', color, 'important');
         anchor.style.setProperty('background-color', color, 'important');
         anchor.style.setProperty('color', 'var(--dtu-ad-accent-deep-on, #ffffff)', 'important');

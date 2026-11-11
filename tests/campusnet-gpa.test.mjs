@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
+import { loadDom } from './_harness.mjs';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 
@@ -232,7 +233,7 @@ function appendCell(document, row, text, childTag = null) {
     row.appendChild(cell);
 }
 
-function buildGradesFixture(document) {
+function buildGradesFixture(document, grades = SCREENSHOT_GRADES) {
     const wrapper = document.createElement('section');
     const table = document.createElement('table');
     table.className = 'gradesList';
@@ -240,7 +241,7 @@ function buildGradesFixture(document) {
     header.className = 'gradesListHeader';
     ['Number', 'Title', 'Grade', 'ECTS', 'Date'].forEach(text => appendCell(document, header, text));
     table.appendChild(header);
-    SCREENSHOT_GRADES.forEach(([code, title, grade, ects], index) => {
+    grades.forEach(([code, title, grade, ects], index) => {
         const row = document.createElement('tr');
         row.className = index % 2 ? 'context_alternating' : 'context_direct';
         appendCell(document, row, code);
@@ -255,7 +256,7 @@ function buildGradesFixture(document) {
     return table;
 }
 
-function loadCampusnetGpaApi({ document = new FakeDocument(), dark = false, storage = null } = {}) {
+function loadCampusnetGpaApi({ document = new FakeDocument(), dark = false, storage = null, location = { hostname: 'test.invalid', pathname: '/' } } = {}) {
     const fileUrl = new URL('darkmode.campusnet-gpa.js', ROOT);
     let source = fs.readFileSync(fileUrl, 'utf8');
     source = source.replace(
@@ -272,6 +273,7 @@ function loadCampusnetGpaApi({ document = new FakeDocument(), dark = false, stor
             applyCampusnetActualGradeColumnLayout,
             clearCampusnetActualGradeColumnLayout,
             createSimRow,
+            saveSimEntries,
             publicApi: globalThis.DTUAfterDarkCampusnetGpa
         };})();`
     );
@@ -281,7 +283,7 @@ function loadCampusnetGpaApi({ document = new FakeDocument(), dark = false, stor
         document,
         globalThis: null,
         localStorage: storage || { getItem() { return null; }, setItem() {} },
-        window: { location: { hostname: 'test.invalid', pathname: '/' } }
+        window: { location }
     };
     sandbox.DTUAfterDarkCampusnetGpaDeps = {
         isTopWindow() { return true; },
@@ -290,6 +292,7 @@ function loadCampusnetGpaApi({ document = new FakeDocument(), dark = false, stor
         setSuppressHeavyWork() {}
     };
     sandbox.globalThis = sandbox;
+    loadDom(sandbox);
     vm.runInNewContext(source, sandbox, { filename: fileURLToPath(fileUrl) });
     return sandbox.__campusnetGpaTestApi;
 }
@@ -313,6 +316,7 @@ function loadCampusnetHostShellTestApi() {
         window: { location: { hostname: 'campusnet.dtu.dk', pathname: '/cnnet/Grades/' } }
     };
     sandbox.globalThis = sandbox;
+    loadDom(sandbox);
     vm.runInNewContext(source, sandbox, { filename: fileURLToPath(fileUrl) });
     return sandbox.__campusnetHostShellTestApi;
 }
@@ -425,6 +429,51 @@ for (const dark of [true, false]) {
     });
 }
 
+function allText(element) {
+    if (!element) return '';
+    return [element.textContent, element.title, ...element.children.map(allText)].filter(Boolean).join(' ');
+}
+
+test('the GPA waits for the whole grades table, which CampusNet still parses when the extension starts', () => {
+    const document = new FakeDocument();
+    const listeners = {};
+    document.readyState = 'loading';
+    document.addEventListener = (type, fn) => { (listeners[type] = listeners[type] || []).push(fn); };
+    const table = buildGradesFixture(document);
+    loadCampusnetGpaApi({ document, location: { hostname: 'campusnet.dtu.dk', pathname: '/cnnet/Grades/Grades.aspx' } });
+    assert.equal(table.querySelector('.gpa-row'), null);
+    document.readyState = 'interactive';
+    (listeners.DOMContentLoaded || []).forEach((fn) => fn());
+    assert.match(allText(table.querySelector('.gpa-row')), /7\.32/);
+});
+
+test('an unreadable ignored-course list withholds the GPA instead of counting ignored courses again', () => {
+    const throwing = { getItem() { throw new Error('storage blocked'); }, setItem() {} };
+    const stored = raw => ({ getItem: k => k === 'gpaExcludedActualRows' ? raw : null, setItem() {} });
+    for (const storage of [stored('{'), stored('{"a":1}'), throwing]) {
+        const document = new FakeDocument();
+        const table = buildGradesFixture(document);
+        const api = loadCampusnetGpaApi({ document, storage });
+        const result = api.getCampusnetActualGradeSummary(table);
+        assert.equal(result.gpa, null);
+        assert.equal(result.exclusionsUnreadable, true);
+
+        api.publicApi.insertGPARow();
+        const text = allText(table.querySelector('.gpa-row'));
+        assert.match(text, /Ignored courses could not be read/);
+        assert.doesNotMatch(text, /7\.32/);
+        // One cell across grade, ECTS and note, so the message stays on one line.
+        assert.doesNotMatch(text, /\u2014/);
+        assert.equal(table.querySelector('.gpa-row').children.length, 2);
+    }
+    // No saved list is the normal first visit, not a failure.
+    const document = new FakeDocument();
+    const table = buildGradesFixture(document);
+    const result = loadCampusnetGpaApi({ document, storage: stored(null) }).getCampusnetActualGradeSummary(table);
+    assert.equal(result.gpa, 7.32);
+    assert.equal(result.exclusionsUnreadable, false);
+});
+
 test('unchanged actual-grade controls and excluded styling make zero writes', () => {
     const api = loadCampusnetGpaApi();
     const row = new FakeElement('tr');
@@ -444,15 +493,26 @@ test('unchanged actual-grade controls and excluded styling make zero writes', ()
     }
 });
 
-test('malformed saved simulations cannot crash the GPA calculator', () => {
-    for (const raw of ['{', '{}', 'null', '[null,1,[]]', '[{"grade":99,"ects":5},{"grade":7,"ects":-5}]']) {
+test('malformed saved simulations cannot crash the GPA calculator and say what was lost', () => {
+    for (const [raw, notice] of [
+        ['{', 'Saved planned grades could not be read.'],
+        ['{}', 'Saved planned grades could not be read.'],
+        ['null', 'Saved planned grades could not be read.'],
+        ['[null,1,[]]', '3 saved planned grades could not be read.'],
+        ['[{"grade":99,"ects":5},{"grade":7,"ects":-5}]', '2 saved planned grades could not be read.']
+    ]) {
         const document = new FakeDocument();
         const table = buildGradesFixture(document);
         const api = loadCampusnetGpaApi({ document, storage: { getItem: k => k === 'gpaSimEntries' ? raw : null, setItem() {} } });
         assert.doesNotThrow(() => api.publicApi.insertGPASimulator());
         assert.equal(table.querySelectorAll('.gpa-sim-row').length, 0);
         assert.equal(table.querySelectorAll('.gpa-sim-add-row').length, 1);
+        assert.equal(allText(table.querySelector('.gpa-sim-unread-row')), notice);
     }
+    const document = new FakeDocument();
+    const table = buildGradesFixture(document);
+    loadCampusnetGpaApi({ document }).publicApi.insertGPASimulator();
+    assert.equal(table.querySelector('.gpa-sim-unread-row'), null, 'no saved plan is not a failure');
 });
 
 test('valid saved simulations are restored after filtering malformed entries', () => {
@@ -464,6 +524,7 @@ test('valid saved simulations are restored after filtering malformed entries', (
     const rows = table.querySelectorAll('.gpa-sim-row');
     assert.equal(rows.length, 1);
     assert.equal(rows[0].querySelector('input').value, '34032');
+    assert.equal(allText(table.querySelector('.gpa-sim-unread-row')), '1 saved planned grade could not be read.');
 });
 
 test('CSSOM color and background serialization does not restart idle styling', () => {
@@ -540,4 +601,41 @@ test('"Add planned grade" sits beside "Only show passed courses" and the estimat
         assert.equal(table.querySelector('.gpa-sim-add-row').style.getPropertyValue('display'), 'none');
         assert.equal(table.querySelectorAll('.gpa-sim-disclaimer-row').length, saved ? 1 : 0);
     }
+});
+
+test('a -3 grade written with a Unicode minus still counts', () => {
+    const document = new FakeDocument();
+    const table = buildGradesFixture(document, [
+        ['01001', 'Mathematics 1a', '12 (A)', 5],
+        ['01002', 'Mathematics 1b', '\u22123 (F)', 5]
+    ]);
+    const api = loadCampusnetGpaApi({ document });
+    const summary = api.getCampusnetActualGradeSummary(table);
+    assert.equal(summary.totalECTS, 10);
+    assert.equal(summary.totalWeighted / summary.totalECTS, 4.5);
+});
+
+test('a cleared ECTS field is saved and restored empty, never as 5', () => {
+    const document = new FakeDocument();
+    const table = buildGradesFixture(document);
+    let saved = null;
+    const storage = { getItem: () => null, setItem(k, v) { if (k === 'gpaSimEntries') saved = v; } };
+    const api = loadCampusnetGpaApi({ document, storage });
+    const row = api.createSimRow({ code: '22052', name: 'Signals', grade: 10, ects: 5 });
+    row.className = 'gpa-sim-row';
+    table.appendChild(row);
+    row.children[2].children[0].value = '10'; // the fake select does not follow option.selected
+    row.children[3].children[0].value = '';
+    api.saveSimEntries();
+    assert.equal(JSON.parse(saved)[0].ects, null, saved);
+
+    const document2 = new FakeDocument();
+    const table2 = buildGradesFixture(document2);
+    const api2 = loadCampusnetGpaApi({ document: document2, storage: { getItem: k => k === 'gpaSimEntries' ? saved : null, setItem() {} } });
+    api2.publicApi.insertGPASimulator();
+    const rows = table2.querySelectorAll('.gpa-sim-row');
+    assert.equal(rows.length, 1);
+    assert.equal(String(rows[0].children[3].children[0].value), '');
+    assert.equal(table2.querySelector('.gpa-sim-unread-row'), null);
+    assert.equal(table2.querySelector('.gpa-projected-row'), null, 'no ECTS means no projection');
 });

@@ -45,9 +45,16 @@ const credentialPatterns = [
     /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/,
     /https?:\/\/[^\s/:@]+:[^\s/@]+@/,
     /\bBearer\s+[A-Za-z0-9._~-]{16,}\b/i,
-    /\b[A-Za-z0-9_]*(?:api[_-]?key|client[_-]?secret|access[_-]?token|auth[_-]?token|password|passwd)\s*[:=]\s*["'`][^"'`\r\n]{8,}["'`]/i,
+    /\b[A-Za-z0-9_]*(?:api[_-]?key|api[_-]?token|secret[_-]?key|private[_-]?key|client[_-]?secret|access[_-]?token|auth[_-]?token|password|passwd)\s*[:=]\s*["'`][^"'`\r\n]{8,}["'`]/i,
     /\bREJSEPLANEN_(?:API_KEY|ACCESS_ID)\s*[:=]\s*["'`][^"'`\r\n]+["'`]/i,
     /[?&](?:api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret)=[^&\s"']{8,}/i
+];
+
+// Private network names and addresses: tailnet, internal TLDs (URL context only, so a
+// file name like config.local.js is fine), RFC 1918 and the 100.64/10 range Tailscale uses.
+const privateHostPatterns = [
+    /:\/\/(?:[a-z0-9-]+\.)+(?:ts\.net|internal|lan|local|home\.arpa)(?![a-z0-9-])/i,
+    /(?<![\d.])(?:10\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}|100\.(?:6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.\d{1,3})\.\d{1,3}(?![\d.])/
 ];
 
 const violations = tracked.filter((file) =>
@@ -56,24 +63,35 @@ const violations = tracked.filter((file) =>
     || forbiddenPatterns.some((pattern) => pattern.test(file))
 );
 
-const contentViolations = tracked.filter((file) => {
+function readTrackedText(file) {
     try {
-        if (statSync(file).size > 10 * 1024 * 1024) return false;
+        if (statSync(file).size > 10 * 1024 * 1024) return null;
         const buffer = readFileSync(file);
-        if (buffer.includes(0)) return false;
-        const content = buffer.toString('utf8');
-        return credentialPatterns.some((pattern) => pattern.test(content));
+        return buffer.includes(0) ? null : buffer.toString('utf8');
     } catch {
-        return false;
+        return null;
     }
-});
+}
 
-if (violations.length || contentViolations.length) {
+const contentViolations = [];
+const hostViolations = [];
+for (const file of tracked) {
+    const content = readTrackedText(file);
+    if (content === null) continue;
+    if (credentialPatterns.some((pattern) => pattern.test(content))) contentViolations.push(file);
+    if (privateHostPatterns.some((pattern) => pattern.test(content))) hostViolations.push(file);
+}
+
+if (violations.length || contentViolations.length || hostViolations.length) {
     console.error('Public-boundary audit failed. Local-only files are tracked:');
     for (const file of violations) console.error(`- ${file}`);
     if (contentViolations.length) {
         console.error('Tracked files contain credential-like content (values withheld):');
         for (const file of contentViolations) console.error(`- ${file}`);
+    }
+    if (hostViolations.length) {
+        console.error('Tracked files name a private host or address (values withheld):');
+        for (const file of hostViolations) console.error(`- ${file}`);
     }
     process.exitCode = 1;
 } else {

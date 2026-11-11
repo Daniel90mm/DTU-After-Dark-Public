@@ -1,14 +1,13 @@
 (function () {
     'use strict';
+    var markExt = globalThis.DTUAfterDarkDom.markExt;
+    var isTopWindow = globalThis.DTUAfterDarkDom.isTopWindow;
+    var normalizeWhitespace = globalThis.DTUAfterDarkDom.normalizeWhitespace;
 
     function getDeps() {
         try { return globalThis.DTUAfterDarkLearnShellDeps || null; } catch (e0) { return null; }
     }
 
-    function isTopWindow() {
-        var deps = getDeps();
-        return !!(deps && typeof deps.isTopWindow === 'function' && deps.isTopWindow());
-    }
 
     function isDarkModeEnabled() {
         var deps = getDeps();
@@ -21,11 +20,6 @@
         return path;
     }
 
-    function markExt(el) {
-        var deps = getDeps();
-        if (el && deps && typeof deps.markExt === 'function') deps.markExt(el);
-        return el;
-    }
 
     function getAdminToolsPlaceholder() {
         var deps = getDeps();
@@ -33,11 +27,6 @@
         return null;
     }
 
-    function normalizeWhitespace(text) {
-        var deps = getDeps();
-        if (deps && typeof deps.normalizeWhitespace === 'function') return deps.normalizeWhitespace(text);
-        return String(text || '').replace(/\s+/g, ' ').trim();
-    }
 
     function saveDarkModePreference(enabled) {
         var deps = getDeps();
@@ -348,6 +337,12 @@
         toggle.type = 'checkbox';
         toggle.id = 'dark-mode-toggle';
         toggle.checked = isDarkModeEnabled();
+        // Auto (device theme) is chosen in Settings; the manual switch waits until it is off.
+        var autoDeps = getDeps();
+        if (autoDeps && typeof autoDeps.isFollowingDeviceTheme === 'function' && autoDeps.isFollowingDeviceTheme()) {
+            toggle.disabled = true;
+            toggle.title = 'Auto follows your device theme (Settings, Appearance)';
+        }
         toggle.style.cssText = 'width: 16px; height: 16px; cursor: pointer; accent-color: var(--dtu-ad-accent);';
         toggle.addEventListener('change', function () {
             Promise.resolve(saveDarkModePreference(!isDarkModeEnabled())).then(function () {

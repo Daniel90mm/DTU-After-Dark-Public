@@ -16,126 +16,11 @@
         return !!deps.isDarkMode();
     }
 
-    function getCampusnetParticipantCategoryMetaFromDoc(doc, labelRegex) {
-        var deps = getDeps();
-        if (!deps || !doc || !labelRegex) return null;
-        var headings = doc.querySelectorAll('.ui-participant-categorybar h3');
-        for (var i = 0; i < headings.length; i++) {
-            var txt = deps.normalizeWhitespace(headings[i].textContent);
-            if (!labelRegex.test(txt)) continue;
-
-            var m = txt.match(/\((\d+)\)/);
-            var count = m ? parseInt(m[1], 10) : null;
-            return {
-                headingEl: headings[i],
-                barEl: headings[i].closest('.ui-participant-categorybar'),
-                containerEl: headings[i].closest('.ui-participants-list-category'),
-                count: isNaN(count) ? null : count
-            };
-        }
-        return null;
-    }
-
-    function getCampusnetUsersCountFromDoc(doc) {
-        var meta = getCampusnetParticipantCategoryMetaFromDoc(doc, /^(Users|Brugere)\b/i);
-        return meta ? meta.count : null;
-    }
-
-    function getCampusnetUsersParticipantElementsFromDoc(doc) {
-        var meta = getCampusnetParticipantCategoryMetaFromDoc(doc, /^(Users|Brugere)\b/i);
-        if (meta && meta.containerEl) {
-            var within = Array.from(meta.containerEl.querySelectorAll('.ui-participant'));
-            if (within.length) return within;
-        }
-
-        var bar = meta ? meta.barEl : null;
-        if (bar) {
-            var items = [];
-            var seen = new Set();
-            var node = bar.nextElementSibling;
-            var guard = 0;
-            while (node && guard < 6000) {
-                guard++;
-                if (node.classList && node.classList.contains('ui-participant-categorybar')) break;
-
-                if (node.classList && node.classList.contains('ui-participant')) {
-                    if (!seen.has(node)) { seen.add(node); items.push(node); }
-                } else if (node.querySelectorAll) {
-                    node.querySelectorAll('.ui-participant').forEach(function (p) {
-                        if (!seen.has(p)) { seen.add(p); items.push(p); }
-                    });
-                }
-                node = node.nextElementSibling;
-            }
-            if (items.length) return items;
-        }
-
-        return Array.from(doc.querySelectorAll('.ui-participant'));
-    }
-
+    // Fetched archive pages go through the same parser as the live page, so a
+    // "Users (1 234)" count and students listed only by e-mail are read here too.
     function parseParticipantListFromDoc(doc) {
         var deps = getDeps();
-        var participants = [];
-        if (!deps || !doc) return participants;
-        var items = getCampusnetUsersParticipantElementsFromDoc(doc);
-        for (var i = 0; i < items.length; i++) {
-            var item = items[i];
-            var entry = {};
-
-            var nameEl = item.querySelector('.ui-participant-fullname a');
-            if (nameEl) {
-                entry.name = deps.normalizeWhitespace(nameEl.textContent);
-                var href = nameEl.getAttribute('href') || '';
-                var idMatch = href.match(/id=(\d+)/i);
-                if (idMatch) entry.userId = idMatch[1];
-            }
-
-            var infoEl = item.querySelector('.ui-participant-additional.user-information');
-            if (infoEl) {
-                var sMatch = infoEl.textContent.match(/\b(s\d{6})\b/i);
-                if (sMatch) entry.sNumber = sMatch[1].toLowerCase();
-            }
-
-            var idx = null;
-            var arrow = item.querySelector('.ui-participants-arrow');
-            if (arrow) {
-                var arrowId = arrow.getAttribute('id') || '';
-                var idMatch2 = arrowId.match(/participantarrow(\d+)/i);
-                if (idMatch2) idx = parseInt(idMatch2[1], 10);
-                if (idx === null || isNaN(idx)) {
-                    var onclick = arrow.getAttribute('onclick') || '';
-                    var onMatch = onclick.match(/\((\d+)\)/);
-                    if (onMatch) idx = parseInt(onMatch[1], 10);
-                }
-            }
-            if (idx === null || isNaN(idx)) idx = i;
-
-            var infoBox = doc.getElementById('participantinformation' + idx);
-            if (!infoBox) infoBox = item.nextElementSibling;
-            if (!infoBox) {
-                var sib = item.nextElementSibling;
-                while (sib && !sib.classList.contains('ui-participant')) {
-                    if (sib.classList.contains('ui-participant-informationbox')) { infoBox = sib; break; }
-                    sib = sib.nextElementSibling;
-                }
-            }
-
-            if (infoBox) {
-                var headers = infoBox.querySelectorAll('.info-header span');
-                for (var h = 0; h < headers.length; h++) {
-                    if (/education|uddannelse/i.test(headers[h].textContent)) {
-                        var infoDiv = headers[h].closest('.ui-participant-infobox');
-                        if (infoDiv) {
-                            entry.program = deps.readParticipantProgram(infoDiv);
-                        }
-                        break;
-                    }
-                }
-            }
-
-            if (entry.sNumber) participants.push(entry);
-        }
-        return participants;
+        return (deps && doc) ? deps.parseParticipantList(doc) : [];
     }
 
     function parseCampusnetArchivedElementsFromDoc(doc) {
@@ -243,8 +128,8 @@
                 if (campusnetArchiveBackfillAbort) return null;
                 if (best && best.usersCount && best.loaded >= best.usersCount) return null;
                 return fetchCampusnetDoc(url).then(function (doc) {
-                    var loaded = getCampusnetUsersParticipantElementsFromDoc(doc).length;
-                    var usersCount = getCampusnetUsersCountFromDoc(doc);
+                    var loaded = getDeps().getCampusnetUsersParticipantElements(doc).length;
+                    var usersCount = getDeps().getCampusnetUsersCountFromPage(doc);
                     var rec = { url: url, doc: doc, loaded: loaded, usersCount: usersCount };
 
                     if (!best) best = rec;
@@ -689,8 +574,6 @@
         fetchAndParseArchivedElements: fetchAndParseArchivedElements,
         runCampusnetArchiveBackfill: runCampusnetArchiveBackfill,
         stopCampusnetArchiveBackfill: stopCampusnetArchiveBackfill,
-        insertCampusnetArchiveBackfillWidget: insertCampusnetArchiveBackfillWidget,
-        isRunning: function () { return campusnetArchiveBackfillRunning; },
-        getProgress: function () { return campusnetArchiveBackfillProgress; }
+        insertCampusnetArchiveBackfillWidget: insertCampusnetArchiveBackfillWidget
     };
 })();

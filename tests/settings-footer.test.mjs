@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { extractFunctions } from './_harness.mjs';
+import fs from 'node:fs';
+import { loadModulesInternals } from './_harness.mjs';
+
+const ROOT = new URL('../', import.meta.url);
 
 function fixture() {
     const keyHandlers = new Set();
@@ -32,13 +35,22 @@ function fixture() {
     document.querySelector = () => document.body.children.find(c => c.className === 'dtu-paused-url-rules-modal') || null;
     const opener = element('button'); opener.isConnected = true; opener.focus();
     const mockWindow = { location: { origin: 'https://learn.inside.dtu.dk', pathname: '/d2l/home', href: 'https://learn.inside.dtu.dk/d2l/home?private=value' } };
-    const { api } = extractFunctions('darkmode.settings.js', ['showPausedUrlRulesModal', 'removePausedUrlRulesModal', 'getAfterDarkDebugIdeasMailtoHref', 'createAfterDarkDisclaimerFooter'], {
-        globals: {
-            document, window: mockWindow, getAfterDarkDisclaimerText: () => 'Unofficial extension.',
-            isTopWindow: () => true, isDarkModeEnabled: () => true, getCurrentUrlWithoutHash: () => 'https://learn.inside.dtu.dk/d2l/home',
-            markExt() {}, hideSettingsModal() {}, showSettingsModal() {}, requestAnimationFrame: fn => fn(),
-            getUrlPausePatterns: () => [], buildSuggestedPausePatternsForCurrentUrl: () => [], normalizeUrlPausePattern: v => v,
-            getMatchingUrlPausePatterns: () => [], setTimeout: fn => fn()
+    const { api } = loadModulesInternals([
+        'darkmode.settings.bridge.js',
+        'darkmode.settings.pause.js',
+        'darkmode.settings.footer.js',
+        'darkmode.settings.js'
+    ], ['showPausedUrlRulesModal', 'removePausedUrlRulesModal', 'getAfterDarkDebugIdeasMailtoHref', 'createAfterDarkDisclaimerFooter'], {
+        document, window: mockWindow, requestAnimationFrame: fn => fn(), setTimeout: fn => fn(),
+        DTUAfterDarkSettingsDeps: {
+            isTopWindow: () => true,
+            isDarkModeEnabled: () => true,
+            getCurrentUrlWithoutHash: () => 'https://learn.inside.dtu.dk/d2l/home',
+            markExt() {},
+            getUrlPausePatterns: () => [],
+            buildSuggestedPausePatternsForCurrentUrl: () => [],
+            normalizeUrlPausePattern: v => v,
+            getMatchingUrlPausePatterns: () => []
         }
     });
     api.showPausedUrlRulesModal();
@@ -91,4 +103,15 @@ test('feedback activation opens the prepared draft without adding page context',
     assert.equal(draft.protocol, 'mailto:');
     assert.equal(draft.searchParams.get('body'), 'Hi Daniel,\n\nPage URL:\n\nIdea or issue:\n');
     assert.doesNotMatch(draft.searchParams.get('body'), /private=value|learn\.inside/);
+});
+
+test('every Settings switch, select and colour input has a name for screen readers', () => {
+    for (const file of ['darkmode.settings.js', 'darkmode.settings.pause.js', 'darkmode.settings.footer.js']) {
+        const lines = fs.readFileSync(new URL(file, ROOT), 'utf8').split('\n');
+        lines.forEach((line, i) => {
+            if (!/createElement\('select'\)|\.type = '(?:checkbox|color)'/.test(line)) return;
+            const near = lines.slice(Math.max(0, i - 4), i + 10).join('\n');
+            assert.match(near, /aria-label/, `${file}:${i + 1} control has no aria-label`);
+        });
+    }
 });

@@ -1,5 +1,6 @@
 (function () {
     'use strict';
+    var isTopWindow = globalThis.DTUAfterDarkDom.isTopWindow;
 
     var GPA_SIM_STORAGE_KEY = 'gpaSimEntries';
     var GPA_EXCLUDED_ACTUAL_STORAGE_KEY = 'gpaExcludedActualRows';
@@ -9,10 +10,6 @@
         try { return globalThis.DTUAfterDarkCampusnetGpaDeps || null; } catch (e0) { return null; }
     }
 
-    function isTopWindow() {
-        var deps = getDeps();
-        return !!(deps && typeof deps.isTopWindow === 'function' && deps.isTopWindow());
-    }
 
     function isFeatureEnabled() {
         var deps = getDeps();
@@ -91,7 +88,7 @@
         var title = getCampusnetActualGradeTitleText(cells[1]);
         var gradeSpan = cells[2].querySelector('span');
         var gradeText = normalizeCampusnetGradeCellText(gradeSpan ? gradeSpan.textContent : cells[2].textContent);
-        var numericMatch = gradeText.match(/^(-?\d+)/);
+        var numericMatch = gradeText.replace(/^[\u2212\u2013]/, '-').match(/^(-?\d+)/);
         var numericGrade = numericMatch ? parseInt(numericMatch[1], 10) : null;
         var ects = parseFloat(normalizeCampusnetGradeCellText(cells[3].textContent).replace(',', '.'));
         var term = normalizeCampusnetGradeCellText(cells[4] ? cells[4].textContent : '');
@@ -131,17 +128,19 @@
         return entries;
     }
 
+    // null means the saved list exists but could not be read: the GPA must not then
+    // silently count the courses the student ignored. No saved list is [].
     function readCampusnetExcludedActualGradeSignatures() {
         try {
             var raw = localStorage.getItem(GPA_EXCLUDED_ACTUAL_STORAGE_KEY);
             if (!raw) return [];
             var parsed = JSON.parse(raw);
-            if (!Array.isArray(parsed)) return [];
+            if (!Array.isArray(parsed)) return null;
             return parsed.filter(function (item) {
                 return typeof item === 'string' && item.trim();
             });
         } catch (e) {
-            return [];
+            return null;
         }
     }
 
@@ -177,7 +176,8 @@
 
     function getCampusnetActualGradeSummary(table) {
         var entries = getCampusnetActualGradeEntries(table);
-        var excludedSet = new Set(readCampusnetExcludedActualGradeSignatures());
+        var excludedList = readCampusnetExcludedActualGradeSignatures();
+        var excludedSet = new Set(excludedList || []);
         var excludedCount = 0;
 
         entries.forEach(function (entry) {
@@ -197,7 +197,8 @@
             excludedSet: excludedSet,
             totalWeighted: weightedGpa.totalWeighted,
             totalECTS: weightedGpa.totalECTS,
-            gpa: weightedGpa.gpa,
+            gpa: excludedList ? weightedGpa.gpa : null,
+            exclusionsUnreadable: !excludedList,
             excludedCount: excludedCount
         };
     }
@@ -431,7 +432,7 @@
                     ev.stopPropagation();
                     var signature = btn.getAttribute('data-gpa-signature') || '';
                     if (!signature) return;
-                    var signatures = new Set(readCampusnetExcludedActualGradeSignatures());
+                    var signatures = new Set(readCampusnetExcludedActualGradeSignatures() || []);
                     if (signatures.has(signature)) signatures.delete(signature);
                     else signatures.add(signature);
                     writeCampusnetExcludedActualGradeSignatures(Array.from(signatures));
@@ -460,15 +461,22 @@
             }
             return;
         }
+        // The extension starts while CampusNet still parses the grades table; a
+        // GPA drawn then counts only the rows so far and is never redrawn.
+        if (document.readyState === 'loading') return;
         var table = getCampusnetGradesTable();
         syncCampusnetActualGradeExclusionControls();
+        if (!table) globalThis.DTUAfterDarkWarnMissingAnchor && globalThis.DTUAfterDarkWarnMissingAnchor('CampusNet GPA', 'table.gradesList', function () { return !getCampusnetGradesTable(); });
         if (!table || table.querySelector('.gpa-row')) return;
 
         var summary = getCampusnetActualGradeSummary(table);
-        if (summary.totalECTS === 0 && summary.excludedCount === 0) return;
+        if (summary.totalECTS === 0 && summary.excludedCount === 0 && !summary.exclusionsUnreadable) return;
 
         var headerRow = table.querySelector('tr.gradesListHeader');
-        if (!headerRow) return;
+        if (!headerRow) {
+            globalThis.DTUAfterDarkWarnMissingAnchor && globalThis.DTUAfterDarkWarnMissingAnchor('CampusNet GPA', 'tr.gradesListHeader', function () { return !document.querySelector('table.gradesList tr.gradesListHeader'); });
+            return;
+        }
 
         var gpaRow = document.createElement('tr');
         gpaRow.className = 'gpa-row';
@@ -485,7 +493,7 @@
         var tdGrade = document.createElement('td');
         tdGrade.setAttribute('data-dtu-ext', '1');
         tdGrade.style.cssText = 'text-align: right; padding-right: 5px; font-weight: bold; white-space: nowrap;';
-        tdGrade.textContent = summary.gpa !== null ? summary.gpa.toFixed(2) : '—';
+        tdGrade.textContent = summary.gpa !== null ? summary.gpa.toFixed(2) : '';
 
         var tdECTS = document.createElement('td');
         tdECTS.setAttribute('data-dtu-ext', '1');
@@ -496,14 +504,24 @@
         tdDate.setAttribute('data-dtu-ext', '1');
         tdDate.style.cssText = 'text-align: right; padding-right: 5px; font-size: 11px;';
         tdDate.style.setProperty('color', isDarkMode() ? '#9aa1aa' : '#6b7280', 'important');
-        if (summary.excludedCount > 0) {
+        if (summary.exclusionsUnreadable) {
+            tdDate.textContent = 'Ignored courses could not be read';
+            tdDate.title = 'Use a course\'s ignore button to start a new list.';
+        } else if (summary.excludedCount > 0) {
             tdDate.textContent = summary.excludedCount + ' ignored';
         }
 
         gpaRow.appendChild(tdLabel);
-        gpaRow.appendChild(tdGrade);
-        gpaRow.appendChild(tdECTS);
-        gpaRow.appendChild(tdDate);
+        if (summary.exclusionsUnreadable) {
+            // No GPA to show: the note takes the grade, ECTS and note columns.
+            tdDate.colSpan = 3;
+            tdDate.style.setProperty('white-space', 'nowrap');
+            gpaRow.appendChild(tdDate);
+        } else {
+            gpaRow.appendChild(tdGrade);
+            gpaRow.appendChild(tdECTS);
+            gpaRow.appendChild(tdDate);
+        }
 
         var lastRow = table.querySelector('tr:last-child');
         if (lastRow) lastRow.after(gpaRow);
@@ -555,7 +573,8 @@
                 code: codeInput ? codeInput.value : '',
                 name: nameInput ? nameInput.value : '',
                 grade: parseInt(gradeSelect.value, 10),
-                ects: parseFloat(ectsInput.value) || 5
+                // An emptied field stays empty: saving 5 would invent credits the student never chose.
+                ects: parseFloat(ectsInput.value) > 0 ? parseFloat(ectsInput.value) : null
             });
         });
         localStorage.setItem(GPA_SIM_STORAGE_KEY, JSON.stringify(entries));
@@ -590,6 +609,8 @@
 
         syncGpaSimulatorDisclaimer(table);
         if (simECTS === 0) return;
+        // Same totals as the GPA row: without a readable ignore list there is no honest projection.
+        if (actualSummary.exclusionsUnreadable) return;
 
         var currentGPA = actualECTS > 0 ? actualWeighted / actualECTS : 0;
         var projectedGPA = (actualECTS + simECTS) > 0
@@ -722,7 +743,7 @@
         ectsInput.setAttribute('data-dtu-ext', '1');
         ectsInput.min = '1';
         ectsInput.max = '60';
-        ectsInput.value = entry.ects || 5;
+        ectsInput.value = entry.ects == null ? '' : entry.ects;
         ectsInput.style.cssText = 'width: 67px; max-width: 100%; text-align: left; padding-left: 10px; padding-right: 22px; box-sizing: border-box;';
         ectsInput.addEventListener('input', function () { saveSimEntries(); updateProjectedGPA(); });
         tdECTS.appendChild(ectsInput);
@@ -758,7 +779,7 @@
     function insertGPASimulator() {
         if (!isTopWindow()) return;
         if (!isFeatureEnabled()) {
-            document.querySelectorAll('.gpa-sim-row, .gpa-sim-add-row, .gpa-sim-add-btn, .gpa-projected-row, .gpa-sim-disclaimer-row').forEach(function (el) {
+            document.querySelectorAll('.gpa-sim-row, .gpa-sim-add-row, .gpa-sim-add-btn, .gpa-projected-row, .gpa-sim-disclaimer-row, .gpa-sim-unread-row').forEach(function (el) {
                 el.remove();
             });
             document.querySelectorAll('[data-gpa-controls-flex="1"]').forEach(function (el) {
@@ -769,23 +790,34 @@
             });
             return;
         }
+        if (document.readyState === 'loading') return;
         var table = getCampusnetGradesTable();
         if (!table || table.querySelector('.gpa-sim-add-row')) return;
 
         var headerRow = table.querySelector('tr.gradesListHeader');
         if (!headerRow) return;
 
+        // A saved plan that cannot be read is reported, not quietly dropped: the next
+        // save overwrites it, so the student should know it was there.
         var savedEntries = [];
+        var savedUnreadable = false;
         try {
             var stored = localStorage.getItem(GPA_SIM_STORAGE_KEY);
             if (stored) savedEntries = JSON.parse(stored);
-        } catch (e) { }
-        if (!Array.isArray(savedEntries)) savedEntries = [];
+        } catch (e) {
+            savedUnreadable = true;
+        }
+        if (!Array.isArray(savedEntries)) {
+            savedEntries = [];
+            savedUnreadable = true;
+        }
+        var savedCount = savedEntries.length;
         savedEntries = savedEntries.filter(function (entry) {
             return entry && typeof entry === 'object' && !Array.isArray(entry)
                 && DANISH_GRADES.indexOf(entry.grade) >= 0
-                && Number.isFinite(entry.ects) && entry.ects > 0;
+                && (entry.ects === null || (Number.isFinite(entry.ects) && entry.ects > 0));
         });
+        var lostCount = savedCount - savedEntries.length;
 
         // The row stays as the anchor planned rows are inserted after (right under the
         // header). The button itself sits with the page's own controls, next to "Only
@@ -830,6 +862,8 @@
         addBtn.addEventListener('click', function (e) {
             e.preventDefault();
             setSuppressHeavyWork(true);
+            var unreadRow = table.querySelector('.gpa-sim-unread-row');
+            if (unreadRow) unreadRow.remove();
             var newEntry = { code: '', name: '', grade: 7, ects: 5 };
             var newRow = createSimRow(newEntry);
             var lastSimRow = table.querySelector('.gpa-sim-row:last-of-type');
@@ -866,6 +900,22 @@
         headerRow.after(addRow);
 
         var insertAfter = addRow;
+        if (savedUnreadable || lostCount > 0) {
+            var unreadRow = document.createElement('tr');
+            unreadRow.className = 'gpa-sim-unread-row';
+            unreadRow.setAttribute('data-dtu-ext', '1');
+            var unreadTd = document.createElement('td');
+            unreadTd.colSpan = 5;
+            unreadTd.setAttribute('data-dtu-ext', '1');
+            unreadTd.style.cssText = 'text-align:left;padding:4px 6px;font-size:12px;';
+            unreadTd.style.setProperty('color', isDarkMode() ? '#e0e0e0' : '#1f2937', 'important');
+            unreadTd.textContent = savedUnreadable
+                ? 'Saved planned grades could not be read.'
+                : lostCount + ' saved planned grade' + (lostCount === 1 ? '' : 's') + ' could not be read.';
+            unreadRow.appendChild(unreadTd);
+            insertAfter.after(unreadRow);
+            insertAfter = unreadRow;
+        }
         savedEntries.forEach(function (entry) {
             var simRow = createSimRow(entry);
             insertAfter.after(simRow);
@@ -886,9 +936,14 @@
         };
     } catch (eExpose) { }
 
-    if (isCampusnetGradesPage()) {
+    function startCampusnetGradesPage() {
         insertGPARow();
         insertGPASimulator();
         syncCampusnetActualGradeExclusionControls();
+    }
+
+    if (isCampusnetGradesPage()) {
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startCampusnetGradesPage);
+        else startCampusnetGradesPage();
     }
 })();

@@ -20,8 +20,9 @@ Highlights:
 - DTU Learn dashboard tools for deadlines, live bus departures, Library occupancy/events/news, course search, and course Content shortcuts.
 - Course-content download tools for supported DTU Learn Lessons pages.
 - CampusNet GPA tools with weighted GPA, projected-grade simulation, and grade-row controls.
-- Optional CampusNet Participant Intelligence for course composition, shared course history, and Retention Radar.
-- Course Catalog insights for grade statistics, course evaluations, and textbook links.
+- CampusNet Participant Intelligence: course composition, Retention (enrolment changes between visits), and optional shared course history.
+- Study Planner exam schedule: your exams per exam period from DTU's exam table, with workload ratings and calendar export.
+- Course Catalog insights for grade statistics, course evaluations, exam dates, a prerequisite course map, and textbook links.
 - Smart Room Links that turn room mentions already shown on supported DTU pages into MazeMap links.
 - Per-feature settings and paused-URL controls.
 
@@ -30,11 +31,28 @@ Supported services include DTU Learn, CampusNet, Study Planner, kurser.dtu.dk, g
 Privacy:
 
 - Preferences, caches, and feature state are stored locally in the browser.
-- Participant Intelligence is disabled by default and stores its dataset locally only when enabled.
+- Course composition and Retention are on in a new install; they store no names, only each course's participant count. Shared course history, which stores participant names locally, is off until you turn it on.
 - DTU After Dark does not include advertising, analytics, heartbeat telemetry, or remote code.
 - Live features contact the DTU and third-party services documented in the public privacy policy.
 
 DTU After Dark is unofficial and is not affiliated with or endorsed by DTU or any service provider. Information shown by the extension may be delayed, incomplete, or inaccurate; always verify critical information through official DTU channels.
+
+## Version 9.1.0 release notes
+
+- New exam schedule in the Study Planner: an "Exam schedule" tab shows one exam period at a time with a day strip and one line per course: date, format and the workload rating from the course's latest evaluation. Dates come from DTU's published exam table; you can change a date or format, and courses in your basket show under the period they fit. "Add to calendar" downloads the exams as calendar events.
+- Course pages on kurser.dtu.dk get an "Exam date" row with the exam day from DTU's exam table for each period the course runs in.
+- New Course map on kurser.dtu.dk: a "Show map" button under Academic prerequisites opens a map of the courses that lead to a course and the courses it leads to, including older courses no longer in the catalogue.
+- Redesigned Deadlines widget: each period's dates are printed on its marks, the next step sits under the period name, and only periods with a deadline in the next 60 days show.
+- Dark Mode is one choice in Settings: Light, Dark or Auto. Auto follows your device's light or dark setting on every DTU site.
+- The Library panel's visitor chart shows today as a filled line against a usual day, with the live count marked "now" and DTU Library events labelled above the hours they run. A reading older than two hours shows as unavailable instead of as the current count.
+- On CampusNet participant lists, hover a study line in Course composition to see who it counts, and click it to show only those students. Course composition and Retention are on in a new install; Shared course history stays off until you turn it on.
+- The Bus widget includes the Letbane (line L), no longer lists the discontinued 300S, and shows Copenhagen times across the clock change.
+- Accent colours repaint the Study Planner, CampusNet and kurser.dtu.dk at once.
+- Settings switches have names for screen readers, the bus setup is a proper dialog, and the device's reduce-motion setting stops the extension's animations.
+- Safer links: deadline, library feed and Content shortcut links only open the DTU or https addresses they should.
+- Course content download never saves a sign-in page as a file and names files that failed.
+- When saved settings or a DTU page cannot be read (GPA, planned grades, bus settings, grade statistics), the widget says so instead of showing a wrong result.
+- Search Courses on the DTU Learn homepage is off until you turn it on in Settings.
 
 ## Version 9.0.0 release notes
 

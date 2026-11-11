@@ -165,27 +165,52 @@
         deps.storageLocalSet({ [deps.participantIntelStorageKey]: data });
     }
 
+    // Every caller reads, changes and saves the whole object inside its
+    // callback. Two reads in flight at once let the later save drop the
+    // earlier change (participant history vs Retention on the same page), so
+    // reads run one at a time: the next starts after the previous callback
+    // has issued its save.
+    var participantIntelLoadQueue = [];
+    var participantIntelLoadBusy = false;
+
     function loadParticipantIntel(cb) {
         var deps = getDeps();
         if (!deps) {
             if (cb) cb({ self: null, students: {}, retention: {}, courseNames: {}, backfill: { scanned: {}, autoWeekly: false, lastRunTs: 0 } });
             return;
         }
+        participantIntelLoadQueue.push(cb);
+        if (!participantIntelLoadBusy) runNextParticipantIntelLoad();
+    }
+
+    function runNextParticipantIntelLoad() {
+        var deps = getDeps();
+        var cb = participantIntelLoadQueue.shift();
+        if (!deps || !cb) {
+            participantIntelLoadBusy = false;
+            return;
+        }
+        participantIntelLoadBusy = true;
         deps.storageLocalGet({ [deps.participantIntelStorageKey]: null }, function (result) {
-            var data = result[deps.participantIntelStorageKey];
-            if (!data || typeof data !== 'object') {
-                data = { self: null, students: {}, retention: {}, courseNames: {}, backfill: { scanned: {}, autoWeekly: false, lastRunTs: 0 } };
-            }
-            if (!data.students) data.students = {};
-            if (!data.retention) data.retention = {};
-            if (!data.courseNames) data.courseNames = {};
-            if (!data.backfill || typeof data.backfill !== 'object') data.backfill = { scanned: {}, autoWeekly: false, lastRunTs: 0 };
-            if (!data.backfill.scanned || typeof data.backfill.scanned !== 'object') data.backfill.scanned = {};
-            if (typeof data.backfill.autoWeekly !== 'boolean') data.backfill.autoWeekly = false;
-            if (typeof data.backfill.lastRunTs !== 'number') data.backfill.lastRunTs = 0;
-            if (dedupeParticipantIntelData(data)) saveParticipantIntel(data);
-            cb(data);
+            try { readParticipantIntelResult(deps, result, cb); }
+            finally { runNextParticipantIntelLoad(); }
         });
+    }
+
+    function readParticipantIntelResult(deps, result, cb) {
+        var data = result[deps.participantIntelStorageKey];
+        if (!data || typeof data !== 'object') {
+            data = { self: null, students: {}, retention: {}, courseNames: {}, backfill: { scanned: {}, autoWeekly: false, lastRunTs: 0 } };
+        }
+        if (!data.students) data.students = {};
+        if (!data.retention) data.retention = {};
+        if (!data.courseNames) data.courseNames = {};
+        if (!data.backfill || typeof data.backfill !== 'object') data.backfill = { scanned: {}, autoWeekly: false, lastRunTs: 0 };
+        if (!data.backfill.scanned || typeof data.backfill.scanned !== 'object') data.backfill.scanned = {};
+        if (typeof data.backfill.autoWeekly !== 'boolean') data.backfill.autoWeekly = false;
+        if (typeof data.backfill.lastRunTs !== 'number') data.backfill.lastRunTs = 0;
+        if (dedupeParticipantIntelData(data)) saveParticipantIntel(data);
+        cb(data);
     }
 
     (function clearCorruptedIntel() {
@@ -271,10 +296,11 @@
 
     // The "Users" list as CampusNet would show it with every participant on one
     // page. When the visible page already holds them all, that is the page
-    // itself. Otherwise the full list is fetched once in the background and
-    // parsed as an inert document, so CampusNet's page size is left alone and
-    // no profile pictures are requested (CampusNet serves each one slowly).
-    // Falls back to the visible page when the fetch fails.
+    // itself. Otherwise it is read from CampusNet's participant export, or, if
+    // that fails, from the one-page list fetched in the background and parsed
+    // as an inert document, so CampusNet's page size is left alone and no
+    // profile pictures are requested (CampusNet serves each one slowly).
+    // Falls back to the visible page when both fail.
     var FULL_PARTICIPANT_LIST_TTL_MS = 10 * 60 * 1000;
 
     var BLANK_PICTURE = 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==';
@@ -321,38 +347,144 @@
         });
     }
 
+    // CampusNet's own participant export (the list's More, Export), limited to
+    // the Users and the four columns the composition needs. On 12106 (786
+    // users) it answers in about 3 s with 160 KB, where the one-page list takes
+    // 13 to 25 s and 3 MB. The fields go in the export form's order, which is
+    // also the column order of the file.
+    var PARTICIPANT_EXPORT_FIELDS = ['FirstName', 'LastName', 'StudyNumber', 'Education'];
+
+    function fetchParticipantExport(path) {
+        var body = new URLSearchParams();
+        PARTICIPANT_EXPORT_FIELDS.forEach(function (f) { body.append('fields', f); });
+        body.append('Seperator', ';');
+        body.append('roleid', 'Everyone regardless of roles');
+        body.append('acl', '2');
+        body.append('includeClosed', 'True');
+        return fetch(window.location.origin + path + '/export', { method: 'POST', body: body, credentials: 'include' }).then(function (res) {
+            if (!res.ok) throw new Error('http_' + res.status);
+            if (!/attachment/i.test(res.headers.get('content-disposition') || '')) throw new Error('export_not_file');
+            return res.arrayBuffer();
+        }).then(decodeParticipantExport);
+    }
+
+    // The file is UTF-16LE (as Excel wants it); read UTF-8 too in case that changes.
+    function decodeParticipantExport(buf) {
+        var bytes = new Uint8Array(buf);
+        var utf16 = (bytes[0] === 0xff && bytes[1] === 0xfe) || (bytes.length > 1 && bytes[1] === 0);
+        return new TextDecoder(utf16 ? 'utf-16le' : 'utf-8').decode(bytes).replace(/^﻿/, '');
+    }
+
+    // Rows "First;Last;s123456;Education;" under a header row. Throws when the
+    // columns are not the ones asked for, so the caller falls back to the list.
+    function parseParticipantExport(text) {
+        var deps = getDeps();
+        var lines = String(text || '').split(/\r?\n/).filter(function (l) { return l.trim(); });
+        var header = lines.length ? lines[0].split(';') : [];
+        if (header.length < 4 || !/stud/i.test(header[2]) || !/educ|uddan/i.test(header[3])) throw new Error('export_columns');
+        var participants = [];
+        for (var i = 1; i < lines.length; i++) {
+            var cols = lines[i].split(';');
+            var sNumber = String(cols[2] || '').trim().toLowerCase();
+            if (!/^s\d{6}$/.test(sNumber)) continue;
+            participants.push({
+                name: deps.normalizeWhitespace((cols[0] || '') + ' ' + (cols[1] || '')),
+                sNumber: sNumber,
+                program: deps.readExportProgram(cols[3] || '')
+            });
+        }
+        return participants;
+    }
+
+    // The one-page list as a document, for the program filter, which copies
+    // entries CampusNet keeps on other pages into the Users list. Loaded only
+    // when a filter needs it, since it is the slow part.
+    var fullListDocCache = null;
+    var fullListDocInFlight = null;
+
+    function getFullListUsersElements() {
+        var deps = getDeps();
+        var cache = fullListDocCache;
+        if (!deps || !cache || cache.key !== window.location.pathname
+            || (Date.now() - cache.ts) >= FULL_PARTICIPANT_LIST_TTL_MS) return [];
+        return deps.getCampusnetUsersParticipantElements(cache.doc);
+    }
+
+    // cb(true) once getFullListUsersElements has the list, cb(false) if it
+    // could not be read. Always called asynchronously.
+    function loadFullListDoc(cb) {
+        var key = window.location.pathname;
+        if (getFullListUsersElements().length) { setTimeout(function () { cb(true); }, 0); return; }
+        if (!fullListDocInFlight || fullListDocInFlight.key !== key) {
+            var promise = fetchFullParticipantsHtml(key).then(function (html) {
+                var doc = new DOMParser().parseFromString(html, 'text/html');
+                fullListDocCache = { key: key, ts: Date.now(), doc: doc };
+                return doc;
+            });
+            fullListDocInFlight = { key: key, promise: promise };
+            promise.then(function () {}, function () {}).then(function () {
+                if (fullListDocInFlight && fullListDocInFlight.promise === promise) fullListDocInFlight = null;
+            });
+        }
+        fullListDocInFlight.promise.then(function () {
+            cb(getFullListUsersElements().length > 0);
+        }, function () { cb(false); });
+    }
+
     function getFullParticipantList(cb) {
         var deps = getDeps();
         if (!deps) { cb([], { complete: false, total: 0 }); return; }
         var visible = parseParticipantList();
         var total = deps.getCampusnetUsersCountFromPage() || 0;
         var visibleUsers = deps.getCampusnetUsersParticipantElements().length;
-        if (!total || visibleUsers >= total) {
+        // No "Users (N)" heading (the Roles view) says nothing about the list
+        // size, so that view loads the full list too.
+        if (!visibleUsers || (total && visibleUsers >= total)) {
             cb(visible, { complete: true, total: total || visibleUsers });
             return;
         }
 
         var key = window.location.pathname;
         var now = Date.now();
-        if (fullParticipantListCache && fullParticipantListCache.key === key
-            && (now - fullParticipantListCache.ts) < FULL_PARTICIPANT_LIST_TTL_MS) {
-            cb(fullParticipantListCache.participants, { complete: true, total: fullParticipantListCache.total });
+        var cached = fullParticipantListCache && fullParticipantListCache.key === key ? fullParticipantListCache : null;
+        if (cached && (now - cached.ts) < FULL_PARTICIPANT_LIST_TTL_MS) {
+            cb(cached.participants, { complete: true, total: cached.total });
             return;
+        }
+        // A refresh that fails keeps the last full list rather than this page alone.
+        function fallBack() {
+            if (cached) cb(cached.participants, { complete: true, total: cached.total });
+            else cb(visible, { complete: false, total: total });
         }
 
         if (fullParticipantListFailure && fullParticipantListFailure.key === key
             && (now - fullParticipantListFailure.ts) < 60000) {
-            cb(visible, { complete: false, total: total });
+            fallBack();
             return;
         }
 
         if (!fullParticipantListInFlight || fullParticipantListInFlight.key !== key) {
-            var promise = fetchFullParticipantsHtml(key).then(function (html) {
-                var doc = new DOMParser().parseFromString(html, 'text/html');
-                var participants = parseParticipantList(doc);
-                var fullTotal = deps.getCampusnetUsersCountFromPage(doc) || participants.length;
-                if (!participants.length) throw new Error('parse_empty');
-                fullParticipantListCache = { key: key, ts: Date.now(), participants: participants, total: fullTotal };
+            var promise = fetchParticipantExport(key).then(function (text) {
+                var exported = parseParticipantExport(text);
+                if (!exported.length) throw new Error('export_empty');
+                return { participants: exported, total: total || exported.length };
+            }).catch(function () {
+                return fetchFullParticipantsHtml(key).then(function (html) {
+                    var doc = new DOMParser().parseFromString(html, 'text/html');
+                    var parsed = parseParticipantList(doc);
+                    if (!parsed.length) throw new Error('parse_empty');
+                    fullListDocCache = { key: key, ts: Date.now(), doc: doc };
+                    return { participants: parsed, total: deps.getCampusnetUsersCountFromPage(doc) || parsed.length };
+                });
+            }).then(function (list) {
+                // The export has no CampusNet user ids; take them from this page,
+                // which is how the student's own entry is recognised.
+                var userIds = {};
+                visible.forEach(function (p) { if (p.sNumber && p.userId) userIds[p.sNumber] = p.userId; });
+                list.participants.forEach(function (p) {
+                    if (!p.userId && userIds[p.sNumber]) p.userId = userIds[p.sNumber];
+                });
+                fullParticipantListCache = { key: key, ts: Date.now(), participants: list.participants, total: list.total };
                 return fullParticipantListCache;
             });
             fullParticipantListInFlight = { key: key, promise: promise };
@@ -365,9 +497,7 @@
 
         fullParticipantListInFlight.promise.then(function (entry) {
             cb(entry.participants, { complete: true, total: entry.total });
-        }, function () {
-            cb(visible, { complete: false, total: total });
-        });
+        }, fallBack);
     }
 
     function detectAndStoreSelf(intel, participants, courseCode, semester) {
@@ -600,6 +730,10 @@
         saveParticipantIntel: saveParticipantIntel,
         parseParticipantList: parseParticipantList,
         getFullParticipantList: getFullParticipantList,
+        getFullListUsersElements: getFullListUsersElements,
+        loadFullListDoc: loadFullListDoc,
+        parseParticipantExport: parseParticipantExport,
+        decodeParticipantExport: decodeParticipantExport,
         collectParticipantData: collectParticipantData,
         detectAndStoreSelf: detectAndStoreSelf
     };

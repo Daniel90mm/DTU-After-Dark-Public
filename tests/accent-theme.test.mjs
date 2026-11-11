@@ -3,7 +3,7 @@ import test from 'node:test';
 import fs from 'node:fs';
 import { extractFunctions, makeLocalStorage, plain, readSource, ROOT } from './_harness.mjs';
 
-const SRC = readSource('darkmode.js');
+const SRC = readSource('darkmode.accent-theme.js');
 
 function sliceConst(name) {
     const start = SRC.indexOf(`const ${name} = `);
@@ -20,7 +20,7 @@ const PRELUDE = [
 ].map(sliceConst).join('\n') + `
     var _accentThemeId = ACCENT_THEME_DEFAULT;
     var _accentCustomHex = ACCENT_CUSTOM_DEFAULT;
-    var darkModeEnabled = true;
+    function isDarkModeEnabled() { return true; }
     var __writes = [];
     function storageLocalSet(items) { __writes.push(items); }
     function replaceLogoImage() {}
@@ -32,10 +32,10 @@ function load() {
     const props = new Map();
     const documentElement = { style: { setProperty: (k, v) => props.set(k, v) } };
     const localStorage = makeLocalStorage();
-    const { api, context } = extractFunctions('darkmode.js', [
+    const { api, context } = extractFunctions('darkmode.accent-theme.js', [
         'normalizeAccentThemeId', 'parseHexColorToRgb', 'clampByte', 'rgbToHex', 'mixRgb',
         'lightenHex', 'darkenHex', 'normalizeHexColor', 'relativeLuminanceFromRgb',
-        'getContrastTextForHex', 'getAccentBarTextForHex', 'getReadableAccentTextHex', 'getAccentForSurfaceHex', 'hexToRgbTriplet', 'computeCustomAccentTheme',
+        'getContrastTextForHex', 'getAccentBarTextForHex', 'getReadableAccentTextHex', 'getAccentForSurfaceHex', 'hexToRgbTriplet', 'computeCustomAccentTheme', 'readableSoftHex',
         'getAccentThemeById', 'applyAccentThemeVars', 'setAccentCustomHex', 'setAccentThemeId'
     ], { prelude: PRELUDE, globals: { document: { documentElement }, localStorage } });
     api.__state = () => context.__state();
@@ -90,6 +90,14 @@ test('custom themes derive every shade from the picked colour, and bad input fal
     assert.equal(plain(api.computeCustomAccentTheme('nope')).accent, '#990000');
 });
 
+test('the custom soft shade reads at 4.5:1 on dark panels, even for black or grey picks', () => {
+    const { api } = load();
+    for (const hex of ['#000000', '#333333', '#6f6f6f', '#990000', '#1fd082']) {
+        const soft = plain(api.computeCustomAccentTheme(hex)).accentSoft;
+        assert.ok(contrast(soft, '#2d2d2d', api) >= 4.5, hex + ' gives soft ' + soft);
+    }
+});
+
 test('contrast text picks black on light colours and white on dark ones', () => {
     const { api } = load();
     assert.equal(api.getContrastTextForHex('#f6d04d'), '#000000');
@@ -125,11 +133,12 @@ test('an invalid custom colour is ignored entirely', () => {
 
 test('the Settings colour picker previews on input and saves only on change', () => {
     const s = readSource('darkmode.settings.js');
+    const bridge = readSource('darkmode.settings.bridge.js');
     assert.match(s, /color\.addEventListener\('input', function \(\) \{ onPickCustomColor\(false\); \}\);/);
     assert.match(s, /color\.addEventListener\('change', function \(\) \{ onPickCustomColor\(true\); \}\);/);
     assert.match(s, /var opts = persist \? undefined : \{ noStorage: true \};/);
-    assert.match(s, /callDep\('setAccentThemeId', \[nextId, opts\], null\)/);
-    assert.match(s, /callDep\('setAccentCustomHex', \[nextHex, opts\], null\)/);
+    assert.match(bridge, /callDep\('setAccentThemeId', \[nextId, opts\], null\)/);
+    assert.match(bridge, /callDep\('setAccentCustomHex', \[nextHex, opts\], null\)/);
     assert.doesNotMatch(s, /'corporate-red'/);
 });
 

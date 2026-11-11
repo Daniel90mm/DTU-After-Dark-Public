@@ -67,3 +67,45 @@ test('public boundary rejects a non-empty credential without echoing its value',
     assert.match(result.stderr, /credential-like content/);
     assert.doesNotMatch(result.stderr, new RegExp(credential));
 });
+
+// Fixture hosts and tokens are assembled at runtime so this tracked file never holds one whole.
+const dot = '.';
+test('public boundary rejects private hostnames and addresses', (t) => {
+    const bad = {
+        'tailnet.js': `fetch("https://box${dot}tail1234${dot}ts${dot}net/x");\n`,
+        'internal.js': `const u = "http://build${dot}corp${dot}internal/health";\n`,
+        'lan.md': `See http://nas${dot}lan:8080 for logs.\n`,
+        'cgnat.sh': `ssh user@${[100, 73, 106, 62].join(dot)}\n`,
+        'rfc1918.json': `{"host": "${[192, 168, 1, 20].join(dot)}"}\n`,
+        'ten.js': `const h = '${[10, 0, 4, 7].join(dot)}';\n`
+    };
+    const directory = createTrackedRepo(bad);
+    t.after(() => rmSync(directory, { recursive: true, force: true }));
+    const result = runAudit(directory);
+    assert.equal(result.status, 1);
+    for (const file of Object.keys(bad)) assert.match(result.stderr, new RegExp(file.replace('.', '\\.')));
+});
+
+test('public boundary accepts public DTU hosts, config.local.js mentions and version numbers', (t) => {
+    const directory = createTrackedRepo({
+        'ok.js': "fetch('https://learn.inside.dtu.dk/d2l/api');\n// overrides go in config.local.js\nconst v = '10.0.4';\n",
+        'README.md': 'Version 1.10.0 works in Firefox 128.0.3.\n'
+    });
+    t.after(() => rmSync(directory, { recursive: true, force: true }));
+    const result = runAudit(directory);
+    assert.equal(result.status, 0, result.stderr);
+});
+
+test('public boundary rejects a bare API token or secret key assignment', (t) => {
+    const value = ['not', 'for', 'public', 'a'.repeat(24)].join('-');
+    const directory = createTrackedRepo({
+        'a.js': 'const ' + ['API', 'TOKEN'].join('_') + ' = ' + JSON.stringify(value) + ';\n',
+        'b.js': 'const ' + ['secret', 'Key'].join('') + ' = ' + JSON.stringify(value) + ';\n'
+    });
+    t.after(() => rmSync(directory, { recursive: true, force: true }));
+    const result = runAudit(directory);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /a\.js/);
+    assert.match(result.stderr, /b\.js/);
+    assert.doesNotMatch(result.stderr, new RegExp(value));
+});

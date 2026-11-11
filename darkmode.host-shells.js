@@ -1,14 +1,11 @@
 (function () {
     'use strict';
+    var isTopWindow = globalThis.DTUAfterDarkDom.isTopWindow;
 
     function getDeps() {
         try { return globalThis.DTUAfterDarkHostShellDeps || null; } catch (e0) { return null; }
     }
 
-    function isTopWindow() {
-        var deps = getDeps();
-        return !!(deps && typeof deps.isTopWindow === 'function' && deps.isTopWindow());
-    }
 
     function isDarkModeEnabled() {
         var deps = getDeps();
@@ -175,12 +172,15 @@
 
         function applyCampusnetAccentElements() {
             var accentThemeId = getAccentThemeId();
-            var accentDeepHex = getResolvedAccentDeep();
+            // Each colour is a var() over the root accent variables, with the
+            // current hex as fallback, so a theme picked in another tab
+            // repaints these inline styles without a reload.
             var theme = getAccentThemeById(accentThemeId) || {};
-            var accentDeepHoverHex = theme.accentDeepHover || '#990000';
-            var accentHex = theme.accent || '#990000';
+            var accentDeepHex = 'var(--dtu-ad-accent-deep, ' + getResolvedAccentDeep() + ')';
+            var accentDeepHoverHex = 'var(--dtu-ad-accent-deep-hover, ' + (theme.accentDeepHover || '#990000') + ')';
+            var accentHex = 'var(--dtu-ad-accent, ' + (theme.accent || '#990000') + ')';
             var accentHoverHex = theme.accentHover || '#b30000';
-            var accentSoftHex = theme.accentSoft || accentHex;
+            var accentSoftHex = 'var(--dtu-ad-accent-soft, ' + (theme.accentSoft || theme.accent || '#990000') + ')';
             var linkColor = isDarkModeEnabled() ? accentSoftHex : 'var(--dtu-ad-accent-deep-text, ' + accentDeepHex + ')';
             // The base/deep accent is too dark against CampusNet's dark canvas.
             // Keep the user-selected soft accent in dark mode; interaction is

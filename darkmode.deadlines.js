@@ -1,5 +1,8 @@
 (function () {
     'use strict';
+    var markExt = globalThis.DTUAfterDarkDom.markExt;
+    var isTopWindow = globalThis.DTUAfterDarkDom.isTopWindow;
+    var normalizeWhitespace = globalThis.DTUAfterDarkDom.normalizeWhitespace;
 
     var DEADLINES_CACHE_KEY = 'dtuDarkModeDeadlinesCacheV2';
     // DTU publishes these dates years ahead and edits them rarely, so elapsed time is a
@@ -32,10 +35,6 @@
         try { return globalThis.DTUAfterDarkDeadlinesDeps || null; } catch (e0) { return null; }
     }
 
-    function isTopWindow() {
-        var deps = getDeps();
-        return !!(deps && typeof deps.isTopWindow === 'function' && deps.isTopWindow());
-    }
 
     function isDarkMode() {
         var deps = getDeps();
@@ -49,7 +48,7 @@
 
     function isSearchWidgetEnabled() {
         var deps = getDeps();
-        if (!deps || typeof deps.isSearchWidgetEnabled !== 'function') return true;
+        if (!deps || typeof deps.isSearchWidgetEnabled !== 'function') return false;
         return !!deps.isSearchWidgetEnabled();
     }
 
@@ -58,19 +57,7 @@
         return !!(deps && typeof deps.isDTULearnHomepage === 'function' && deps.isDTULearnHomepage());
     }
 
-    function markExt(el) {
-        var deps = getDeps();
-        if (el && deps && typeof deps.markExt === 'function') deps.markExt(el);
-        return el;
-    }
 
-    function normalizeWhitespace(text) {
-        var deps = getDeps();
-        if (deps && typeof deps.normalizeWhitespace === 'function') {
-            return deps.normalizeWhitespace(text);
-        }
-        return String(text || '').replace(/\s+/g, ' ').trim();
-    }
 
     function normalizeDeadlinePeriodText(text) {
         var decoded = String(text || '');
@@ -357,7 +344,7 @@
         _deadlinesFetchInProgress = true;
         sendRuntimeMessage({ type: 'dtu-student-deadlines', forceRefresh: !!forceRefresh }, function (response) {
             _deadlinesFetchInProgress = false;
-            if (response && response.ok) {
+            if (isUsableDeadlinesResponse(response)) {
                 _deadlinesLastResponse = response;
                 _deadlinesLastRefreshFailed = false;
                 try {
@@ -480,14 +467,33 @@
         else item.removeAttribute('style');
     }
 
+    var COURSE_DEADLINES_URL = 'https://student.dtu.dk/en/courses-and-teaching/course-registration/course-registration-deadlines';
+    var EXAM_DEADLINES_URL = 'https://student.dtu.dk/en/exam/exam-registration/-deadlines-for-exams';
+
+    // A source link from the response or the stored cache: only an https page on
+    // student.dtu.dk, else DTU's fixed page.
+    function deadlineSourceUrl(source, fallback) {
+        try {
+            var u = new URL(String(source && source.url || ''));
+            if (u.protocol === 'https:' && u.hostname === 'student.dtu.dk') return u.href;
+        } catch (e0) { }
+        return fallback;
+    }
+
+    // A stored response is used only in the shape the widget reads.
+    function isUsableDeadlinesResponse(resp) {
+        if (!resp || typeof resp !== 'object' || !resp.ok) return false;
+        return ['course', 'exam'].every(function (k) {
+            var src = resp[k];
+            if (src == null) return true;
+            return typeof src === 'object' && (src.groups == null || Array.isArray(src.groups));
+        });
+    }
+
     function buildTopDeadlines(resp, todayTs, limit) {
         var out = [];
-        var courseUrl = (resp && resp.course && resp.course.url)
-            ? resp.course.url
-            : 'https://student.dtu.dk/en/courses-and-teaching/course-registration/course-registration-deadlines';
-        var examUrl = (resp && resp.exam && resp.exam.url)
-            ? resp.exam.url
-            : 'https://student.dtu.dk/en/exam/exam-registration/-deadlines-for-exams';
+        var courseUrl = deadlineSourceUrl(resp && resp.course, COURSE_DEADLINES_URL);
+        var examUrl = deadlineSourceUrl(resp && resp.exam, EXAM_DEADLINES_URL);
 
         var courseRows = buildUpcomingDeadlineRows((resp && resp.course && resp.course.groups) || [], todayTs, 60);
         var examRows = buildUpcomingDeadlineRows((resp && resp.exam && resp.exam.groups) || [], todayTs, 60);
@@ -513,15 +519,6 @@
         return deduped.slice(0, end);
     }
 
-    function formatDeadlineHintDate(iso) {
-        var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        var match = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-        if (!match) return String(iso || '');
-        var day = parseInt(match[3], 10);
-        var month = months[parseInt(match[2], 10) - 1] || match[2];
-        return day + ' ' + month;
-    }
-
     // Wording taken from DTU's own course-registration deadlines page, so the widget
     // explains a period the same way the source does.
     var DEADLINE_ACTION_EXPLAINERS = {
@@ -544,22 +541,6 @@
         return 'Action';
     }
 
-    function deadlineOneLineHint(row) {
-        if (!row) return '';
-        var action = deadlineActionName(row.label);
-        var start = formatDeadlineHintDate(row.startIso);
-        var end = formatDeadlineHintDate(row.endIso);
-
-        if (end) {
-            if (row.state === 'upcoming') {
-                return action + ' opens ' + start + '; deadline ' + end + '.';
-            }
-            return action + ' deadline: ' + end + '.';
-        }
-        if (start) return action + ' deadline: ' + start + '.';
-        return '';
-    }
-
     function getDeadlinePeriodLabels(row) {
         if (!row) return [];
         var source = Array.isArray(row.periods) && row.periods.length
@@ -576,39 +557,23 @@
         return labels;
     }
 
-    function formatDeadlineChip(row, todayTs) {
-        var nextTs = getDeadlineNextTs(row, todayTs);
-        var days = (nextTs == null) ? null : diffDaysUtc(todayTs, nextTs);
-        var active = row && row.state === 'active';
-        var opens = !!(row && !active && row.endTs != null && todayTs < row.startTs);
-
-        var text = '';
-        if (days === 0) {
-            text = active ? 'Ends today' : (opens ? 'Opens today' : 'Due today');
-        } else if (days != null) {
-            text = active ? (days + 'd left') : (opens ? ('Opens in ' + days + 'd') : ('Due in ' + days + 'd'));
-        }
-
-        var color = active
-            ? (isDarkMode() ? '#66bb6a' : '#2e7d32')
-            : (days != null && days <= 7
-                ? (isDarkMode() ? '#ffa726' : '#e65100')
-                : (isDarkMode() ? '#66b3ff' : '#1565c0'));
-
-        return { text: text, color: color, days: days };
-    }
-
+    var DEADLINE_AXIS_TAIL_DAYS = 10;
     var DEADLINE_MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
     // Six calendar months from the start of the current one. That reaches the next
     // registration round for the following teaching period while keeping each month
     // wide enough for its marks to carry readable labels.
-    function buildDeadlineTimelineAxis(todayTs) {
+    // Given lastTs (the last mark to draw), the axis stops shortly after it instead, never
+    // shorter than three months, so the marks get the width an empty tail would waste.
+    function buildDeadlineTimelineAxis(todayTs, lastTs) {
         var todayDate = new Date(todayTs);
         var year = todayDate.getUTCFullYear();
         var month = todayDate.getUTCMonth();
         var startTs = Date.UTC(year, month, 1);
         var endTs = Date.UTC(year, month + 6, 1);
+        if (typeof lastTs === 'number' && isFinite(lastTs)) {
+            endTs = Math.min(endTs, Math.max(Date.UTC(year, month + 3, 1), lastTs + DEADLINE_AXIS_TAIL_DAYS * 86400000));
+        }
         var spanTs = endTs - startTs;
 
         function percentFor(ts) {
@@ -618,6 +583,7 @@
         var ticks = [];
         for (var i = 0; i < 6; i++) {
             var tickTs = Date.UTC(year, month + i, 1);
+            if (tickTs >= endTs) break;
             var tickDate = new Date(tickTs);
             var label = DEADLINE_MONTH_NAMES[tickDate.getUTCMonth()];
             // The year only where it turns, so the axis never reads as the wrong January.
@@ -749,6 +715,25 @@
         return groups;
     }
 
+    // A period earns a row only when its next deadline is close enough to act on. DTU
+    // opens June, July and August registration on the same day months ahead, which
+    // otherwise filled the widget with rows holding a single mark at the far edge.
+    // The soonest period always stays, so the widget is never empty while dates exist.
+    var DEADLINE_PERIOD_LOOKAHEAD_DAYS = 60;
+
+    function selectDeadlinePeriodGroups(groups, todayTs) {
+        var list = Array.isArray(groups) ? groups : [];
+        var limitTs = todayTs + DEADLINE_PERIOD_LOOKAHEAD_DAYS * 86400000;
+        var near = list.filter(function (group) {
+            return group.nextRow && group.nextRow.nextTs <= limitTs;
+        });
+        if (near.length || !list.length) return near;
+        var soonest = list.reduce(function (best, group) {
+            return (!best || group.nextRow.nextTs < best.nextRow.nextTs) ? group : best;
+        }, null);
+        return [soonest];
+    }
+
     function describeDeadlinePeriod(group) {
         if (!group || group.startTs == null || group.endTs == null) return '';
         return (group.kind === 'exam' ? 'Exam period ' : 'Teaching ') + formatDeadlineSpan(group.startTs, group.endTs);
@@ -761,55 +746,73 @@
         return action;
     }
 
-    // Labels run on two lines: above the upper bars and below the lower marks. Their pixel
-    // width is unknown while the rows are built, so it is estimated against a narrow track.
-    // A label that would collide is left off; its mark still names it in the tooltip.
-    var DEADLINE_LABEL_PERCENT_PER_CHAR = (6 / 620) * 100;
+    // Each mark carries its name and dates as a label: above the bar on the upper lane,
+    // below it on the lower lane. A mark takes the upper lane unless its bar or label would
+    // collide there. Label width is estimated from the character count and the track width.
+    // A label that fits on neither lane is left off; its mark still names it in the tooltip.
+    var DEADLINE_LABEL_PX_PER_CHAR = 6.2;
+    // Period name column plus the gap to the track, as set in the grid rule below.
+    var DEADLINE_LABEL_COLUMN_PX = 222;
+    var DEADLINE_DEFAULT_TRACK_PX = 620;
 
-    function layoutDeadlinePeriodMarks(group, axis) {
+    function deadlineSpansClash(spans, from, to, gap) {
+        return spans.some(function (span) { return from < span[1] + gap && to > span[0] - gap; });
+    }
+
+    function layoutDeadlinePeriodMarks(group, axis, trackPx) {
+        var charPercent = (DEADLINE_LABEL_PX_PER_CHAR / (trackPx > 0 ? trackPx : DEADLINE_DEFAULT_TRACK_PX)) * 100;
         var marks = group.rows.map(function (row) {
             var startTs = getDeadlineRowStartTs(row);
             var endTs = getDeadlineRowEndTs(row);
             var isRange = endTs > startTs;
             var name = deadlineMarkName(row);
             var startPercent = axis.percentFor(startTs);
+            var continuesBefore = isRange && startTs < axis.startTs;
+            var continuesAfter = isRange && endTs > axis.endTs;
+            var dateText = formatDeadlineDayMonth(startTs);
+            if (isRange) {
+                dateText = continuesBefore
+                    ? (continuesAfter ? '' : 'until ' + formatDeadlineDayMonth(endTs))
+                    : (continuesAfter ? 'from ' + formatDeadlineDayMonth(startTs) : formatDeadlineSpan(startTs, endTs));
+            }
             return {
                 row: row,
                 type: isRange ? 'range' : 'date',
                 startPercent: startPercent,
                 endPercent: isRange ? Math.min(100, Math.max(startPercent + 0.8, axis.percentFor(endTs))) : startPercent,
-                continuesBefore: isRange && startTs < axis.startTs,
-                continuesAfter: isRange && endTs > axis.endTs,
+                continuesBefore: continuesBefore,
+                continuesAfter: continuesAfter,
                 soft: deadlineActionName(row.label) === 'Supplementary registration',
-                label: isRange ? name : (name + ' ' + formatDeadlineDayMonth(startTs)),
+                name: name,
+                dateText: dateText,
+                label: isRange ? name : (name + ' ' + dateText),
                 lane: 1
             };
         });
 
-        var upperEnd = -Infinity;
-        marks.filter(function (mark) { return mark.type === 'range'; })
-            .sort(function (a, b) { return a.startPercent - b.startPercent || a.endPercent - b.endPercent; })
-            .forEach(function (mark) {
-                if (mark.startPercent > upperEnd + 0.6) {
-                    mark.lane = 0;
-                    upperEnd = mark.endPercent;
-                }
-            });
-
-        var occupied = [[], []];
-        marks.slice().sort(function (a, b) { return a.startPercent - b.startPercent; }).forEach(function (mark) {
-            var width = mark.label.length * DEADLINE_LABEL_PERCENT_PER_CHAR;
-            var anchorEnd = mark.type === 'range' ? mark.endPercent : mark.startPercent;
+        var bars = [[], []];
+        var labels = [[], []];
+        marks.slice().sort(function (a, b) {
+            return a.startPercent - b.startPercent || a.endPercent - b.endPercent;
+        }).forEach(function (mark) {
+            var width = (mark.name.length + 1 + mark.dateText.length) * charPercent;
             var from = mark.startPercent;
             mark.labelAlignEnd = from + width > 100;
-            if (mark.labelAlignEnd) from = anchorEnd - width;
+            if (mark.labelAlignEnd) from = mark.endPercent - width;
             var to = from + width;
-            var clash = occupied[mark.lane].some(function (span) {
-                return from < span[1] + 1 && to > span[0] - 1;
-            });
-            mark.showLabel = !clash && from >= 0 && !!mark.label;
-            mark.labelPercent = mark.labelAlignEnd ? anchorEnd : mark.startPercent;
-            if (mark.showLabel) occupied[mark.lane].push([from, to]);
+            var labelFits = from >= 0 && !!mark.label;
+            var lane = -1;
+            var barLane = -1;
+            for (var i = 0; i < 2; i++) {
+                if (deadlineSpansClash(bars[i], mark.startPercent, mark.endPercent, 0.6)) continue;
+                if (barLane < 0) barLane = i;
+                if (lane < 0 && labelFits && !deadlineSpansClash(labels[i], from, to, 1)) lane = i;
+            }
+            mark.showLabel = lane >= 0;
+            mark.lane = lane >= 0 ? lane : (barLane >= 0 ? barLane : 1);
+            mark.labelPercent = mark.labelAlignEnd ? mark.endPercent : mark.startPercent;
+            bars[mark.lane].push([mark.startPercent, mark.endPercent]);
+            if (mark.showLabel) labels[mark.lane].push([from, to]);
         });
         return marks;
     }
@@ -857,76 +860,6 @@
         return joinDeadlineTooltipParts([content.title, content.description, content.period, content.date]);
     }
 
-    function createDeadlinesHomeRow(row, todayTs) {
-        var chipInfo = formatDeadlineChip(row, todayTs);
-        var active = row && row.state === 'active';
-
-        var card = document.createElement('div');
-        markExt(card);
-        card.style.cssText = 'display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px; padding: 10px 0; min-width: 0;';
-
-        var center = document.createElement('div');
-        markExt(center);
-        center.style.cssText = 'display: flex; flex-direction: column; gap: 2px; padding: 0 10px; min-width: 0;';
-
-        var title = document.createElement('div');
-        markExt(title);
-        title.textContent = row.label || '';
-        title.title = row.label || '';
-        title.style.cssText = 'font-size: 13px; font-weight: 600; line-height: 18px; color: '
-            + (isDarkMode() ? '#e0e0e0' : '#1f2937') + ';';
-
-        var range = formatDeadlineRangeCompact(row);
-        var dates = document.createElement('div');
-        markExt(dates);
-        dates.textContent = range || '';
-        dates.title = range || '';
-        dates.style.cssText = 'font-size: 11px; color: ' + (isDarkMode() ? '#b0b0b0' : '#4b5563') + '; '
-            + 'white-space: nowrap; overflow: hidden; text-overflow: ellipsis;';
-        if (!range) dates.style.display = 'none';
-
-        var hintText = deadlineOneLineHint(row) || '';
-        var hint = document.createElement('div');
-        markExt(hint);
-        hint.textContent = hintText || '';
-        hint.title = hintText || '';
-        hint.style.cssText = 'font-size: 11px; line-height: 15px; color: ' + (isDarkMode() ? '#a8a8a8' : '#6b7280') + '; margin-top: 1px;';
-        if (!hintText) hint.style.display = 'none';
-
-        center.appendChild(title);
-        center.appendChild(dates);
-        center.appendChild(hint);
-
-        getDeadlinePeriodLabels(row).forEach(function (periodText) {
-            var period = document.createElement('div');
-            markExt(period);
-            period.textContent = periodText;
-            period.title = periodText;
-            period.style.cssText = 'font-size: 10px; color: ' + (isDarkMode() ? '#a8a8a8' : '#6b7280') + '; margin-top: 1px;';
-            center.appendChild(period);
-        });
-
-        var badge = document.createElement('div');
-        markExt(badge);
-        var chipText = chipInfo.text || '';
-        badge.textContent = chipText;
-
-        var chipBg = active
-            ? (isDarkMode() ? 'rgba(102,187,106,0.15)' : 'rgba(46,125,50,0.1)')
-            : (chipInfo.days != null && chipInfo.days <= 7
-                ? (isDarkMode() ? 'rgba(255,167,38,0.15)' : 'rgba(230,81,0,0.1)')
-                : (isDarkMode() ? 'rgba(102,179,255,0.15)' : 'rgba(21,101,192,0.1)'));
-        badge.style.cssText = 'align-self: start; padding: 2px 8px; border-radius: 6px; font-size: 11px; '
-            + 'font-weight: 700; white-space: nowrap; background: ' + chipBg + '; color: ' + chipInfo.color + ';';
-        badge.style.setProperty('color', chipInfo.color, 'important');
-        if (!chipText) badge.style.display = 'none';
-
-        card.appendChild(center);
-        card.appendChild(badge);
-
-        return card;
-    }
-
     function ensureDeadlinesTimelineStyles() {
         if (!document || !document.head || document.getElementById(DEADLINES_TIMELINE_STYLE_ID)) return;
         var style = document.createElement('style');
@@ -934,52 +867,66 @@
         style.textContent = [
             '/* Hallmark - pre-emit critique: P5 H5 E4 S5 R5 V5 */',
             '/* Hallmark - component: deadline timeline by period - theme: DTU After Dark',
-            ' * One row per teaching or exam period, marks labelled in place, accent only for what is open or due within 7 days.',
+            ' * One row per teaching or exam period, marks labelled in place with their dates, the period as a thin neutral bar,',
+            ' * accent only for what is open or due within 7 days.',
             ' * states: passive visualization; marks are focusable and show their tooltip on hover and focus',
             ' */',
-            '.dtu-deadline-timeline{--deadline-accent:var(--dtu-ad-accent-mark-light,var(--dtu-ad-accent-deep-text,#990000));--deadline-grid:rgba(31,41,55,.14);--deadline-rule:rgba(26,26,26,.06);--deadline-band:rgba(26,26,26,.04);--deadline-text:#1a1a1a;--deadline-muted:#686868;--deadline-surface:#fff;display:block;min-width:0;padding:2px 0 0;container-type:inline-size;font-variant-numeric:tabular-nums;}',
-            '.dtu-deadline-timeline[data-theme="dark"]{--deadline-accent:var(--dtu-ad-accent-mark-dark,var(--dtu-ad-accent-soft,#ff6b6b));--deadline-grid:rgba(255,255,255,.11);--deadline-rule:rgba(255,255,255,.07);--deadline-band:rgba(255,255,255,.05);--deadline-text:#f0eee8;--deadline-muted:#aaa9a5;--deadline-surface:#2d2d2d;}',
-            '.dtu-deadline-timeline-axis,.dtu-deadline-period{display:grid;grid-template-columns:minmax(140px,200px) minmax(0,1fr) minmax(110px,150px);column-gap:24px;min-width:0;}',
+            '.dtu-deadline-timeline{--deadline-accent:var(--dtu-ad-accent-mark-light,var(--dtu-ad-accent-deep-text,#990000));--deadline-grid:rgba(31,41,55,.14);--deadline-rule:rgba(26,26,26,.06);--deadline-band:rgba(26,26,26,.24);--deadline-text:#1a1a1a;--deadline-muted:#686868;--deadline-surface:#fff;display:block;min-width:0;padding:2px 0 0;container-type:inline-size;font-variant-numeric:tabular-nums;}',
+            '.dtu-deadline-timeline[data-theme="dark"]{--deadline-accent:var(--dtu-ad-accent-mark-dark,var(--dtu-ad-accent-soft,#ff6b6b));--deadline-grid:rgba(255,255,255,.11);--deadline-rule:rgba(255,255,255,.07);--deadline-band:rgba(255,255,255,.2);--deadline-text:#f0eee8;--deadline-muted:#aaa9a5;--deadline-surface:#2d2d2d;}',
+            '.dtu-deadline-timeline-axis,.dtu-deadline-period{display:grid;grid-template-columns:200px minmax(0,1fr);column-gap:22px;min-width:0;}',
             '.dtu-deadline-timeline-axis{align-items:end;}',
-            '.dtu-deadline-timeline-key{padding:0 0 5px;font-size:11px;line-height:14px;color:var(--deadline-muted);}',
             '.dtu-deadline-timeline-track{position:relative;min-width:0;}',
-            '.dtu-deadline-timeline-axis .dtu-deadline-timeline-track{height:36px;}',
+            '.dtu-deadline-timeline-axis .dtu-deadline-timeline-track{height:44px;}',
             '.dtu-deadline-timeline-tick-label{position:absolute;bottom:5px;padding-left:5px;font-size:11px;line-height:14px;color:var(--deadline-muted);white-space:nowrap;}',
-            '.dtu-deadline-timeline-today-label{position:absolute;top:0;transform:translateX(-50%);font-size:11px;font-weight:700;line-height:14px;color:var(--deadline-accent);white-space:nowrap;}',
+            '.dtu-deadline-timeline-today-label{position:absolute;top:0;transform:translateX(-50%);padding:2px 8px;border-radius:9px;background:var(--deadline-accent);font-size:11px;font-weight:700;line-height:14px;color:var(--deadline-surface);white-space:nowrap;}',
             '.dtu-deadline-timeline-today-label.align-start{transform:none;}',
             '.dtu-deadline-timeline-today-label.align-end{transform:translateX(-100%);}',
             '.dtu-deadline-period{align-items:center;border-top:1px solid var(--deadline-grid);}',
             '.dtu-deadline-period-label{min-width:0;padding:12px 0;}',
             '.dtu-deadline-period-name{font-size:14px;line-height:18px;color:var(--deadline-text);overflow-wrap:anywhere;}',
-            '.dtu-deadline-period-sub{margin-top:3px;font-size:12px;line-height:15px;color:var(--deadline-muted);}',
-            '.dtu-deadline-period .dtu-deadline-timeline-track{align-self:stretch;height:72px;}',
+            '.dtu-deadline-period-sub,.dtu-deadline-period-status{margin-top:3px;font-size:12px;line-height:15px;color:var(--deadline-muted);}',
+            '.dtu-deadline-period-status.is-accent{font-weight:700;color:var(--deadline-accent);}',
+            '.dtu-deadline-period .dtu-deadline-timeline-track{align-self:stretch;height:110px;}',
+            '.dtu-deadline-period.is-single-lane .dtu-deadline-timeline-track{height:80px;}',
             '.dtu-deadline-timeline-tick{position:absolute;top:0;bottom:0;width:1px;background:var(--deadline-rule);pointer-events:none;}',
-            '.dtu-deadline-period-band{position:absolute;top:0;bottom:0;background:var(--deadline-band);pointer-events:none;}',
+            '.dtu-deadline-period-band{position:absolute;top:82px;height:4px;border-radius:2px;background:var(--deadline-band);pointer-events:none;}',
+            '.dtu-deadline-period-band.is-clipped-start{border-top-left-radius:0;border-bottom-left-radius:0;}',
+            '.dtu-deadline-period-band.is-clipped-end{border-top-right-radius:0;border-bottom-right-radius:0;}',
+            '.dtu-deadline-period-band-label{position:absolute;top:89px;font-size:11px;line-height:14px;color:var(--deadline-muted);white-space:nowrap;pointer-events:none;}',
+            '.dtu-deadline-period-band-label.align-end{transform:translateX(-100%);}',
+            '.dtu-deadline-period.is-single-lane .dtu-deadline-period-band{top:52px;}',
+            '.dtu-deadline-period.is-single-lane .dtu-deadline-period-band-label{top:59px;}',
             '.dtu-deadline-timeline-today{position:absolute;top:0;bottom:-1px;z-index:4;width:2px;margin-left:-1px;background:var(--deadline-accent);pointer-events:none;}',
             // Every mark is drawn in the accent at full strength. --dtu-ad-accent-mark-* is the accent,
             // or the preset's own shade for this surface, at 4.5:1 or better (see darkmode.js), so
             // pale presets like DTU Grey and dark ones like Navy both stay visible and keep their hue.
             // Supplementary windows are told apart by an outline rather than by fading the colour.
-            '.dtu-deadline-timeline-bar{position:absolute;height:6px;min-width:4px;border-radius:3px;background:var(--deadline-accent);cursor:help;}',
-            '.dtu-deadline-timeline-bar.is-lane-0{top:24px;}',
-            '.dtu-deadline-timeline-bar.is-lane-1{top:40px;}',
-            '.dtu-deadline-timeline-bar.is-active{height:8px;margin-top:-1px;border-radius:4px;}',
-            '.dtu-deadline-timeline-bar.is-clipped-start{border-top-left-radius:0;border-bottom-left-radius:0;background:linear-gradient(90deg,transparent 0,var(--deadline-accent) 12px);}',
-            '.dtu-deadline-timeline-bar.is-clipped-end{border-top-right-radius:0;border-bottom-right-radius:0;background:linear-gradient(270deg,transparent 0,var(--deadline-accent) 12px);}',
-            '.dtu-deadline-timeline-bar.is-clipped-start.is-clipped-end{background:linear-gradient(90deg,transparent 0,var(--deadline-accent) 12px,var(--deadline-accent) calc(100% - 12px),transparent 100%);}',
+            '.dtu-deadline-timeline-bar{position:absolute;height:8px;min-width:4px;border-radius:4px;background:var(--deadline-accent);cursor:help;}',
+            '.dtu-deadline-timeline-bar.is-lane-0{top:28px;}',
+            '.dtu-deadline-timeline-bar.is-lane-1{top:46px;}',
+            '.dtu-deadline-timeline-bar.is-active{height:10px;margin-top:-1px;border-radius:5px;}',
+            // A window that runs past the axis ends square at that edge.
+            '.dtu-deadline-timeline-bar.is-clipped-start{border-top-left-radius:0;border-bottom-left-radius:0;}',
+            '.dtu-deadline-timeline-bar.is-clipped-end{border-top-right-radius:0;border-bottom-right-radius:0;}',
             '.dtu-deadline-timeline-bar.is-soft{background:transparent;box-shadow:inset 0 0 0 1.5px var(--deadline-accent);}',
             '.dtu-deadline-timeline-bar.is-soft.is-clipped-start{box-shadow:inset 0 1.5px 0 var(--deadline-accent),inset 0 -1.5px 0 var(--deadline-accent),inset -1.5px 0 0 var(--deadline-accent);}',
             '.dtu-deadline-timeline-bar.is-soft.is-clipped-end{box-shadow:inset 0 1.5px 0 var(--deadline-accent),inset 0 -1.5px 0 var(--deadline-accent),inset 1.5px 0 0 var(--deadline-accent);}',
             '.dtu-deadline-timeline-bar.is-soft.is-clipped-start.is-clipped-end{box-shadow:inset 0 1.5px 0 var(--deadline-accent),inset 0 -1.5px 0 var(--deadline-accent);}',
-            '.dtu-deadline-timeline-date-mark{position:absolute;top:33px;width:3px;height:14px;margin-left:-1px;border-radius:1px;background:var(--deadline-accent);cursor:help;}',
+            // The diamond is drawn on ::before so the tooltip inside the mark is not rotated with it.
+            '.dtu-deadline-timeline-date-mark{position:absolute;width:10px;height:10px;margin-left:-5px;cursor:help;}',
+            '.dtu-deadline-timeline-date-mark::before{content:"";position:absolute;inset:0;border-radius:2px;background:var(--deadline-accent);transform:rotate(45deg);}',
+            '.dtu-deadline-timeline-date-mark.is-lane-0{top:27px;}',
+            '.dtu-deadline-timeline-date-mark.is-lane-1{top:45px;}',
             '.dtu-deadline-timeline-bar::after,.dtu-deadline-timeline-date-mark::after{content:"";position:absolute;background:transparent;}',
             '.dtu-deadline-timeline-bar::after{inset:-9px -6px;}',
-            '.dtu-deadline-timeline-date-mark::after{inset:-5px -10px;}',
-            '.dtu-deadline-mark-label{position:absolute;font-size:11px;line-height:14px;color:var(--deadline-muted);white-space:nowrap;pointer-events:none;}',
-            '.dtu-deadline-mark-label.is-above{top:5px;}',
-            '.dtu-deadline-mark-label.is-below{top:52px;}',
-            '.dtu-deadline-mark-label.align-end{transform:translateX(-100%);}',
-            '.dtu-deadline-mark-label.is-accent{font-weight:700;color:var(--deadline-accent);}',
+            '.dtu-deadline-timeline-date-mark::after{inset:-6px;}',
+            // The label sits over the Today line on its own patch of surface, so the line never strikes through text.
+            '.dtu-deadline-mark-label{position:absolute;z-index:5;margin-left:-3px;padding:0 3px;background:var(--deadline-surface);font-size:11px;line-height:14px;color:var(--deadline-muted);white-space:nowrap;pointer-events:none;}',
+            '.dtu-deadline-mark-name{margin-right:5px;font-weight:700;color:var(--deadline-text);}',
+            '.dtu-deadline-mark-label.is-above{top:9px;}',
+            '.dtu-deadline-mark-label.is-below{top:60px;}',
+            '.dtu-deadline-mark-label.align-end{margin-left:3px;transform:translateX(-100%);}',
+            '.dtu-deadline-mark-label.is-accent .dtu-deadline-mark-name{color:var(--deadline-accent);}',
             '.dtu-deadline-timeline-bar:focus-visible,.dtu-deadline-timeline-date-mark:focus-visible{outline:2px solid var(--deadline-text);outline-offset:3px;}',
             '.dtu-deadline-timeline-bar:hover,.dtu-deadline-timeline-bar:focus,.dtu-deadline-timeline-date-mark:hover,.dtu-deadline-timeline-date-mark:focus{z-index:30;}',
             '.dtu-deadline-mark-tooltip{display:none;position:absolute;left:50%;bottom:calc(100% + 7px);z-index:40;width:max-content;max-width:min(280px,50vw);padding:8px 10px;border:1px solid var(--deadline-grid);border-radius:3px;background:var(--deadline-surface);color:var(--deadline-text);box-shadow:0 4px 14px rgba(0,0,0,.22);font-size:11px;font-weight:400;line-height:15px;text-align:left;white-space:normal;pointer-events:auto;transform:translateX(-50%);}',
@@ -1093,7 +1040,16 @@
         return label;
     }
 
-    function createDeadlinePeriodRow(group, axis, todayTs) {
+    // "Withdrawal closes in 4 days": the next thing to happen in the period, under its name.
+    function describeDeadlinePeriodNext(group, todayTs) {
+        var info = formatDeadlinePeriodStatus(group.nextRow, todayTs);
+        if (!info.text) return info;
+        var name = deadlineMarkName(group.nextRow);
+        info.text = name ? (name + ' ' + info.text.charAt(0).toLowerCase() + info.text.slice(1)) : info.text;
+        return info;
+    }
+
+    function createDeadlinePeriodRow(group, axis, todayTs, trackPx) {
         var row = createDeadlineTimelineElement('div', 'dtu-deadline-period');
         var track = createDeadlineTimelineElement('div', 'dtu-deadline-timeline-track');
         track.setAttribute('aria-label', group.name + ', ' + group.rows.length
@@ -1102,16 +1058,29 @@
         axis.ticks.slice(1).forEach(function (tick) {
             track.appendChild(createTimelinePositionedElement('dtu-deadline-timeline-tick', tick.percent));
         });
-        if (group.startTs != null && group.endTs != null
-            && group.endTs >= axis.startTs && group.startTs <= axis.endTs) {
+
+        var marks = layoutDeadlinePeriodMarks(group, axis, trackPx);
+        if (!marks.some(function (mark) { return mark.lane === 1; })) row.className += ' is-single-lane';
+
+        // The teaching or exam period itself: a thin neutral bar under the marks, named in place.
+        var periodText = describeDeadlinePeriod(group);
+        var bandDrawn = !!periodText && group.endTs >= axis.startTs && group.startTs < axis.endTs;
+        if (bandDrawn) {
             var bandStart = axis.percentFor(group.startTs);
             var band = createTimelinePositionedElement('dtu-deadline-period-band', bandStart);
             // The period's last day is inclusive, so the band runs to the end of that day.
-            band.style.width = Math.max(0, axis.percentFor(group.endTs + 86400000) - bandStart) + '%';
+            band.style.width = Math.max(0.8, axis.percentFor(group.endTs + 86400000) - bandStart) + '%';
+            if (group.startTs < axis.startTs) band.className += ' is-clipped-start';
+            if (group.endTs > axis.endTs) band.className += ' is-clipped-end';
             track.appendChild(band);
+            var bandLabelEnd = bandStart + periodText.length * (DEADLINE_LABEL_PX_PER_CHAR / (trackPx > 0 ? trackPx : DEADLINE_DEFAULT_TRACK_PX)) * 100 > 100;
+            var bandLabel = createTimelinePositionedElement('dtu-deadline-period-band-label', bandLabelEnd ? 100 : bandStart);
+            if (bandLabelEnd) bandLabel.className += ' align-end';
+            bandLabel.textContent = periodText;
+            track.appendChild(bandLabel);
         }
 
-        layoutDeadlinePeriodMarks(group, axis).forEach(function (mark) {
+        marks.forEach(function (mark) {
             var status = formatDeadlinePeriodStatus(mark.row, todayTs);
             var element;
             if (mark.type === 'range') {
@@ -1126,7 +1095,7 @@
                     element.style.maskImage = 'none';
                 }
             } else {
-                element = createTimelinePositionedElement('dtu-deadline-timeline-date-mark', mark.startPercent);
+                element = createTimelinePositionedElement('dtu-deadline-timeline-date-mark is-lane-' + mark.lane, mark.startPercent);
                 if (status.urgent) element.className += ' is-soon';
             }
             attachDeadlineMarkTooltip(element, deadlineTimelineTooltipContent(mark.row), mark.startPercent);
@@ -1137,14 +1106,24 @@
             if (mark.labelAlignEnd) text.className += ' align-end';
             if (mark.row.state === 'active' || (mark.type === 'date' && status.urgent)) text.className += ' is-accent';
             text.setAttribute('aria-hidden', 'true');
-            text.textContent = mark.label;
+            text.appendChild(createDeadlineTimelineElement('span', 'dtu-deadline-mark-name', mark.name));
+            if (mark.dateText) text.appendChild(createDeadlineTimelineElement('span', 'dtu-deadline-mark-dates', mark.dateText));
             track.appendChild(text);
         });
 
         track.appendChild(createTimelinePositionedElement('dtu-deadline-timeline-today', axis.todayPercent));
-        row.appendChild(createDeadlinePeriodLabel(group));
+
+        var label = createDeadlineTimelineElement('div', 'dtu-deadline-period-label');
+        label.appendChild(createDeadlineTimelineElement('div', 'dtu-deadline-period-name', group.name));
+        var next = describeDeadlinePeriodNext(group, todayTs);
+        if (next.text) {
+            label.appendChild(createDeadlineTimelineElement('div',
+                'dtu-deadline-period-status' + (next.urgent ? ' is-accent' : ''), next.text));
+        }
+        // A period that starts after the axis ends has no bar to name it, so it is named here.
+        if (periodText && !bandDrawn) label.appendChild(createDeadlineTimelineElement('div', 'dtu-deadline-period-sub', periodText));
+        row.appendChild(label);
         row.appendChild(track);
-        row.appendChild(createDeadlineStatusElement(group, todayTs));
         return row;
     }
 
@@ -1165,10 +1144,21 @@
         return row;
     }
 
-    function createDeadlinesTimeline(rows, todayTs) {
-        var axis = buildDeadlineTimelineAxis(todayTs);
-        var visibleRows = selectDeadlineTimelineRows(rows, todayTs);
-        var groups = buildDeadlinePeriodGroups(visibleRows);
+    // widthPx is the widget's width when known; it only sharpens the label collision estimate.
+    function createDeadlinesTimeline(rows, todayTs, widthPx) {
+        var horizon = buildDeadlineTimelineAxis(todayTs);
+        var groups = selectDeadlinePeriodGroups(buildDeadlinePeriodGroups(selectDeadlineTimelineRows(rows, todayTs)), todayTs);
+        var visibleRows = [];
+        var lastTs = todayTs;
+        groups.forEach(function (group) {
+            group.rows.forEach(function (row) {
+                if (visibleRows.indexOf(row) === -1) visibleRows.push(row);
+                lastTs = Math.max(lastTs, Math.min(horizon.endTs, getDeadlineRowEndTs(row)));
+            });
+        });
+        var axis = buildDeadlineTimelineAxis(todayTs, lastTs);
+        var trackPx = widthPx > 0 ? Math.max(420, widthPx - DEADLINE_LABEL_COLUMN_PX) : 0;
+        visibleRows.sort(function (a, b) { return a.nextTs - b.nextTs; });
         var root = createDeadlineTimelineElement('div', 'dtu-deadline-timeline');
         root.setAttribute('data-theme', isDarkMode() ? 'dark' : 'light');
         root.setAttribute('role', 'group');
@@ -1177,7 +1167,7 @@
 
         var desktop = createDeadlineTimelineElement('div', 'dtu-deadline-timeline-desktop');
         var axisRow = createDeadlineTimelineElement('div', 'dtu-deadline-timeline-axis');
-        axisRow.appendChild(createDeadlineTimelineElement('div', 'dtu-deadline-timeline-key', 'Shaded: teaching or exam period'));
+        axisRow.appendChild(createDeadlineTimelineElement('div'));
         var axisTrack = createDeadlineTimelineElement('div', 'dtu-deadline-timeline-track');
         axisTrack.setAttribute('aria-hidden', 'true');
         axis.ticks.forEach(function (tick) {
@@ -1186,17 +1176,16 @@
             axisTrack.appendChild(tickLabel);
         });
         var todayLabel = createTimelinePositionedElement('dtu-deadline-timeline-today-label', axis.todayPercent);
-        if (axis.todayPercent < 4) todayLabel.className += ' align-start';
-        if (axis.todayPercent > 96) todayLabel.className += ' align-end';
-        todayLabel.textContent = 'Today';
+        if (axis.todayPercent < 6) todayLabel.className += ' align-start';
+        if (axis.todayPercent > 94) todayLabel.className += ' align-end';
+        todayLabel.textContent = 'Today ' + formatDeadlineDayMonth(axis.todayTs);
         axisTrack.appendChild(todayLabel);
         axisRow.appendChild(axisTrack);
-        axisRow.appendChild(createDeadlineTimelineElement('div'));
         desktop.appendChild(axisRow);
 
         var mobile = createDeadlineTimelineElement('div', 'dtu-deadline-mobile-list');
         groups.forEach(function (group) {
-            desktop.appendChild(createDeadlinePeriodRow(group, axis, todayTs));
+            desktop.appendChild(createDeadlinePeriodRow(group, axis, todayTs, trackPx));
             mobile.appendChild(createDeadlinePeriodMobileRow(group, todayTs));
         });
 
@@ -1271,7 +1260,7 @@
                 var raw = localStorage.getItem(DEADLINES_CACHE_KEY);
                 if (raw) {
                     var parsed = JSON.parse(raw);
-                    if (parsed && parsed.ok) _deadlinesLastResponse = parsed;
+                    if (isUsableDeadlinesResponse(parsed)) _deadlinesLastResponse = parsed;
                 }
             } catch (e) {
             }
@@ -1349,8 +1338,8 @@
         }
 
         if (sources) {
-            var courseUrl = (resp.course && resp.course.url) ? resp.course.url : 'https://student.dtu.dk/en/courses-and-teaching/course-registration/course-registration-deadlines';
-            var examUrl = (resp.exam && resp.exam.url) ? resp.exam.url : 'https://student.dtu.dk/en/exam/exam-registration/-deadlines-for-exams';
+            var courseUrl = deadlineSourceUrl(resp.course, COURSE_DEADLINES_URL);
+            var examUrl = deadlineSourceUrl(resp.exam, EXAM_DEADLINES_URL);
             sources.querySelectorAll('a').forEach(function (anchor) {
                 if (anchor.getAttribute('data-kind') === 'course') anchor.href = courseUrl;
                 if (anchor.getAttribute('data-kind') === 'exam') anchor.href = examUrl;
@@ -1390,7 +1379,7 @@
         if (more) more.style.display = 'none';
 
         if (next) {
-            next.appendChild(createDeadlinesTimeline(rows, todayTs));
+            next.appendChild(createDeadlinesTimeline(rows, todayTs, next.clientWidth));
             // A source that has run past its published horizon contributes no lanes at all,
             // so without this its absence reads as "nothing is due" rather than "no data".
             buildDeadlineHorizonNotices(resp, todayTs).forEach(function (text) {

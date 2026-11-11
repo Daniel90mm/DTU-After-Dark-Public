@@ -27,7 +27,7 @@ function makeStorage(api, initial = {}) {
     return { area, flush: () => { while (pending.length) pending.shift()(); } };
 }
 
-function load({ api = 'browser', local = {}, ext = {}, darkModeEnabled = true, top = true } = {}) {
+function load({ api = 'browser', local = {}, ext = {}, darkModeEnabled = true, top = true, deviceDark } = {}) {
     const storage = makeStorage(api, ext);
     const reloads = [];
     const listeners = [];
@@ -36,16 +36,21 @@ function load({ api = 'browser', local = {}, ext = {}, darkModeEnabled = true, t
         localStorage: makeLocalStorage(local),
         location: { reload: () => reloads.push(1) }
     };
+    if (deviceDark !== undefined) globals.matchMedia = () => ({ matches: deviceDark });
     if (api === 'browser') globals.browser = { storage: storageNs };
     else globals.chrome = { storage: storageNs, runtime: {} };
     const { api: fns, context } = extractFunctions('darkmode.js', [
+        'deviceThemeQuery',
+        'isFollowingDeviceTheme',
         'isDarkModeEnabled',
         'getExtensionStorageArea',
         'saveDarkModePreference',
+        'saveDarkModeFollowDevice',
         'applyStoredDarkModeValue',
         'subscribeDarkModeStorageChanges'
     ], {
         prelude: `var DARK_MODE_KEY = ${JSON.stringify(KEY)};
+            var DARK_MODE_FOLLOW_KEY = 'dtuDarkModeFollowDevice';
             var darkModeEnabled = ${darkModeEnabled};
             var IS_TOP_WINDOW = ${top};`,
         globals
@@ -77,6 +82,7 @@ for (const api of ['browser', 'chrome']) {
         t.storage.flush();
         await p;
         assert.equal(t.storage.area.data[KEY], false);
+        assert.equal(t.storage.area.data['dtuDarkModeFollowDevice'], false, 'manual choice ends Auto');
     });
 }
 
@@ -84,7 +90,7 @@ test('save resolves even when there is no extension storage', async () => {
     const { api: fns } = extractFunctions('darkmode.js', [
         'getExtensionStorageArea', 'saveDarkModePreference'
     ], {
-        prelude: `var DARK_MODE_KEY = ${JSON.stringify(KEY)};`,
+        prelude: `var DARK_MODE_KEY = ${JSON.stringify(KEY)}; var DARK_MODE_FOLLOW_KEY = 'dtuDarkModeFollowDevice';`,
         globals: { localStorage: makeLocalStorage() }
     });
     await fns.saveDarkModePreference(true);
@@ -135,8 +141,9 @@ test('storage change listener reloads only on a real boolean change in local sto
 
 test('both Dark Mode toggles reload only after the save resolves', () => {
     const settings = readSource('darkmode.settings.js');
-    assert.match(settings, /'dark-mode-toggle':[\s\S]{0,300}saveDarkModePreference\(checked\)\)\.then\(/);
-    assert.match(settings, /function saveDarkModePreference\(enabled\) \{\s*return callDep/);
+    const bridge = readSource('darkmode.settings.bridge.js');
+    assert.match(settings, /saveDarkModePreference\(opt\[0\] === 'dark'\);[\s\S]{0,120}Promise\.resolve\(saved\)\.then\(function \(\) \{ location\.reload/);
+    assert.match(bridge, /function saveDarkModePreference\(enabled\) \{\s*return callDep/);
     const shell = readSource('darkmode.learn-shell.js');
     assert.match(shell, /saveDarkModePreference\(!isDarkModeEnabled\(\)\)\)\.then\(/);
 });
@@ -151,4 +158,46 @@ test('startup sync: an unset extension value means the default, so a stale "fals
     const settled = load({ darkModeEnabled: true, local: { [KEY]: 'true' } });
     settled.fns.applyStoredDarkModeValue(undefined);
     assert.equal(settled.reloads.length, 0);
+});
+
+const FOLLOW = 'dtuDarkModeFollowDevice';
+
+test('Auto: the device wins over the stored manual value; off means manual', () => {
+    assert.equal(load({ local: { [FOLLOW]: 'true', [KEY]: 'true' }, deviceDark: false }).fns.isDarkModeEnabled(), false);
+    assert.equal(load({ local: { [FOLLOW]: 'true', [KEY]: 'false' }, deviceDark: true }).fns.isDarkModeEnabled(), true);
+    assert.equal(load({ local: { [KEY]: 'true' }, deviceDark: false }).fns.isDarkModeEnabled(), true);
+});
+
+test('match device theme: startup sync caches the shared flag and reloads when the device disagrees', () => {
+    const t = load({ darkModeEnabled: true, deviceDark: false });
+    t.fns.applyStoredDarkModeValue(true, true);
+    assert.equal(t.localStorage.getItem(FOLLOW), 'true');
+    assert.equal(t.reloads.length, 1);
+    const u = load({ darkModeEnabled: true, local: { [FOLLOW]: 'true' }, deviceDark: true });
+    u.fns.applyStoredDarkModeValue(false, undefined);
+    assert.equal(u.localStorage.getItem(FOLLOW), null, 'unset follow means off');
+    assert.equal(u.reloads.length, 1, 'manual false now applies');
+});
+
+test('match device theme: save writes localStorage and extension storage', async () => {
+    const t = load();
+    const p = t.fns.saveDarkModeFollowDevice(true);
+    assert.equal(t.localStorage.getItem(FOLLOW), 'true');
+    t.storage.flush();
+    await p;
+    assert.equal(t.storage.area.data[FOLLOW], true);
+});
+
+test('a light table cell in course text gets dark text on the cell itself, not only its children', () => {
+    // The general light-text rule in htmlBlockStyles has a class, two type
+    // :not()s and three [style] :not()s; the marker rule for the cell must
+    // carry the same list plus the marker so it wins the cascade (checked in
+    // Chromium and Firefox with .dtu-dev/probe-authored-light-cell.mjs).
+    const css = readSource('darkmode.dark-engine.js').match(/const htmlBlockStyles = `([\s\S]*?)`;/)[1];
+    const general = 'div.d2l-html-block-rendered *:not(a):not(a *):not([style^="color"]):not([style*="; color"]):not([style*=";color"])';
+    const marker = 'div.d2l-html-block-rendered [data-dtu-authored-light-bg]:not(a):not(a *):not([style^="color"]):not([style*="; color"]):not([style*=";color"])';
+    assert.ok(css.includes(general), 'the general light-text rule is still there');
+    const rule = css.slice(css.indexOf(marker));
+    assert.ok(css.includes(marker), 'the marker rule repeats the :not() list');
+    assert.match(rule.slice(0, rule.indexOf('}')), /color:\s*#202122\s*!important/);
 });

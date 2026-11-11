@@ -5,13 +5,14 @@ import { extractFunctions, makeLocalStorage, makeLocation, plain } from './_harn
 const KEY = 'dtuAfterDarkUrlPausePatterns';
 
 function loadPause(href, patterns = []) {
-    return extractFunctions('darkmode.js', [
+    return extractFunctions('darkmode.url-pause.js', [
         'getCurrentUrlWithoutHash',
         'normalizeUrlPausePattern',
         'isPauseProtectedUrl',
         'isPauseProtectedPattern',
         'getUrlPausePatterns',
         'wildcardPatternToRegExp',
+        'wildcardMatches',
         'getMatchingUrlPausePatterns',
         'buildSuggestedPausePatternsForCurrentUrl'
     ], {
@@ -23,9 +24,9 @@ function loadPause(href, patterns = []) {
     }).api;
 }
 
-test('the storage key used by the test matches darkmode.js', async () => {
+test('the storage key used by the test matches darkmode.url-pause.js', async () => {
     const { readSource } = await import('./_harness.mjs');
-    assert.match(readSource('darkmode.js'), new RegExp(`URL_PAUSE_PATTERNS_KEY\\s*=\\s*'${KEY}'`));
+    assert.match(readSource('darkmode.url-pause.js'), new RegExp(`URL_PAUSE_PATTERNS_KEY\\s*=\\s*'${KEY}'`));
 });
 
 test('patterns normalise: whitespace, leading slash, hash', () => {
@@ -59,7 +60,7 @@ test('the Learn homepage can never be paused, even by a catch-all pattern', () =
 });
 
 test('corrupt stored patterns are ignored, not thrown', () => {
-    const api = extractFunctions('darkmode.js', ['normalizeUrlPausePattern', 'getUrlPausePatterns'], {
+    const api = extractFunctions('darkmode.url-pause.js', ['normalizeUrlPausePattern', 'getUrlPausePatterns'], {
         prelude: `var URL_PAUSE_PATTERNS_KEY = ${JSON.stringify(KEY)};`,
         globals: { location: makeLocation('https://learn.inside.dtu.dk/'), localStorage: makeLocalStorage({ [KEY]: '{not json' }) }
     }).api;
@@ -81,4 +82,12 @@ test('suggestions for a course tool page offer tool-wide and course-wide pattern
 test('suggestions never include the protected homepage', () => {
     const api = loadPause('https://learn.inside.dtu.dk/d2l/home');
     assert.deepEqual(plain(api.buildSuggestedPausePatternsForCurrentUrl()), ['https://learn.inside.dtu.dk/d2l/home*']);
+});
+
+test('wildcard matching agrees with the regular expression form on ordinary patterns', () => {
+    const api = loadPause('https://learn.inside.dtu.dk/');
+    const url = 'https://learn.inside.dtu.dk/d2l/lms/news/main.d2l?ou=12345&x=1';
+    for (const p of ['https://learn.inside.dtu.dk/d2l/lms/*?ou=123*', '*news*', 'HTTPS://LEARN*', '*?ou=999*', 'https://learn.inside.dtu.dk/', '*', '*x=1', '*x=2']) {
+        assert.equal(api.wildcardMatches(p, url), api.wildcardPatternToRegExp(p).test(url), p);
+    }
 });

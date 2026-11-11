@@ -1,36 +1,20 @@
 (function () {
     'use strict';
+    var markExt = globalThis.DTUAfterDarkDom.markExt;
+    var isTopWindow = globalThis.DTUAfterDarkDom.isTopWindow;
+    var normalizeWhitespace = globalThis.DTUAfterDarkDom.normalizeWhitespace;
 
     function getDeps() {
         try { return globalThis.DTUAfterDarkLearnNavDeps || null; } catch (e0) { return null; }
     }
 
-    function isTopWindow() {
-        var deps = getDeps();
-        return !!(deps && typeof deps.isTopWindow === 'function' && deps.isTopWindow());
-    }
 
     function isFeatureFlagEnabled(key) {
         var deps = getDeps();
         return !!(deps && typeof deps.isFeatureFlagEnabled === 'function' && deps.isFeatureFlagEnabled(key));
     }
 
-    function isDarkModeEnabled() {
-        var deps = getDeps();
-        return !!(deps && typeof deps.isDarkModeEnabled === 'function' && deps.isDarkModeEnabled());
-    }
 
-    function normalizeWhitespace(text) {
-        var deps = getDeps();
-        if (deps && typeof deps.normalizeWhitespace === 'function') return deps.normalizeWhitespace(text);
-        return String(text || '').replace(/\s+/g, ' ').trim();
-    }
-
-    function markExt(el) {
-        var deps = getDeps();
-        if (el && deps && typeof deps.markExt === 'function') deps.markExt(el);
-        return el;
-    }
 
     function deepQueryAll(selector, root) {
         var deps = getDeps();
@@ -102,11 +86,6 @@
     function hideSettingsModal() {
         var deps = getDeps();
         if (deps && typeof deps.hideSettingsModal === 'function') deps.hideSettingsModal();
-    }
-
-    function saveDarkModePreference(enabled) {
-        var deps = getDeps();
-        if (deps && typeof deps.saveDarkModePreference === 'function') deps.saveDarkModePreference(enabled);
     }
 
     function getLearnNavLinksFeatureKey() {
@@ -466,16 +445,24 @@
         return false;
     }
 
-    function configureAfterDarkLibraryNavItem(navItem) {
+    // D2L's nav dropdown code must never see a press on our openers.
+    function blockD2LDropdown(event) {
+        try { event.stopPropagation(); } catch (e0) { }
+        try { if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation(); } catch (e1) { }
+    }
+
+    // The one builder for the extension's own nav items (Library, Settings): a
+    // D2L-styled opener that click, Enter and Space all send through open().
+    function configureAfterDarkNavItem(navItem, itemClass, label, openerKey, open) {
         if (!navItem) return;
         // Already wired: rebuilding would replace the opener on every feature
         // pass and drop keyboard focus from it (e.g. after closing the panel).
-        var wiredOpener = navItem._dtuLibraryOpener;
+        var wiredOpener = navItem[openerKey];
         if (wiredOpener && wiredOpener.isConnected && navItem.contains(wiredOpener)) {
             applyAfterDarkNavItemVisibility(navItem);
             return;
         }
-        navItem.className = 'd2l-navigation-s-item dtu-library-nav-item';
+        navItem.className = 'd2l-navigation-s-item ' + itemClass;
         navItem.setAttribute('role', 'listitem');
         markExt(navItem);
 
@@ -496,7 +483,7 @@
         wrapper.className = 'd2l-navigation-s-group-wrapper';
         var textSpan = document.createElement('span');
         textSpan.className = 'd2l-navigation-s-group-text';
-        textSpan.textContent = 'Library';
+        textSpan.textContent = label;
         var chevron = createStableNavChevron();
 
         wrapper.appendChild(textSpan);
@@ -504,26 +491,25 @@
         openerBtn.appendChild(wrapper);
         dropdown.appendChild(openerBtn);
         navItem.appendChild(dropdown);
-        navItem._dtuLibraryOpener = openerBtn;
-
-        function blockD2LDropdown(event) {
-            try { event.stopPropagation(); } catch (e1) { }
-            try { if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation(); } catch (e2) { }
-        }
+        navItem[openerKey] = openerBtn;
 
         openerBtn.addEventListener('pointerdown', blockD2LDropdown, true);
         openerBtn.addEventListener('mousedown', blockD2LDropdown, true);
         openerBtn.addEventListener('click', function (event) {
-            return openLibraryPanelFromNav(openerBtn, event);
+            return open(openerBtn, event);
         }, true);
         openerBtn.addEventListener('keydown', function (event) {
             if (!event) return;
             if (event.key === 'Enter' || event.key === ' ') {
-                return openLibraryPanelFromNav(openerBtn, event);
+                return open(openerBtn, event);
             }
         }, true);
 
         applyAfterDarkNavItemVisibility(navItem);
+    }
+
+    function configureAfterDarkLibraryNavItem(navItem) {
+        configureAfterDarkNavItem(navItem, 'dtu-library-nav-item', 'Library', '_dtuLibraryOpener', openLibraryPanelFromNav);
     }
 
     function insertLibraryNavItem() {
@@ -561,64 +547,8 @@
         placeLibraryNavItem(mainWrapper, navItem);
     }
 
-    function configureAfterDarkSettingsNavItem(navItem, mainWrapper) {
-        if (!navItem) return;
-        // Already wired: rebuilding would replace the opener on every feature
-        // pass and drop keyboard focus from it (e.g. after closing Settings).
-        var wiredOpener = navItem._dtuSettingsOpener;
-        if (wiredOpener && wiredOpener.isConnected && navItem.contains(wiredOpener)) {
-            applyAfterDarkNavItemVisibility(navItem);
-            return;
-        }
-        navItem.className = 'd2l-navigation-s-item dtu-settings-nav-item';
-        navItem.setAttribute('role', 'listitem');
-        markExt(navItem);
-
-        while (navItem.firstChild) {
-            try { navItem.removeChild(navItem.firstChild); } catch (e0) { break; }
-        }
-
-        var dropdown = document.createElement('d2l-dropdown');
-        markExt(dropdown);
-
-        var openerBtn = document.createElement('button');
-        openerBtn.className = 'd2l-navigation-s-group d2l-dropdown-opener';
-        openerBtn.setAttribute('aria-expanded', 'false');
-        openerBtn.setAttribute('aria-haspopup', 'true');
-        markExt(openerBtn);
-
-        var wrapper = document.createElement('span');
-        wrapper.className = 'd2l-navigation-s-group-wrapper';
-        var textSpan = document.createElement('span');
-        textSpan.className = 'd2l-navigation-s-group-text';
-        textSpan.textContent = 'Settings';
-        var chevron = createStableNavChevron();
-
-        wrapper.appendChild(textSpan);
-        wrapper.appendChild(chevron);
-        openerBtn.appendChild(wrapper);
-        dropdown.appendChild(openerBtn);
-        navItem.appendChild(dropdown);
-        navItem._dtuSettingsOpener = openerBtn;
-
-        function blockD2LDropdown(event) {
-            try { event.stopPropagation(); } catch (e1) { }
-            try { if (typeof event.stopImmediatePropagation === 'function') event.stopImmediatePropagation(); } catch (e2) { }
-        }
-
-        openerBtn.addEventListener('pointerdown', blockD2LDropdown, true);
-        openerBtn.addEventListener('mousedown', blockD2LDropdown, true);
-        openerBtn.addEventListener('click', function (event) {
-            return openSettingsModalFromNav(openerBtn, event);
-        }, true);
-        openerBtn.addEventListener('keydown', function (event) {
-            if (!event) return;
-            if (event.key === 'Enter' || event.key === ' ') {
-                return openSettingsModalFromNav(openerBtn, event);
-            }
-        }, true);
-
-        applyAfterDarkNavItemVisibility(navItem);
+    function configureAfterDarkSettingsNavItem(navItem) {
+        configureAfterDarkNavItem(navItem, 'dtu-settings-nav-item', 'Settings', '_dtuSettingsOpener', openSettingsModalFromNav);
     }
 
     function insertSettingsNavItem() {
@@ -634,7 +564,7 @@
             try { existing = queryFirstDeep('.dtu-settings-nav-item', document); } catch (e1) { existing = null; }
         }
         if (existing) {
-            configureAfterDarkSettingsNavItem(existing, mainWrapper);
+            configureAfterDarkSettingsNavItem(existing);
             placeAfterDarkNavItem(mainWrapper, existing);
             return;
         }
@@ -644,7 +574,7 @@
         navItem.setAttribute('role', 'listitem');
         markExt(navItem);
 
-        configureAfterDarkSettingsNavItem(navItem, mainWrapper);
+        configureAfterDarkSettingsNavItem(navItem);
         placeAfterDarkNavItem(mainWrapper, navItem);
     }
 
@@ -686,27 +616,6 @@
             if (isNavItemHidden(item)) continue;
             var text = normalizeWhitespace(item ? item.textContent : '').toLowerCase();
             if (text === 'help') return item;
-        }
-        return null;
-    }
-
-    function getSettingsNavItem(mainWrapper) {
-        if (!mainWrapper || !mainWrapper.querySelectorAll) return null;
-        var items = [];
-        try {
-            items = Array.from(mainWrapper.children || []).filter(function (child) {
-                return child && child.classList && child.classList.contains('d2l-navigation-s-item');
-            });
-        } catch (e0) { items = []; }
-        if (!items.length) {
-            try { items = Array.from(mainWrapper.querySelectorAll('.d2l-navigation-s-item')); } catch (e1) { items = []; }
-        }
-        for (var i = 0; i < items.length; i++) {
-            var item = items[i];
-            if (isNavItemHidden(item)) continue;
-            if (item.classList && item.classList.contains('dtu-settings-nav-item')) return item;
-            var text = normalizeWhitespace(item ? item.textContent : '').toLowerCase();
-            if (text === 'settings') return item;
         }
         return null;
     }

@@ -22,6 +22,14 @@ function buildSourceFiles() {
     return [...block[1].matchAll(/'([^']+)'/g)].map((m) => m[1]);
 }
 
+function backgroundSourceFiles() {
+    return buildSourceFiles().filter((f) => /^background(\..+)?\.js$/.test(f));
+}
+
+function backgroundSource() {
+    return backgroundSourceFiles().map(readSource).join('\n');
+}
+
 test('both manifests ship the same content scripts in the same order', () => {
     assert.deepEqual(chrome.content_scripts, firefox.content_scripts);
 });
@@ -36,7 +44,8 @@ test('web-accessible resources match between manifests and exist', () => {
     const chromeResources = chrome.web_accessible_resources.flatMap((entry) => entry.resources);
     assert.deepEqual(chromeResources, firefox.web_accessible_resources);
     for (const file of chromeResources) assert.ok(exists(file), file);
-    const contentHosts = new Set(firefox.content_scripts.flatMap((cs) => cs.matches));
+    // Resource matches are origins (path /*); a content-script group may narrow the path.
+    const contentHosts = new Set(firefox.content_scripts.flatMap((cs) => cs.matches.map((m) => m.replace(/^(\*:\/\/[^/]+)\/.*$/, '$1/*'))));
     assert.deepEqual(new Set(chrome.web_accessible_resources[0].matches), contentHosts);
 });
 
@@ -51,7 +60,7 @@ test('every file a manifest names exists on disk', () => {
 
 test('the build copies every shipped script and the stylesheet', () => {
     const built = new Set(buildSourceFiles());
-    for (const file of [...contentScriptFiles(firefox), 'background.js', 'darkmode.css']) {
+    for (const file of [...contentScriptFiles(firefox), ...firefox.background.scripts, 'darkmode.css']) {
         assert.ok(built.has(file), `${file} missing from scripts/build.mjs sourceFiles`);
     }
     for (const file of built) assert.ok(exists(file), `build lists missing file ${file}`);
@@ -80,6 +89,35 @@ test('config.js loads before darkmode.js wherever both are injected', () => {
     }
 });
 
+test('darkmode.dom.js loads before every module that reads DTUAfterDarkDom', () => {
+    // A top-frame-only group may rely on an earlier all-frames group for the same host and run_at,
+    // because the browser injects groups in manifest order into one content-script world.
+    const groups = firefox.content_scripts;
+    groups.forEach((cs, gi) => {
+        const js = cs.js || [];
+        js.forEach((file, fi) => {
+            if (file === 'darkmode.dom.js' || !readSource(file).includes('DTUAfterDarkDom.')) return;
+            const sameGroup = js.indexOf('darkmode.dom.js');
+            if (sameGroup > -1 && sameGroup < fi) return;
+            const earlier = groups.slice(0, gi).some((prev) => (prev.js || []).includes('darkmode.dom.js')
+                && (prev.run_at || '') === (cs.run_at || '')
+                && cs.matches.every((m) => prev.matches.some((p) => p.endsWith('/*') && m.startsWith(p.slice(0, -1)))));
+            assert.ok(earlier, `${file} in group ${gi} (${cs.matches.join(',')}) has no darkmode.dom.js before it`);
+        });
+    });
+});
+
+test('darkmode.skeleton.js loads before every module that draws skeletons', () => {
+    for (const cs of firefox.content_scripts) {
+        const js = cs.js || [];
+        for (const user of ['darkmode.participant-intel-ui.js', 'darkmode.studyplan-exam-schedule.js']) {
+            if (!js.includes(user)) continue;
+            const at = js.indexOf('darkmode.skeleton.js');
+            assert.ok(at > -1 && at < js.indexOf(user), user + ' on ' + cs.matches.join(','));
+        }
+    }
+});
+
 test('the background message allowlist covers every content-script host', () => {
     const bg = readSource('background.js');
     const block = bg.match(/ALLOWED_SENDER_HOSTS = \[([\s\S]*?)\]/);
@@ -96,7 +134,7 @@ test('the background message allowlist covers every content-script host', () => 
 });
 
 test('background fetch targets are covered by host permissions', () => {
-    const bg = readSource('background.js');
+    const bg = backgroundSource();
     const permitted = new Set(firefox.permissions.filter((p) => p.includes('://')).map(hostOf));
     const fetched = new Set([...bg.matchAll(/['`]https:\/\/([a-z0-9.-]+)\//gi)].map((m) => m[1].toLowerCase()));
     assert.ok(fetched.size > 3);
@@ -113,4 +151,23 @@ test('config.js tracks only safe defaults', () => {
     const config = readSource('config.js');
     assert.doesNotMatch(config, /(api[_-]?key|secret|token|password)\s*[:=]\s*['"][^'"]{8,}/i);
     assert.ok(!exists('config.local.js') || !gitignore.includes('!/config.local.js'), 'config.local.js must stay untracked');
+});
+
+test('the Windows build scripts copy every file the manifests load', () => {
+    const needed = [...contentScriptFiles(firefox), ...firefox.background.scripts, ...firefox.web_accessible_resources.filter((f) => !f.startsWith('images/'))];
+    for (const script of ['scripts/build-chrome.ps1', 'scripts/build-firefox.ps1']) {
+        const text = readSource(script);
+        const missing = needed.filter((f) => !text.includes(`'${f}'`));
+        assert.deepEqual(missing, [], `${script} misses ${missing.join(', ')}`);
+    }
+});
+
+test('the Lessons bulk download files load only on DTU Learn course-content pages', () => {
+    const lessons = ['darkmode.lessons-bulk.zip.js', 'darkmode.lessons-bulk.tree.js', 'darkmode.lessons-bulk.fetch.js', 'darkmode.lessons-bulk.js'];
+    for (const manifest of [firefox, chrome]) {
+        const groups = manifest.content_scripts.filter((cs) => lessons.some((f) => (cs.js || []).includes(f)));
+        assert.equal(groups.length, 1);
+        assert.deepEqual(groups[0].matches, ['*://learn.inside.dtu.dk/d2l/le/*']);
+        assert.deepEqual(groups[0].js, lessons, 'zip, tree, fetch, then the UI');
+    }
 });
