@@ -812,6 +812,7 @@
         .vui-no-separator,
         ul.d2l-datalist,
         .d2l-widget-header,
+        .d2l-widget-header d2l-dropdown-context-menu,
         .d2l-widget-header a,
         .d2l-widget-header a.d2l-link,
         .d2l-widget-content-padding .d2l-placeholder,
