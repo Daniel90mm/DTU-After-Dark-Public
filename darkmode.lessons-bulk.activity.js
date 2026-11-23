@@ -247,7 +247,8 @@
         var root = doc.querySelector('.d2l-page-main') || doc.querySelector('form') || doc.body;
         root.querySelectorAll('d2l-html-block').forEach(function (block) {
             var div = doc.createElement('div');
-            div.innerHTML = block.getAttribute('html') || '';
+            var parsed = new DOMParser().parseFromString(String(block.getAttribute('html') || ''), 'text/html');
+            div.append.apply(div, Array.prototype.slice.call(parsed.body.childNodes));
             block.replaceWith(div);
         });
         root.querySelectorAll('img').forEach(function (img) {
