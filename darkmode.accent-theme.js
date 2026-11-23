@@ -553,6 +553,7 @@
     // - Light mode: accent fill + black outline border
     var _accentLogoSvgTemplate = null;
     var _accentLogoSvgLoadPromise = null;
+    var _accentLogoSvgLoadFailed = false;
     var _accentLogoDataUrlCache = {};
 
     function getResolvedAccent() {
@@ -560,7 +561,7 @@
         return (theme && theme.accent) || '#990000';
     }
 
-    function buildAccentLogoDataUrl(svgText, accentHex, lightModeOutline) {
+    function buildAccentLogoDataUrl(svgText, accentHex) {
         if (!svgText || !/<svg[\s>]/i.test(svgText)) return '';
         var cleanSvg = String(svgText).replace(/<\?xml[^>]*>\s*/i, '');
         var styleTag = '<style>path{fill:' + accentHex + ' !important;stroke:none !important;}</style>';
@@ -569,16 +570,19 @@
     }
 
     function ensureAccentLogoSvgLoaded(svgUrl) {
-        if (_accentLogoSvgTemplate || _accentLogoSvgLoadPromise) return;
+        // One try per page: a failed fetch would otherwise retry from replaceLogoImage forever.
+        if (_accentLogoSvgTemplate || _accentLogoSvgLoadPromise || _accentLogoSvgLoadFailed) return;
         _accentLogoSvgLoadPromise = Promise.resolve()
             .then(function () { return fetch(svgUrl); })
             .then(function (resp) { return (resp && resp.ok) ? resp.text() : ''; })
             .then(function (text) {
                 if (text && /<svg[\s>]/i.test(text)) {
                     _accentLogoSvgTemplate = text;
+                } else {
+                    _accentLogoSvgLoadFailed = true;
                 }
             })
-            .catch(function () { })
+            .catch(function () { _accentLogoSvgLoadFailed = true; })
             .finally(function () {
                 _accentLogoSvgLoadPromise = null;
                 try { replaceLogoImage(); } catch (e0) { }
@@ -595,7 +599,7 @@
 
         var svgUrl = getExtensionUrl('images/Corp_White_Transparent.svg');
         if (_accentLogoSvgTemplate) {
-            var dataUrl = buildAccentLogoDataUrl(_accentLogoSvgTemplate, accentHex, !isDarkModeEnabled());
+            var dataUrl = buildAccentLogoDataUrl(_accentLogoSvgTemplate, accentHex);
             if (dataUrl) {
                 _accentLogoDataUrlCache[cacheKey] = dataUrl;
                 return dataUrl;

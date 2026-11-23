@@ -20,7 +20,7 @@ function fixture({ homepage = true } = {}) {
     const link = element({ href: '/d2l/lms/lti/launch.d2l?rcode=dtu-644730' });
     link.closest = () => nav;
     const atomic = { closest: () => widget };
-    const { api } = loadModuleInternals('darkmode.deadlines.js', ['enforceCourseSearchVisibility'], {
+    const { api } = loadModuleInternals(['darkmode.deadlines.data.js', 'darkmode.deadlines.timeline.js', 'darkmode.deadlines.js'], ['enforceCourseSearchVisibility'], {
         window: { location: { hostname: 'test.invalid' }, addEventListener() {} },
         document: { addEventListener() {}, querySelector: () => present ? atomic : null },
         DTUAfterDarkDeadlinesDeps: {

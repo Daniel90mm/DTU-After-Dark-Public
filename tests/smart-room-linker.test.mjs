@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { loadModuleInternals, makeLocation, plain } from './_harness.mjs';
+import { loadModuleInternals, makeLocation, plain, readSource } from './_harness.mjs';
 
 const { api } = loadModuleInternals('darkmode.smart-room-linker.js', [
     'parseBuildingRoomFromTextOrQuery',
@@ -92,7 +92,8 @@ function linkerIn(href) {
         isDTULearnLegacyHeavyCourseToolPage: () => /\/d2l\/lms\/(dropbox|classlist|group|news)\//.test(new URL(href).pathname)
     };
     return loadModuleInternals('darkmode.smart-room-linker.js', ['shouldRunSmartRoomLinkerInThisWindow'], {
-        location: makeLocation(href), DTUAfterDarkSmartRoomLinkerDeps: deps
+        location: makeLocation(href), DTUAfterDarkSmartRoomLinkerDeps: deps,
+        DTUAfterDarkFeatureFlags: { FEATURE_SMART_ROOM_LINKER_KEY: 'dtuAfterDarkFeatureSmartRoomLinker' }
     }).api.shouldRunSmartRoomLinkerInThisWindow();
 }
 
@@ -120,4 +121,9 @@ test('ISBN references stay intact for Textbook Links and are never room links', 
     assert.deepEqual(rooms('978-0-262-03561-3'), []);
     assert.deepEqual(rooms('ISBN-10: 0-8044-2957-X'), []);
     assert.deepEqual(rooms('ISBN 978-0-262-03561-3. Lecture in 306-127.'), ['306/127']);
+});
+
+test('a failed MazeMap request is not cached for 12 h; a real "not found" is', () => {
+    const src = readSource('darkmode.smart-room-linker.js');
+    assert.match(src, /if \(out\.ok \|\| out\.error === 'not_found' \|\| \/\^invalid_\/\.test\(out\.error\)\) mazemapResolveCache\[key\] = out;/);
 });

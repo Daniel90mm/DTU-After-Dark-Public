@@ -2,6 +2,7 @@
 (function() {
     'use strict';
 
+    const fetchWithTimeLimit = DTUAfterDarkShared.fetchWithTimeLimit;
     const normalizeSpace = DTUAfterDarkShared.normalizeSpace;
     const stripHtmlTags = DTUAfterDarkShared.stripHtmlTags;
 
@@ -11,7 +12,74 @@
     const STUDENT_DEADLINES_RETRY_AFTER_FAILURE_MS = 1000 * 60 * 10; // back off a failing source
     const STUDENT_COURSE_REG_DEADLINES_URL = 'https://student.dtu.dk/en/courses-and-teaching/course-registration/course-registration-deadlines';
     const STUDENT_EXAM_REG_DEADLINES_URL = 'https://student.dtu.dk/en/exam/exam-registration/-deadlines-for-exams';
-    const _studentDeadlinesCache = { course: null, exam: null };
+    // Exchange application deadline: DTU Beyond Borders lists it on every partner
+    // university. Read only when the student turned it on in Settings and granted the
+    // optional permission; the request is the search page's own call (usid 0 = signed out).
+    const EXCHANGE_ORIGIN = 'https://beyondborders.dtu.dk/*';
+    const EXCHANGE_PAGE_URL = 'https://beyondborders.dtu.dk/Pages/searchUni.aspx';
+    const EXCHANGE_DATA_URL = 'https://beyondborders.dtu.dk/_vti_bin/BB_WS.asmx/getAllUniversities';
+    const EXCHANGE_MONTHS = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+
+    const _studentDeadlinesCache = { course: null, exam: null, exchange: null };
+
+    // "<span class='deadline'>dec 01, 2026</span> for Fall 2027" on each university. One
+    // lane per term, dated by the deadline most universities give for it.
+    function parseExchangeDeadlineGroups(universities) {
+        const counts = Object.create(null);
+        (Array.isArray(universities) ? universities : []).forEach((u) => {
+            const re = /deadline[^>]*>\s*([a-z]{3})[a-z]*\s+(\d{1,2}),\s*(\d{4})\s*<\/span>\s*for\s+([A-Za-z]+\s+\d{4})/gi;
+            let m;
+            while ((m = re.exec(String(u && u.PeriodOfStay || ''))) !== null) {
+                const month = EXCHANGE_MONTHS[m[1].toLowerCase()];
+                if (month == null) continue;
+                const ts = Date.UTC(Number(m[3]), month, Number(m[2]));
+                const key = m[4] + '|' + ts;
+                counts[key] = (counts[key] || 0) + 1;
+            }
+        });
+        const best = Object.create(null);
+        Object.keys(counts).forEach((key) => {
+            const term = key.split('|')[0];
+            if (!best[term] || counts[key] > counts[best[term]]) best[term] = key;
+        });
+        return Object.keys(best).map((term) => {
+            const ts = Number(best[term].split('|')[1]);
+            return {
+                heading: 'Exchange ' + term,
+                items: [{ label: 'Application', startIso: new Date(ts).toISOString().slice(0, 10), startTs: ts, endIso: null, endTs: null, raw: 'Exchange application deadline for ' + term }]
+            };
+        });
+    }
+
+    async function hasExchangePermission() {
+        try {
+            const runtime = DTUAfterDarkCache.runtime;
+            return !!(runtime.permissions && await runtime.permissions.contains({ origins: [EXCHANGE_ORIGIN] }));
+        } catch (e) {
+            return false;
+        }
+    }
+
+    async function fetchExchangeDeadlines() {
+        const url = EXCHANGE_PAGE_URL;
+        try {
+            const res = await fetchWithTimeLimit(EXCHANGE_DATA_URL, {
+                method: 'POST',
+                cache: 'no-store',
+                credentials: 'omit',
+                headers: { 'Content-Type': 'application/json; charset=utf-8' },
+                body: "{ usid: '0' }"
+            });
+            if (!res || !res.ok) return { ok: false, url, status: res ? res.status : 0, error: 'http' };
+            const json = await res.json();
+            const list = typeof json.d === 'string' ? JSON.parse(json.d) : json.d;
+            const groups = parseExchangeDeadlineGroups(list);
+            if (!groups.length) return { ok: false, url, status: res.status, error: 'parse_empty' };
+            return { ok: true, url, status: res.status, groups };
+        } catch (e) {
+            return { ok: false, url, status: 0, error: 'fetch_error', message: String(e && e.message || e) };
+        }
+    }
 
     function parseDmyDate(rawText) {
         const text = normalizeSpace(rawText);
@@ -108,52 +176,60 @@
         return groups;
     }
 
-    async function fetchStudentDeadlines(forceRefresh) {
-        async function fetchOne(url) {
-            try {
-                const res = await fetch(url, { cache: 'no-store', credentials: 'omit', redirect: 'follow' });
-                if (!res || !res.ok) return { ok: false, url, status: res ? res.status : 0, error: 'http' };
-                const html = await res.text();
-                if (!html || html.length < 200) return { ok: false, url, status: res.status, error: 'empty_html' };
-                const groups = parseStudentDeadlinesGroupsFromHtml(html);
-                if (!groups || !groups.length) return { ok: false, url, status: res.status, error: 'parse_empty' };
-                return { ok: true, url, status: res.status, groups };
-            } catch (e) {
-                return { ok: false, url, status: 0, error: 'fetch_error', message: String(e && e.message || e) };
-            }
+    // Each source is cached on its own. Caching them as one record meant a single
+    // failed fetch was stored alongside the other source's good data and the whole
+    // response still reported ok, so the failed source's deadlines silently vanished
+    // for a day.
+    async function fetchDeadlinePage(url) {
+        try {
+            const res = await fetchWithTimeLimit(url, { cache: 'no-store', credentials: 'omit', redirect: 'follow' });
+            if (!res || !res.ok) return { ok: false, url, status: res ? res.status : 0, error: 'http' };
+            const html = await res.text();
+            if (!html || html.length < 200) return { ok: false, url, status: res.status, error: 'empty_html' };
+            const groups = parseStudentDeadlinesGroupsFromHtml(html);
+            if (!groups || !groups.length) return { ok: false, url, status: res.status, error: 'parse_empty' };
+            return { ok: true, url, status: res.status, groups };
+        } catch (e) {
+            return { ok: false, url, status: 0, error: 'fetch_error', message: String(e && e.message || e) };
+        }
+    }
+
+    async function resolveSource(key, url, fetcher, forceRefresh) {
+        const now = Date.now();
+        const entry = _studentDeadlinesCache[key];
+        const fresh = entry && (now - entry.fetchedAt) < STUDENT_DEADLINES_CACHE_TTL_MS;
+        const backingOff = entry && entry.lastFailureAt
+            && (now - entry.lastFailureAt) < STUDENT_DEADLINES_RETRY_AFTER_FAILURE_MS;
+        if (!forceRefresh && entry && (fresh || backingOff)) {
+            return { result: entry.result, fetchedAt: entry.fetchedAt, cached: true };
         }
 
-        // Each source is cached on its own. Caching them as one record meant a single
-        // failed fetch was stored alongside the other source's good data and the whole
-        // response still reported ok, so the failed source's deadlines silently vanished
-        // for a day.
-        async function resolveSource(key, url) {
-            const now = Date.now();
-            const entry = _studentDeadlinesCache[key];
-            const fresh = entry && (now - entry.fetchedAt) < STUDENT_DEADLINES_CACHE_TTL_MS;
-            const backingOff = entry && entry.lastFailureAt
-                && (now - entry.lastFailureAt) < STUDENT_DEADLINES_RETRY_AFTER_FAILURE_MS;
-            if (!forceRefresh && entry && (fresh || backingOff)) {
-                return { result: entry.result, fetchedAt: entry.fetchedAt, cached: true };
-            }
-
-            const result = await fetchOne(url);
-            if (result.ok) {
-                const fetchedAt = Date.now();
-                _studentDeadlinesCache[key] = { fetchedAt, result, lastFailureAt: 0 };
-                return { result, fetchedAt, cached: false };
-            }
-
-            // A failed refetch must never discard data we already hold.
-            if (entry) {
-                entry.lastFailureAt = Date.now();
-                return { result: entry.result, fetchedAt: entry.fetchedAt, cached: true, refreshError: result.error };
-            }
-            return { result, fetchedAt: Date.now(), cached: false };
+        const result = await (fetcher ? fetcher() : fetchDeadlinePage(url));
+        if (result.ok) {
+            const fetchedAt = Date.now();
+            _studentDeadlinesCache[key] = { fetchedAt, result, lastFailureAt: 0 };
+            return { result, fetchedAt, cached: false };
         }
 
-        const course = await resolveSource('course', STUDENT_COURSE_REG_DEADLINES_URL);
-        const exam = await resolveSource('exam', STUDENT_EXAM_REG_DEADLINES_URL);
+        // A failed refetch must never discard data we already hold.
+        if (entry) {
+            entry.lastFailureAt = Date.now();
+            return { result: entry.result, fetchedAt: entry.fetchedAt, cached: true, refreshError: result.error };
+        }
+        return { result, fetchedAt: Date.now(), cached: false };
+    }
+
+    // Beyond Borders' partner list, read only with the optional permission.
+    async function fetchExchange(forceRefresh) {
+        if (!(await hasExchangePermission())) return { ok: false, url: EXCHANGE_PAGE_URL, error: 'no_permission' };
+        return (await resolveSource('exchange', EXCHANGE_PAGE_URL, fetchExchangeDeadlines, forceRefresh)).result;
+    }
+
+    async function fetchStudentDeadlines(forceRefresh, withExchange) {
+        const course = await resolveSource('course', STUDENT_COURSE_REG_DEADLINES_URL, null, forceRefresh);
+        const exam = await resolveSource('exam', STUDENT_EXAM_REG_DEADLINES_URL, null, forceRefresh);
+        // Optional third source; it never affects ok or fetchedAt of the two DTU pages.
+        const exchange = withExchange ? await fetchExchange(forceRefresh) : null;
 
         return {
             ok: !!(course.result.ok || exam.result.ok),
@@ -162,6 +238,7 @@
             cached: course.cached && exam.cached,
             course: course.result,
             exam: exam.result,
+            exchange,
             debug: {
                 course: { cached: course.cached, fetchedAt: course.fetchedAt, refreshError: course.refreshError || null },
                 exam: { cached: exam.cached, fetchedAt: exam.fetchedAt, refreshError: exam.refreshError || null }
@@ -169,6 +246,7 @@
         };
     }
     globalThis.DTUAfterDarkDeadlines = {
-        fetchStudentDeadlines
+        fetchStudentDeadlines,
+        parseExchangeDeadlineGroups
     };
 })();

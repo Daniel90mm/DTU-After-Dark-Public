@@ -18,9 +18,38 @@
             + 'The developer(s) accept no responsibility for any consequences arising from the use of this extension.';
     }
 
+    // The draft carries what a bug report needs to be reproduced. The page is given without its query
+    // or hash (they can hold ids), and the student sees and can edit everything before sending.
+    function getAfterDarkFeedbackContext() {
+        var lines = [];
+        try { lines.push('Page: ' + window.location.origin + window.location.pathname); } catch (e0) { }
+        var version = '';
+        try {
+            var rt = (globalThis.browser && globalThis.browser.runtime) || (globalThis.chrome && globalThis.chrome.runtime);
+            version = (rt && rt.getManifest && rt.getManifest().version) || '';
+        } catch (e1) { }
+        var ua = '';
+        try { ua = String(navigator.userAgent || ''); } catch (e2) { }
+        var m = ua.match(/(Firefox|Edg|OPR|Chrome)\/(\d+)/);
+        var browserName = m ? ({ Edg: 'Edge', OPR: 'Opera' }[m[1]] || m[1]) + ' ' + m[2] : 'unknown browser';
+        lines.push('Extension: ' + (version ? 'DTU After Dark ' + version : 'DTU After Dark') + ', ' + browserName);
+        lines.push('Theme: ' + (_settingsBridge.isDarkModeEnabled() ? 'dark' : 'light')
+            + (_settingsBridge.isFollowingDeviceTheme() ? ' (follows device)' : '')
+            + ', accent ' + _settingsBridge.getAccentThemeId());
+        var off = [];
+        var keys = _settingsBridge.getFeatureKeys() || {};
+        Object.keys(keys).forEach(function (name) {
+            if (!_settingsBridge.isFeatureFlagEnabled(keys[name])) off.push(name);
+        });
+        if (!_settingsBridge.isBusEnabled()) off.push('bus');
+        if (!_settingsBridge.isDeadlinesEnabled()) off.push('deadlines');
+        lines.push('Features off: ' + (off.length ? off.join(', ') : 'none'));
+        return lines.join('\n');
+    }
+
     function getAfterDarkDebugIdeasMailtoHref() {
         var subject = 'DTU After Dark - Debug/Ideas';
-        var body = 'Hi Daniel,\n\nPage URL:\n\nIdea or issue:\n';
+        var body = 'Hi Daniel,\n\nIdea or issue:\n\n\n' + getAfterDarkFeedbackContext() + '\n';
         return 'mailto:daniel-yttesen@hotmail.com?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
     }
 

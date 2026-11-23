@@ -344,6 +344,22 @@ textarea::placeholder {
   color: #e0e0e0 !important;
 }
 
+/* D2L popovers (navbar dropdowns, tooltips) paint their frame and pointer inside
+   a shadow root from these variables. Legacy tools such as /d2l/lms/news skip
+   shadow styling, so set them on the host: custom properties inherit inward.
+   Tooltips also need their own variables, which default to --d2l-color-ferrite
+   (remapped to light text above). Error tooltips keep their red. */
+d2l-dropdown-content,
+d2l-dropdown-menu,
+d2l-dropdown-tabs,
+d2l-tooltip:not([state="error"]) {
+  --d2l-popover-background-color: #2d2d2d;
+  --d2l-popover-border-color: #404040;
+  --d2l-popover-foreground-color: #e0e0e0;
+  --d2l-tooltip-background-color: #2d2d2d;
+  --d2l-tooltip-border-color: #404040;
+}
+
 /* Plain lists must not carry a solid panel background — let them inherit the
    page base (dark 1). A grey here showed as grey boxes behind list-based
    layouts (e.g. the announcements search-options "Posted In" list). Real
@@ -642,6 +658,19 @@ svg,
   color: #e0e0e0 !important;
 }
 
+/* A page header inside the two-panel main area sits on the #2d2d2d panel: let the panel show
+   (Lessons Overview of Medicin og Teknologi drew a black box behind its title). */
+.d2l-twopanelselector-main .d2l-page-header {
+  background-color: transparent !important;
+}
+
+/* The same page inside the Lessons viewer: no dark frame around the panel (enforcePageBackground). */
+html.dtu-in-lessons-viewer .d2l-twopanelselector-wrapper,
+html.dtu-in-lessons-viewer .d2l-twopanelselector-main,
+html.dtu-in-lessons-viewer .d2l-page-bg {
+  background-color: #2d2d2d !important;
+}
+
 /* Collapsepane content - dark 1 */
 .d2l-page-collapsepane-content,
 .d2l-page-collapsepane-content-inner,
@@ -780,6 +809,13 @@ d2l-labs-navigation-main-header *,
   background-image: none !important;
 }
 
+/* Image-tile course navbar (D2L "ib" navigation, e.g. Medicin og Teknologi): the tile row
+   took the darker generic list fill and the bottom cap stayed white. Paint both like the bar. */
+.d2l-navigation-main-ib .d2l-navigation-main-ib-list,
+.d2l-navigation-main-ib .d2l-navigation-main-ib-bottom-cap {
+  background-color: #2d2d2d !important;
+}
+
 /* Fix slot elements in navigation */
 slot[name="main"],
 .d2l-labs-navigation-centerer slot,
@@ -872,6 +908,12 @@ div[style*="white"]:not(.typebox):not([data-dtu-ext]) {
 #AB_DL_PH_Grades {
   background-color: #2d2d2d !important;
   color: #e0e0e0 !important;
+}
+
+/* D2L paints .d2l-datalist-style1 with a white-to-clear gradient (navbar message,
+   subscription and alert dropdowns). Clear it here so it never waits for the JS pass. */
+.d2l-datalist-container {
+  background-image: none !important;
 }
 
 /* Calendar Tasks uses generic placeholders, but its outer shell and title row
@@ -2047,7 +2089,7 @@ article.question {
   background-color: rgba(255, 255, 255, 0.05) !important;
 }
 
-#searchCourseCatalogDialog .modal-body div,
+#searchCourseCatalogDialog .modal-body div:not(.spinner div),
 #searchCourseCatalogDialog .modal-body form,
 #searchCourseCatalogDialog .modal-body table {
   background-color: transparent !important;
@@ -2076,6 +2118,37 @@ article.question {
 #createActivity.modal .modal-content {
   background: #2d2d2d !important;
   background-color: #2d2d2d !important;
+}
+
+/* Bootstrap modals (studieplan's Register/Withdraw dialog and its other dialogs): the wrapper
+   fills the screen, so the generic ".modal" rule hid the page instead of letting Bootstrap's
+   backdrop dim it. The ".modal-content" card keeps dark 2. Evaluering's BEM .modal has no
+   .modal-dialog child and keeps the generic rule. */
+.modal:has(> .modal-dialog) {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+/* The backdrop is a body > div, so the page-wrapper rule turned DTU's black scrim dark 1,
+   which barely dims a dark page. Keep it black, as DTU draws it. */
+html body > div.modal-backdrop {
+  background-color: #000 !important;
+  background: #000 !important;
+}
+
+/* A form inside a dialog is layout, not a page wrapper: the generic "form" dark 1 drew a
+   black bar under the Register/Withdraw course table. */
+.modal-content form {
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+/* Studieplan's spin.js loading spinner (Register/Withdraw Continue, quick search): DTU's black
+   bars vanished on dark; the generic div[style*="background"] rule even repainted them dark 2.
+   Draw them light. [style] lifts this above that rule. */
+div.spinner[role="progressbar"] > div > div[style] {
+  background: #e0e0e0 !important;
+  background-color: #e0e0e0 !important;
 }
 
 /* Confirm dialogs */
@@ -2992,6 +3065,19 @@ button.dropdown-toggle.red {
   border-color: #404040 !important;
 }
 
+/* kurser.dtu.dk side basket: kurser's inline `.panel-basket td` paints each cell #fbfbfb
+   with #dadada !important borders, so the row rule above leaves near-white cells (and the
+   light-cell check then gives them dark text). Same specificity plus one, to win. */
+.panel-basket tr.basketItem > td {
+  background-color: #2d2d2d !important;
+  color: #e0e0e0 !important;
+  border-color: #404040 !important;
+}
+
+.panel-basket tr.basketItem .deleteCourse {
+  color: #e0e0e0 !important;
+}
+
 /* Generic white/light background overrides for studieplan */
 .bg-white,
 .bg-light,
@@ -3062,6 +3148,12 @@ d2l-alert[type="default"] d2l-html-block {
 }
 
 /* ===== DTU Course Base (kurser.dtu.dk) ===== */
+/* "see more" study line expanders: kurser's inline #b20000 has contrast 1.9 on the dark box
+   (found by the archive replay on 128 of 1716 course pages). Same blue as the links around it. */
+#studiebox .expander {
+  color: #66b3ff !important;
+}
+
 /* Container */
 .container {
   background-color: transparent !important;

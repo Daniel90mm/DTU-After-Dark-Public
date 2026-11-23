@@ -117,6 +117,10 @@ function jsonResponse(body, status = 200) {
 
 function loadBusModule({ storage = makeStorage(), fetchImpl, runtime = {}, homepage = true } = {}) {
     const fileUrl = new URL('../darkmode.bus.js', import.meta.url);
+    const apiUrl = new URL('../darkmode.bus.api.js', import.meta.url);
+    const presetsUrl = new URL('../darkmode.bus.presets.js', import.meta.url);
+    const addLineUrl = new URL('../darkmode.bus.setup.addline.js', import.meta.url);
+    const setupUrl = new URL('../darkmode.bus.setup.js', import.meta.url);
     let source = fs.readFileSync(fileUrl, 'utf8');
     const tail = /\}\)\(\);\s*$/;
     if (!tail.test(source)) throw new Error('darkmode.bus.js does not end with an IIFE close');
@@ -174,6 +178,10 @@ globalThis.__busStressApi = {
     };
     sandbox.globalThis = sandbox;
     loadDom(sandbox);
+    vm.runInNewContext(fs.readFileSync(presetsUrl, 'utf8'), sandbox, { filename: presetsUrl.pathname });
+    vm.runInNewContext(fs.readFileSync(addLineUrl, 'utf8'), sandbox, { filename: addLineUrl.pathname });
+    vm.runInNewContext(fs.readFileSync(setupUrl, 'utf8'), sandbox, { filename: setupUrl.pathname });
+    vm.runInNewContext(fs.readFileSync(apiUrl, 'utf8'), sandbox, { filename: apiUrl.pathname });
     vm.runInNewContext(source, sandbox, { filename: fileUrl.pathname });
     sandbox.DTUAfterDarkBusDeps = {
         getUiState() { return {}; },
@@ -243,10 +251,8 @@ test('test_bug_departure_times_use_host_timezone_instead_of_copenhagen', () => {
         const timeApi = extractFunctions('darkmode.bus.js', [
             'copenhagenTimestamp',
             'minutesUntilDeparture',
-            'isDelayed',
             'getDelayMinutes',
             'formatDepartureTime',
-            'formatDelayTag',
             'departureTimestamp',
             'mapBusDepartureForDisplay'
         ], { globals: { Date: fixedDate(nowTs) } }).api;

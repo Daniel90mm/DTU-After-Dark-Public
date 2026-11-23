@@ -12,7 +12,13 @@ This repo is still centered around a large content script, but the runtime bound
 - `darkmode.dom.js`
   - Loads right after `config.js` in every all-frames group. `DTUAfterDarkDom` holds the one copy of
     `markExt`, `isTopWindow` and `normalizeWhitespace`; modules read them at the top of their IIFE.
+  - `schedulePlacement` runs a feature's placement pass when the document changes or a composed
+    `dtu-after-dark-shadow-attached` event arrives. Passes are coalesced to one per frame, and the
+    watch stops when the pass returns true or its time cap expires.
   - Tests get it through the harness (`makeSandbox`, or `loadDom(sandbox)` for a hand-built sandbox).
+- `darkmode.shadow-hook.page.js`
+  - Tiny page-world hook for `learn.inside.dtu.dk` and `s.brightspace.com`.
+  - Wraps `Element.prototype.attachShadow` once and reports each new root to the dark engine with a composed event.
 - `background.js`
   - Cross-origin fetch broker, caching, and runtime message handlers.
   - Any network-backed feature usually has a message type here first.
@@ -22,6 +28,9 @@ This repo is still centered around a large content script, but the runtime bound
 - `darkmode.dark-engine.js`
   - Extracted shared dark-mode runtime.
   - Owns shadow-root style injection, dynamic inline overrides, iframe/html-block processing, and `runDarkModeChecks`.
+- `darkmode.dark-engine.styles.js`
+  - Constant stylesheet text for the dark engine.
+  - Loads just before `darkmode.dark-engine.js` and exposes `DTUAfterDarkDarkEngineStyles`; the engine reads it once and throws if it is missing.
 - `darkmode.library.js`
   - Extracted DTU Learn library nav/panel shell.
   - Owns the Library nav item, modal open/close flow, quick links, and events/news list UI.
@@ -55,7 +64,13 @@ This repo is still centered around a large content script, but the runtime bound
   - Owns course-card button insertion, per-course override storage sync, and the shortcut-link editor modal.
 - `darkmode.deadlines.js`
   - Extracted DTU Learn deadlines widget shell.
-  - Owns homepage widget rendering, deduping, refresh/collapse UX, and admin toggles for deadlines/search.
+  - Owns the homepage widget shell, cache/refresh state, source links, collapse state, and admin toggles for deadlines/search.
+- `darkmode.deadlines.timeline.js`
+  - DTU Learn deadline timeline drawing.
+  - Owns the month axis, Today pill, period rows, lanes, bars, diamonds and mark label placement.
+- `darkmode.deadlines.data.js`
+  - DTU Learn deadline period data.
+  - Owns period heading parsing, period grouping and selection, and row date accessors.
 - `darkmode.kurser-widgets.js`
   - Extracted `kurser.dtu.dk` course-widget shell.
   - Owns the grade-statistics course panel.
@@ -74,8 +89,14 @@ This repo is still centered around a large content script, but the runtime bound
 - `darkmode.studyplan-exam-schedule-core.js`
   - Pure Study Planner exam-schedule logic, no DOM writes.
   - Parses DTU's exam table, kurser.dtu.dk exam fields and planner periods; resolves one outcome per course (suggested, agreed with teacher, no exam, not confirmed); merges stored student entries; computes gaps between exams.
+- `darkmode.studyplan-exam-schedule.styles.js`
+  - Study Planner exam-schedule stylesheet and theme tokens.
+  - Owns the dialog CSS text and the light/dark tokens applied to the panel and button.
+- `darkmode.studyplan-exam-schedule.editor.js`
+  - Study Planner exam-schedule date and format editor.
+  - Owns the format list, the day/month/year fields, the several-days toggle, and the save/cancel/reset actions.
 - `darkmode.studyplan-exam-schedule.js`
-  - Study Planner exam-schedule UI: the period header button, the panel, the row editor, and storage of student entries (`dtuAfterDarkExamScheduleV1`).
+  - Study Planner exam-schedule UI: the period header button, the panel, the rows, and storage of student entries (`dtuAfterDarkExamScheduleV1`).
 - `darkmode.participant-intel-ui.js`
   - Extracted CampusNet participant-intelligence UI shell.
   - Owns demographics, shared-history badges, profile history, and Retention Radar rendering.
@@ -102,9 +123,15 @@ This repo is still centered around a large content script, but the runtime bound
 - Theme/bootstrap/storage:
   - `darkmode.js`
   - Early helpers near the top of the file: dark mode state, accent handling, feature flags, storage wrappers.
+  - `darkmode.dom.js`
+  - Shared event-driven `schedulePlacement` watch used by feature bootstraps.
 - Global darkening engine and shadow DOM support:
   - `darkmode.dark-engine.js`
   - Shadow-root style injection, dynamic inline overrides, iframe/html-block rescans, and dark-mode runtime checks.
+  - `darkmode.shadow-hook.page.js`
+  - Page-world `attachShadow` wrapper that reports each new D2L shadow root to the engine.
+  - `darkmode.dark-engine.styles.js`
+  - Constant CSS text for shadow roots and iframes. No runtime dependencies.
   - `darkmode.js`
   - Unified mutation scheduling and bridge wrappers into the dark engine.
 - DTU Learn library panel shell:
@@ -138,8 +165,12 @@ This repo is still centered around a large content script, but the runtime bound
   - `darkmode.content-shortcut.js`
   - Course-card button injection, Org Unit override storage sync, and the override manager modal.
 - DTU Learn deadlines widget:
+  - `darkmode.deadlines.data.js`
+  - Deadline period parsing, grouping and selection.
+  - `darkmode.deadlines.timeline.js`
+  - Month axis, Today pill, period rows, lanes, bars, diamonds and mark label placement.
   - `darkmode.deadlines.js`
-  - Homepage widget placement, deadline row rendering, admin toggles, cache/refresh state.
+  - Homepage widget placement, source links, admin toggles, cache/refresh and collapse state.
 - Kurser course-widget shell:
   - `darkmode.kurser-widgets.js`
   - Grade-statistics fetching, rendering, and cleanup.
@@ -154,7 +185,9 @@ This repo is still centered around a large content script, but the runtime bound
   - Lessons-page mount logic, section discovery, legacy/API fallback resolution, and bundled/native download flow.
 - Study Planner exam schedule:
   - `darkmode.studyplan-exam-schedule-core.js` (parsers, resolver, gaps)
-  - `darkmode.studyplan-exam-schedule.js` (button, panel, editor, storage)
+  - `darkmode.studyplan-exam-schedule.styles.js` (stylesheet and theme tokens)
+  - `darkmode.studyplan-exam-schedule.editor.js` (date and format editor)
+  - `darkmode.studyplan-exam-schedule.js` (button, panel, rows, storage)
 - Participant-intelligence UI shell:
   - `darkmode.participant-intel-ui.js`
   - CampusNet participant-page demographics, shared-history badges, profile history cards, and Retention Radar rendering.
@@ -203,6 +236,13 @@ When editing `darkmode.js`, start with `rg` on the feature entrypoint instead of
   - `requestLibraryCrowding`
   - `renderLibraryTrendSection`
 - DTU Learn deadlines:
+  - `darkmode.deadlines.data.js`
+  - `parseDeadlinePeriodHeading`
+  - `buildDeadlinePeriodGroups`
+  - `darkmode.deadlines.timeline.js`
+  - `buildDeadlineTimelineAxis`
+  - `layoutDeadlinePeriodMarks`
+  - `createDeadlinesTimeline`
   - `darkmode.deadlines.js`
   - `insertDeadlinesHomepageWidget`
   - `buildTopDeadlines`
@@ -310,6 +350,8 @@ For most feature work:
 3. Check `README.md` and `changes.md` before finishing.
 4. Run a focused syntax/build verification:
    - `node --check darkmode.js`
+   - `node --check darkmode.shadow-hook.page.js` when touching the page-world shadow hook
+   - `node --check darkmode.dark-engine.styles.js` when touching the dark engine stylesheet text
    - `node --check darkmode.learn-nav.js` when touching the DTU Learn nav shell
    - `node --check darkmode.learn-accent-shell.js` when touching DTU Learn accent-band or legacy LMS shell styling
    - `node --check darkmode.learn-shell.js` when touching the DTU Learn shell extras
@@ -320,11 +362,15 @@ For most feature work:
   - `node --check darkmode.bus.js` when touching the DTU Learn bus module
    - `node --check darkmode.content-shortcut.js` when touching the DTU Learn content shortcut shell
    - `node --check darkmode.library.js` when touching the library shell
+   - `node --check darkmode.deadlines.data.js` when touching deadline period parsing or grouping
+   - `node --check darkmode.deadlines.timeline.js` when touching deadline timeline drawing
    - `node --check darkmode.deadlines.js` when touching the deadlines widget shell
    - `node --check darkmode.kurser-course-eval.js` when touching the kurser course-evaluation shell
    - `node --check darkmode.textbooks.js` when touching the shared textbook-links module
    - `node --check darkmode.kurser-widgets.js` when touching the kurser course-widget shell
    - `node --check darkmode.studyplan-exam-schedule-core.js` when touching Study Planner exam parsing or resolution
+   - `node --check darkmode.studyplan-exam-schedule.styles.js` when touching the Study Planner exam schedule stylesheet
+   - `node --check darkmode.studyplan-exam-schedule.editor.js` when touching the Study Planner exam date and format editor
    - `node --check darkmode.lessons-bulk.js` when touching the Lessons bulk-download runtime
    - `node --check darkmode.participant-intel-backfill.js` when touching archive backfill/history-scanner code
    - `node --check darkmode.participant-intel-core.js` when touching participant-intelligence storage/parser code

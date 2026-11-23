@@ -192,6 +192,18 @@ test('the map has content when a course lists or is listed by another, catalogue
     assert.equal(api.courseMapHasContent(cat, f, 'NEW'), false, 'a course missing from the data');
 });
 
+test('the preview counts what a course lists and what lists it, and says it in one line', () => {
+    const cat = { A: { n: 'a' }, B: { n: 'b', g: [['A', 'GONE']] }, C: { n: 'c', g: [['B']] }, D: { n: 'd', g: [['B']] }, E: { n: 'e' } };
+    const f = api.buildFollowerIndex(cat);
+    assert.deepEqual(plain(api.courseMapCounts(cat, f, 'B')), { before: 2, after: 2 }, 'a listed course not in the catalogue counts');
+    assert.deepEqual(plain(api.courseMapCounts(cat, f, 'A')), { before: 0, after: 1 });
+    assert.deepEqual(plain(api.courseMapCounts(cat, f, 'E')), { before: 0, after: 0 });
+    assert.deepEqual(plain(api.courseMapCounts(cat, f, 'E', { g: [['A']] })), { before: 1, after: 0 }, 'the live reading of the page wins');
+    assert.equal(api.courseMapCaption('B', { before: 2, after: 2 }), '2 courses before B, 2 courses build on it');
+    assert.equal(api.courseMapCaption('A', { before: 0, after: 1 }), 'No prerequisites listed, 1 course builds on it');
+    assert.equal(api.courseMapCaption('C', { before: 1, after: 0 }), '1 course before C, no course builds on it');
+});
+
 const crawler = await import('../scripts/crawl-course-prerequisites.mjs');
 const page = (code, name, rows) => `<h2>${code} ${name}</h2><table>${rows.map(([label, value]) => `<tr><td><label>${label}</label></td><td>${value}</td></tr>`).join('')}</table>`;
 

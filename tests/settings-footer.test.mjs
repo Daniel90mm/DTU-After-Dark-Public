@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import fs from 'node:fs';
-import { loadModulesInternals } from './_harness.mjs';
+import { loadModuleInternals, loadModulesInternals } from './_harness.mjs';
 
 const ROOT = new URL('../', import.meta.url);
 
@@ -50,7 +50,13 @@ function fixture() {
             getUrlPausePatterns: () => [],
             buildSuggestedPausePatternsForCurrentUrl: () => [],
             normalizeUrlPausePattern: v => v,
-            getMatchingUrlPausePatterns: () => []
+            getMatchingUrlPausePatterns: () => [],
+            isFollowingDeviceTheme: () => true,
+            getAccentThemeId: () => 'dtu_red',
+            getFeatureKeys: () => ({ library: 'kLib', courseMap: 'kMap' }),
+            isFeatureFlagEnabled: (k) => k !== 'kMap',
+            isBusEnabled: () => false,
+            isDeadlinesEnabled: () => true
         }
     });
     api.showPausedUrlRulesModal();
@@ -87,22 +93,26 @@ test('closing paused URLs restores scroll and focus, and removes its key handler
     assert.equal(f.document.activeElement, f.opener);
 });
 
-test('feedback prepares an email with no automatic page or stored data', () => {
+test('feedback prepares an email with the page path, version, browser, theme and features that are off', () => {
     const f = fixture(); const url = new URL(f.api.getAfterDarkDebugIdeasMailtoHref());
     assert.equal(url.protocol, 'mailto:'); assert.equal(url.pathname, 'daniel-yttesen@hotmail.com');
     assert.equal(url.searchParams.get('subject'), 'DTU After Dark - Debug/Ideas');
-    assert.equal(url.searchParams.get('body'), 'Hi Daniel,\n\nPage URL:\n\nIdea or issue:\n');
+    const body = url.searchParams.get('body');
+    assert.match(body, /^Hi Daniel,\n\nIdea or issue:\n\n\n/);
+    assert.match(body, /\nPage: https:\/\/learn\.inside\.dtu\.dk\/d2l\/home\n/);
+    assert.match(body, /\nExtension: DTU After Dark[^\n]*\n/);
+    assert.match(body, /\nTheme: dark \(follows device\), accent dtu_red\n/);
+    assert.match(body, /\nFeatures off: courseMap, bus\n$/);
 });
 
-test('feedback activation opens the prepared draft without adding page context', () => {
+test('feedback never puts the query string or hash of the page in the draft', () => {
     const f = fixture(); const footer = f.api.createAfterDarkDisclaimerFooter();
     const button = footer.querySelectorAll('button').find(e => e.getAttribute('aria-label') === 'Send feedback or bug report by email');
     assert.equal(button.type, 'button');
     button.listeners.click({ preventDefault() {}, stopPropagation() {} });
     const draft = new URL(f.mockWindow.location.href);
     assert.equal(draft.protocol, 'mailto:');
-    assert.equal(draft.searchParams.get('body'), 'Hi Daniel,\n\nPage URL:\n\nIdea or issue:\n');
-    assert.doesNotMatch(draft.searchParams.get('body'), /private=value|learn\.inside/);
+    assert.doesNotMatch(draft.searchParams.get('body'), /private=value/);
 });
 
 test('every Settings switch, select and colour input has a name for screen readers', () => {
@@ -114,4 +124,27 @@ test('every Settings switch, select and colour input has a name for screen reade
             assert.match(near, /aria-label/, `${file}:${i + 1} control has no aria-label`);
         });
     }
+});
+
+test('a missing Settings deps object warns once and still returns the fallback', () => {
+    const warned = [];
+    const { api } = loadModuleInternals('darkmode.settings.bridge.js', ['callDep', 'getDepValue'], {
+        console: { warn: message => warned.push(message) }
+    });
+    assert.equal(api.callDep('isDarkModeEnabled', [], false), false);
+    assert.equal(api.getDepValue('accentThemeOrder', 'fallback'), 'fallback');
+    assert.equal(warned.length, 1);
+    assert.match(warned[0], /DTUAfterDarkSettingsDeps is missing/);
+});
+
+test('a missing Settings dependency is named once, not on every call', () => {
+    const warned = [];
+    const { api } = loadModuleInternals('darkmode.settings.bridge.js', ['callDep'], {
+        console: { warn: message => warned.push(message) },
+        DTUAfterDarkSettingsDeps: {}
+    });
+    assert.equal(api.callDep('saveDarkModePreference', [true], 'fallback'), 'fallback');
+    assert.equal(api.callDep('saveDarkModePreference', [false], 'fallback'), 'fallback');
+    assert.equal(warned.length, 1);
+    assert.match(warned[0], /DTUAfterDarkSettingsDeps\.saveDarkModePreference is missing/);
 });

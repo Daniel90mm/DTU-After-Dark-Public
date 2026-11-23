@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import vm from 'node:vm';
-import { readSource, loadDom } from './_harness.mjs';
+import { readSource, loadDom, loadModuleInternals, extractFunctions } from './_harness.mjs';
 
 function loadCore() {
     const sandbox = {};
     sandbox.globalThis = sandbox;
     loadDom(sandbox);
+    vm.runInNewContext(readSource('darkmode.ics.js'), sandbox);
     vm.runInNewContext(readSource('darkmode.studyplan-exam-schedule-core.js'), sandbox);
     return sandbox.DTUAfterDarkExamScheduleCore;
 }
@@ -77,6 +78,22 @@ test('a slot code on the course page finds its row', () => {
     assert.equal(r.evidence, 'E2-B');
     assert.equal(r.format, 'written');
     assert.equal(r.range, false);
+});
+
+test('a written exam gets the several-days note only when its course page says so (62117, 62276)', () => {
+    const plainWritten = resolve('02110', written('E2B'), winterSection, autumn);
+    assert.equal(plainWritten.pageDays, undefined);
+    assert.equal(core.outcomeText(plainWritten), "slot E2-B in DTU's exam table");
+    for (const text of ['E2B, Several days of exam can be occur', 'E2B, If the number of students on the course is so large that the exam cannot be completed on the stipulated examination day, the examination dates will include one or two days before or after']) {
+        const r = resolve('02110', written(text), winterSection, autumn);
+        assert.equal(r.date, '2026-12-10');
+        assert.equal(r.range, false);
+        assert.equal(r.pageDays, true);
+        assert.equal(core.outcomeText(r), "slot E2-B in DTU's exam table. The course page says the exam may be held on more than one day.");
+    }
+    const oral = resolve('34034', fields('34034'), winterSection, autumn);
+    assert.equal(core.severalDaysNote(oral), 'Oral exams may run over several days.');
+    assert.equal(oral.pageDays, undefined);
 });
 
 test('a course named in the table uses that row', () => {
@@ -237,9 +254,23 @@ function loadUi(send) {
     sandbox.DTUAfterDarkExamScheduleCore = core;
     sandbox.DTUAfterDarkExamScheduleDeps = { sendRuntimeMessage: send };
     loadDom(sandbox);
+    vm.runInNewContext(readSource('darkmode.studyplan-exam-schedule.styles.js'), sandbox);
+    vm.runInNewContext(readSource('darkmode.studyplan-exam-schedule.editor.js'), sandbox);
     vm.runInNewContext(readSource('darkmode.studyplan-exam-schedule.js'), sandbox);
     return sandbox.DTUAfterDarkExamSchedule;
 }
+
+test('the dialog fails loudly when the styles module is missing', () => {
+    assert.throws(() => loadModuleInternals('darkmode.studyplan-exam-schedule.js', ['openPanel'], {
+        DTUAfterDarkExamScheduleEditor: { renderEditor: function () {} }
+    }), /requires darkmode\.studyplan-exam-schedule\.styles\.js loaded first/);
+});
+
+test('the dialog fails loudly when the editor module is missing', () => {
+    assert.throws(() => loadModuleInternals('darkmode.studyplan-exam-schedule.js', ['openPanel'], {
+        DTUAfterDarkExamScheduleStyles: { CSS: '', applyTheme: function () {} }
+    }), /requires darkmode\.studyplan-exam-schedule\.editor\.js loaded first/);
+});
 
 test('opening the panel asks for the exam table again, button checks reuse it', async () => {
     let calls = 0;
@@ -404,7 +435,8 @@ test('a kurser course page gets one exam per period its catalogue year places it
         .map((e) => [e.label, e.result.status, e.result.date]);
     assert.deepEqual(exams('02110'), [['Autumn 2026', 'suggested', '2026-12-10']]);
     assert.deepEqual(exams('02110-da'), [['Autumn 2026', 'suggested', '2026-12-10']]);
-    assert.deepEqual(exams('34034'), [['Autumn 2026', 'suggested', '2026-12-07'], ['Spring 2027', 'suggested', '2027-05-13']]);
+    // 34034 is taught in autumn only ("Autumn E1A"); its "E1A, F1A" lists the spring re-exam, not a second exam.
+    assert.deepEqual(exams('34034'), [['Autumn 2026', 'suggested', '2026-12-07']]);
     assert.deepEqual(exams('01001'), [['Autumn 2026', 'suggested', '2026-12-06']]);
     assert.deepEqual(exams('02105'), [['Spring 2027', 'suggested', '2027-05-20']]);
     // An exam section that is over is left out: the page shows next year's dates only once the catalogue moves on.
@@ -427,9 +459,123 @@ test('Danish schedule words and 3-week months place a course page', () => {
     assert.deepEqual(prose.map((e) => e.label), ['Autumn 2026']);
 });
 
+test('a course page that places the course in no exam period says why, not that DTU\'s table is empty', () => {
+    // 168 of 1716 catalogue pages (mostly PhD courses off DTU's normal schedule) say "Decide with teacher".
+    const fields = (scheduleText, examText, name = 'X') => ({ examText, scheduleText, assessmentText: 'Report', durationText: '', name, volume: '2026-2027' });
+    const row = (f) => plain(core.coursePageExams('99999', f, sections, '2026-11-11')).map((e) => [e.label, e.result.status, core.outcomeText(e.result)]);
+    assert.deepEqual(row(fields('[The course is not following DTUs normal Schedule]', 'Decide with teacher')),
+        [['2026/2027', 'teacher', 'Per the course page, agree the date with the teacher']]);
+    assert.deepEqual(row(fields('', 'Provided by DTU Learn for Life')),
+        [['2026/2027', 'unconfirmed', 'Not confirmed: the course page places it in no exam period']]);
+    assert.deepEqual(row(fields('', 'Decide with teacher', 'Special course in physics')),
+        [['2026/2027', 'teacher', 'Special course, project or thesis']]);
+});
+
+test('the archive replay findings: teacher, written format, every placement line, No exam, one exam per spanning course', () => {
+    // Found by DeepSeek judging all 1521 Exam date rows of the 2026-11-19 catalogue, each checked by hand.
+    const page = (o) => ({ name: 'X', volume: '2026-2027', durationText: '', assessmentText: 'Written examination', scheduleText: '', examText: '', ...o });
+    const row = (f) => plain(core.coursePageExams('99999', page(f), sections, '2026-11-11')).map((e) => [e.label, e.result.status, e.result.reason || e.result.format]);
+    // A. 02197: "Decide with teacher" and no slot for the season is teacher-agreed, not "no exam slot".
+    assert.deepEqual(row({ scheduleText: 'Spring F4A (Tues 13-17)', examText: 'Decide with teacher', assessmentText: 'Oral examination' }),
+        [['Spring 2027', 'teacher', 'the course page says to agree the exam date with the teacher']]);
+    // B. 22100: the official type decides the format; "an oral group presentation" in the prose does not.
+    assert.equal(core.resolveCourseExam('22100', page({ examText: 'E3A', durationText: 'Written exam: 2 hours',
+        assessmentText: 'Written examination and exercises; The exam consists of 3 sub-tests: 2. An oral group presentation of the project.' }), null, null).format, 'written');
+    assert.equal(core.resolveCourseExam('1', page({ assessmentText: 'Oral examination and reports; Written reports' }), null, null).format, 'oral');
+    // C. 02402: every placement line counts, not only the first; prose lines still do not (01035).
+    assert.deepEqual(row({ scheduleText: 'Autumn E3A (Tues 8-12); Spring F4A (Tues 13-17)', examText: 'E3A, F4A' }).map((e) => e[0]), ['Autumn 2026', 'Spring 2027']);
+    // D. 12231: "No exam" is coursework.
+    assert.deepEqual(row({ scheduleText: 'August', examText: 'No exam', assessmentText: 'Evaluation of exercises/reports; Hand in short reports' }), [['August 2027', 'no-exam', 'none']]);
+    // 28316: "No exam" but the official type is "Oral examination and reports": the page contradicts itself.
+    assert.deepEqual(row({ scheduleText: 'January', examText: 'No exam', assessmentText: 'Oral examination and reports; Each report has an author' }),
+        [['January 2027', 'unconfirmed', 'the course page does not give the exam day']]);
+    // E. 10033: a course taught over two periods with one exam slot gets no "no exam slot" line for the other.
+    assert.deepEqual(row({ scheduleText: 'Autumn E2A (Mon 13-17) and Spring F2A (Mon 13-17)', examText: 'F2A' }).map((e) => e[0]), ['Spring 2027']);
+    // F. 02335, 22111: an autumn course lists its re-exam slot ("E2B, F7, ... and F7 for the re-exam", "E4A, F4A, Oral
+    // re-exam"). When Schedule names a semester, only Schedule places the course: no invented spring exam.
+    assert.deepEqual(row({ scheduleText: 'Autumn E2B (Thurs 8-12)', examText: 'E2B, F7, Regular exam is planned for E2B (and F7 for the; re-exam)' }).map((e) => e[0]), ['Autumn 2026']);
+    assert.deepEqual(row({ scheduleText: 'Autumn E4A (Tues 13-17)', examText: 'E4A, F4A, Oral re-exam.' }).map((e) => e[0]), ['Autumn 2026']);
+    // G. 10406: taught in spring, but the page gives only the autumn slot. The row names the contradiction.
+    const r10406 = row({ scheduleText: 'Spring F5A (Wed 8-12)', examText: 'E5A' });
+    assert.deepEqual(r10406.map((e) => [e[0], e[1]]), [['Spring 2027', 'unconfirmed']]);
+    assert.match(String(r10406[0][2]), /gives only exam slot E5-A, an autumn slot/);
+    // Off the normal schedule, the exam slot still places it (no semester in Schedule).
+    assert.deepEqual(row({ scheduleText: '[The course is not following DTUs normal Schedule]', examText: 'E3A' }).map((e) => e[0]), ['Autumn 2026']);
+    // ... but keeps it when no period resolves.
+    assert.deepEqual(row({ scheduleText: 'Autumn E2A and Spring F2A', examText: 'Special day' }).map((e) => e[0]), ['Autumn 2026', 'Spring 2027']);
+});
+
 test('outcome text is shared by the planner and the course page', () => {
     assert.equal(core.outcomeText({ status: 'suggested', evidence: 'E2-B', range: false }), 'slot E2-B in DTU\'s exam table');
     assert.equal(core.outcomeText({ status: 'suggested', evidence: 'named: 02002', range: true }), 'named in DTU\'s exam table. Oral exams may run over several days.');
     assert.equal(core.outcomeText({ status: 'unconfirmed', reason: 'listed on two dates' }), 'Not confirmed: listed on two dates');
     assert.equal(core.outcomeText({ status: 'no-exam' }), 'Assessed on coursework, per the course page');
+});
+
+test('a date from a row of DTU\'s exam table carries that row\'s grading deadline', () => {
+    const r = resolve('02110', fields('02110'), winterSection, autumn);
+    const row = winterSection.rows.find((x) => x.date === r.date);
+    assert.ok(row.grading);
+    assert.equal(r.grading, row.grading);
+    const fmt = (iso) => iso;
+    assert.equal(core.gradingText('2027-01-13', '2026-12-01', fmt), "DTU's grading deadline: 2027-01-13");
+    assert.equal(core.gradingText('2027-01-13', '2027-01-13', fmt), "DTU's grading deadline: 2027-01-13");
+    assert.equal(core.gradingText('2027-01-13', '2027-01-14', fmt), "DTU's grading deadline: 2027-01-13, 1 day ago");
+    assert.equal(core.gradingText('2027-01-13', '2027-02-02', fmt), "DTU's grading deadline: 2027-01-13, 20 days ago");
+    assert.equal(core.gradingText(undefined, '2027-02-02', fmt), '');
+    assert.equal(plain(core.mergeStudentEntries({ '02110': r }, {}))[0].grading, row.grading);
+    // A course assessed on coursework has no exam row, so no grading deadline.
+    const coursework = plain(core.resolveCourseExam('02110', Object.assign({}, fields('02110'), { assessmentText: 'Reports', durationText: '' }), winterSection, autumn));
+    assert.equal(coursework.status, 'no-exam');
+    assert.equal(coursework.grading, undefined);
+});
+
+test('a grading deadline belongs to the exam day: DTU\'s fixed day, the first oral day named, or the day the student set', () => {
+    const sections = [{ rows: [{ date: '2026-12-07', grading: '2027-01-13' }, { date: '2026-12-09', grading: '2027-01-15' }] }];
+    assert.deepEqual(plain(core.gradingForRow({ status: 'suggested', format: 'written', date: '2026-12-07', range: false, grading: '2027-01-13' }, sections)), { grading: '2027-01-13', day: null });
+    assert.deepEqual(plain(core.gradingForRow({ status: 'suggested', format: 'oral', date: '2026-12-07', range: true, grading: '2027-01-13' }, sections)), { grading: '2027-01-13', day: '2026-12-07' });
+    assert.deepEqual(plain(core.gradingForRow({ status: 'yours', format: 'oral', date: '2026-12-09', endDate: null }, sections)), { grading: '2027-01-15', day: '2026-12-09' });
+    assert.deepEqual(plain(core.gradingForRow({ status: 'yours', format: 'oral', date: '2026-12-07', endDate: '2026-12-09' }, sections)), { grading: '2027-01-15', day: '2026-12-09' });
+    assert.equal(core.gradingForRow({ status: 'yours', format: 'oral', date: '2026-12-08' }, sections), null, 'a day DTU lists no deadline for gets none');
+    assert.equal(core.gradingForRow({ status: 'suggested', format: 'hand-in', date: '2026-12-07', grading: '2027-01-13' }, sections), null);
+    assert.equal(core.gradingText('2027-01-13', '2026-12-01', (d) => d, '2026-12-07'), "DTU's grading deadline for an exam on 2026-12-07: 2027-01-13");
+});
+
+test('the grading watch keeps held exams after the planner moves on, and the planner\'s rows win', () => {
+    const stored = [
+        { code: '02110', exam: '2026-12-10', grading: '2027-01-18' },
+        { code: '01005', exam: '2027-05-20', grading: '2027-06-20' },
+        { code: '10020', exam: '2026-01-10', grading: '2026-02-10' }
+    ];
+    const current = [{ code: '01005', exam: '2027-05-21', grading: '2027-06-21' }, { code: '02402', exam: '2027-05-25', grading: '2027-06-25' }];
+    const merged = plain(core.mergeGradingWatch(stored, current, '2027-02-01'));
+    assert.deepEqual(merged.map((e) => e.code + ' ' + e.exam), ['02110 2026-12-10', '01005 2027-05-21', '02402 2027-05-25'],
+        'held 02110 kept, 01005 replaced by the planner, 10020 dropped 200+ days past its deadline');
+});
+
+test('a failed exam schedule button insert does not block the next try', async () => {
+    let loads = 0, failPlace = true;
+    const warnings = [];
+    const { api } = extractFunctions('darkmode.studyplan-exam-schedule.js', ['insertStudyplanExamScheduleButtons'], {
+        prelude: 'var _inserting = false;',
+        globals: {
+            clearOldExamClusterKeys() {},
+            getDeps: () => ({ featureStudyplanExamScheduleKey: 'k' }),
+            getCore: () => ({ selectSchedulePeriods: () => ['E26'] }),
+            dep: (name) => ({ isTopWindow: () => true, isFeatureFlagEnabled: () => true })[name],
+            removeStudyplanExamSchedule() {},
+            plannerPeriodTables: () => [{ period: { key: 'E26' } }],
+            loadExamTable: () => { loads++; return Promise.resolve({ sections: [] }); },
+            scheduleButtonPlace: () => { if (failPlace) throw new Error('planner changed'); return null; },
+            todayIso: () => '2026-11-22',
+            document: { body: {}, querySelector: () => null },
+            console: { warn: (...a) => warnings.push(a.join(' ')) }
+        }
+    });
+    api.insertStudyplanExamScheduleButtons();
+    for (let i = 0; i < 6; i++) await Promise.resolve();
+    assert.equal(warnings.length, 1);
+    failPlace = false;
+    api.insertStudyplanExamScheduleButtons();
+    assert.equal(loads, 2);
 });

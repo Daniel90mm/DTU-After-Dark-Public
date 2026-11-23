@@ -4,19 +4,27 @@ import { loadModuleInternals, plain, readSource } from './_harness.mjs';
 
 const BACKGROUND_FILES = JSON.parse(readSource('manifest.json')).background.scripts;
 
-function loadBackground({ fetchImpl } = {}) {
+function loadBackground({ fetchImpl, setImpl } = {}) {
     const listeners = [];
+    const startup = [];
     const storage = new Map();
     const fetchCalls = [];
     const chrome = {
         storage: {
             local: {
-                get(key, cb) { cb({ [key]: storage.get(key) }); },
-                set(obj) { for (const [k, v] of Object.entries(obj)) storage.set(k, v); },
-                remove() {}
+                get(key, cb) { cb(key === null ? Object.fromEntries(storage) : { [key]: storage.get(key) }); },
+                set(obj) {
+                    if (setImpl) return setImpl(obj, storage);
+                    for (const [k, v] of Object.entries(obj)) storage.set(k, v);
+                },
+                remove(keys) { for (const k of [].concat(keys)) storage.delete(k); }
             }
         },
-        runtime: { onMessage: { addListener(fn) { listeners.push(fn); } } }
+        runtime: {
+            onMessage: { addListener(fn) { listeners.push(fn); } },
+            onStartup: { addListener(fn) { startup.push(fn); } },
+            id: 'after-dark@test'
+        }
     };
     const fetch = async (url, opts) => {
         fetchCalls.push({ url: String(url), opts });
@@ -47,7 +55,7 @@ function loadBackground({ fetchImpl } = {}) {
         'pickMainGradeIteration',
         'fetchLatestIterations'
     ], { chrome, fetch });
-    return { api, listeners, fetchCalls, storage };
+    return { api, listeners, fetchCalls, storage, startup };
 }
 
 const { api } = loadBackground();
@@ -426,6 +434,10 @@ test('library trend URL must be https; loose ints ignore separators', () => {
     assert.equal(api.sanitizeLibraryTrendApiUrl('not a url'), '');
     assert.equal(api.parseIntLoose('1.234 people'), 1234);
     assert.equal(api.parseIntLoose('none'), null);
+    // Hour 0 (midnight) and an empty library are real values, not missing ones.
+    assert.equal(api.parseIntLoose(0), 0);
+    assert.equal(api.parseIntLoose('0'), 0);
+    assert.equal(api.parseIntLoose(null), null);
 });
 
 test('message router ignores senders outside the DTU allowlist', async () => {
@@ -553,11 +565,18 @@ test('exam schedule: course page requests reject anything but a course number', 
     assert.equal(bg.fetchCalls.length, 0);
 });
 
+// The opening of a kurser course page and of its Information tab, as served.
+const coursePage = (code) => '<html><h2 style="font-family:verdana; font-size:18px;">\r\n' + code + ' Some course</h2>Date of examination</html>';
+const courseInfoPage = (code) => '<ul class="nav nav-tabs"><li role="presentation"><a href="/course/' + code + '">' + code + '</a></li><li class="active"><a href="#">Information</a></li></ul>';
+
+// The shape of DTU's exam table page: a table whose header names the grading deadline.
+const EXAM_TABLE_PAGE = '<html><h2>Winter exams 2026</h2><table><tr><th>Date</th><th>Date of exam</th><th>Grading deadline</th></tr></table></html>';
+
 test('exam schedule: table and course page are fetched once, then cached', async () => {
-    const bg = loadBackground({ fetchImpl: async () => ({ ok: true, status: 200, text: async () => '<html>ok</html>' }) });
+    const bg = loadBackground({ fetchImpl: async (url) => ({ ok: true, status: 200, text: async () => (url.includes('exam-dates') ? EXAM_TABLE_PAGE : coursePage('02110')) }) });
     const table = plain(await sendMessage(bg.listeners, { type: 'dtu-exam-table' }));
     assert.equal(table.ok, true);
-    assert.equal(table.html, '<html>ok</html>');
+    assert.equal(table.html, EXAM_TABLE_PAGE);
     assert.equal(typeof table.fetchedAt, 'number');
     await sendMessage(bg.listeners, { type: 'dtu-exam-table' });
     const page = plain(await sendMessage(bg.listeners, { type: 'dtu-course-page', code: '02110' }));
@@ -568,7 +587,7 @@ test('exam schedule: table and course page are fetched once, then cached', async
 });
 
 test('exam schedule: a course page can be asked for a catalogue year', async () => {
-    const bg = loadBackground({ fetchImpl: async () => ({ ok: true, status: 200, text: async () => '<html>ok</html>' }) });
+    const bg = loadBackground({ fetchImpl: async () => ({ ok: true, status: 200, text: async () => coursePage('02110') }) });
     assert.equal(plain(await sendMessage(bg.listeners, { type: 'dtu-course-page', code: '02110', volume: '2027-2028' })).ok, true);
     await sendMessage(bg.listeners, { type: 'dtu-course-page', code: '02110' });
     assert.deepEqual(bg.fetchCalls.map((c) => c.url), ['https://kurser.dtu.dk/course/2027-2028/02110', 'https://kurser.dtu.dk/course/02110']);
@@ -586,13 +605,13 @@ test('exam schedule: a kurser login stub renews the login, asks again, and is ne
     const bg = loadBackground({
         fetchImpl: async (url) => {
             if (url.includes('forceLogin')) return { ok: true, status: 200, text: async () => '<html>signed in</html>' };
-            const html = first ? KURSER_LOGIN_STUB : '<html>Date of examination</html>';
+            const html = first ? KURSER_LOGIN_STUB : coursePage('12106');
             first = false;
             return { ok: true, status: 200, text: async () => html };
         }
     });
     const page = plain(await sendMessage(bg.listeners, { type: 'dtu-course-page', code: '12106', volume: '2026-2027' }));
-    assert.equal(page.html, '<html>Date of examination</html>');
+    assert.equal(page.html, coursePage('12106'));
     assert.deepEqual(bg.fetchCalls.map((c) => c.url), [
         'https://kurser.dtu.dk/course/2026-2027/12106',
         'https://kurser.dtu.dk/course/2026-2027/12106?forceLogin=true',
@@ -608,10 +627,120 @@ test('exam schedule: a login stub that stays is reported, not cached, and a cach
     await sendMessage(bg.listeners, { type: 'dtu-course-page', code: '12106' });
     assert.equal(bg.fetchCalls.length, 6);
     // A stub cached by an earlier version is fetched again, not returned.
-    const planted = loadBackground({ fetchImpl: async () => ({ ok: true, status: 200, text: async () => '<html>Date of examination</html>' }) });
+    const planted = loadBackground({ fetchImpl: async () => ({ ok: true, status: 200, text: async () => coursePage('12106') }) });
     for (const key of ['cache_course_page_12106']) planted.storage.set(key, { ts: Date.now(), data: { ok: true, html: KURSER_LOGIN_STUB, fetchedAt: Date.now() } });
-    assert.equal(plain(await sendMessage(planted.listeners, { type: 'dtu-course-page', code: '12106' })).html, '<html>Date of examination</html>');
+    assert.equal(plain(await sendMessage(planted.listeners, { type: 'dtu-course-page', code: '12106' })).html, coursePage('12106'));
     assert.equal(planted.fetchCalls.length, 1);
+});
+
+test('exam schedule: a 200 page that is not the exam table is reported and not cached', async () => {
+    const bg = loadBackground({ fetchImpl: async () => ({ ok: true, status: 200, text: async () => '<html><h1>Down for maintenance</h1></html>' }) });
+    assert.deepEqual(plain(await sendMessage(bg.listeners, { type: 'dtu-exam-table' })), { ok: false, error: 'unexpected_page' });
+    await sendMessage(bg.listeners, { type: 'dtu-exam-table' });
+    assert.equal(bg.fetchCalls.length, 2, 'asked again, not served from cache');
+    assert.equal([...bg.storage.keys()].some((k) => k.startsWith('cache_exam_table_')), false);
+    // A wrong page cached by an earlier version is fetched again, not returned.
+    const planted = loadBackground({ fetchImpl: async () => ({ ok: true, status: 200, text: async () => EXAM_TABLE_PAGE }) });
+    planted.storage.set('cache_exam_table_en', { ts: Date.now(), data: { ok: true, html: '<html>maintenance</html>', fetchedAt: Date.now() } });
+    assert.equal(plain(await sendMessage(planted.listeners, { type: 'dtu-exam-table' })).html, EXAM_TABLE_PAGE);
+    assert.equal(planted.fetchCalls.length, 1);
+});
+
+test('exam schedule: a 200 page that is not the course asked for is reported and not cached', async () => {
+    for (const html of ['<html><h1>Down for maintenance</h1></html>', coursePage('02110')]) {
+        const bg = loadBackground({ fetchImpl: async () => ({ ok: true, status: 200, text: async () => html }) });
+        assert.deepEqual(plain(await sendMessage(bg.listeners, { type: 'dtu-course-page', code: '12106' })), { ok: false, error: 'unexpected_page' });
+        await sendMessage(bg.listeners, { type: 'dtu-course-page', code: '12106' });
+        assert.equal(bg.fetchCalls.length, 2, 'asked again, not served from cache');
+        assert.equal([...bg.storage.keys()].some((k) => k.startsWith('cache_course_page_')), false);
+    }
+    // A wrong page cached by an earlier version is fetched again, not returned.
+    const planted = loadBackground({ fetchImpl: async () => ({ ok: true, status: 200, text: async () => coursePage('12106') }) });
+    planted.storage.set('cache_course_page_12106', { ts: Date.now(), data: { ok: true, html: '<html>maintenance</html>', fetchedAt: Date.now() } });
+    assert.equal(plain(await sendMessage(planted.listeners, { type: 'dtu-course-page', code: '12106' })).html, coursePage('12106'));
+    assert.equal(planted.fetchCalls.length, 1);
+});
+
+test('exam schedule: a course page, a catalogue year page and an Information tab count as the course', () => {
+    const { api: exam } = loadModuleInternals(BACKGROUND_FILES, ['isKurserCoursePage'], { chrome: { storage: { local: { get() {}, set() {}, remove() {} } }, runtime: {} } });
+    assert.equal(exam.isKurserCoursePage(coursePage('41B02'), '41B02'), true);
+    assert.equal(exam.isKurserCoursePage(coursePage('01001'), '2026-2027/01001'), true);
+    assert.equal(exam.isKurserCoursePage(courseInfoPage('01001'), '01001/info'), true);
+    assert.equal(exam.isKurserCoursePage(coursePage('01001'), '01001/info'), false);
+    assert.equal(exam.isKurserCoursePage(coursePage('010012'), '01001'), false);
+    assert.equal(exam.isKurserCoursePage(courseInfoPage('02110'), '01001/info'), false);
+});
+
+test('exam schedule: the real exam table page counts as one', () => {
+    const { api: exam } = loadModuleInternals(BACKGROUND_FILES, ['isExamTablePage'], { chrome: { storage: { local: { get() {}, set() {}, remove() {} } }, runtime: {} } });
+    assert.equal(exam.isExamTablePage(readSource('tests/fixtures/exam-dates-2026-11-07.html')), true);
+});
+
+test('cache: expired entries are deleted at browser start, fresh ones and settings stay', async () => {
+    const bg = loadBackground();
+    const now = Date.now();
+    bg.storage.set('cache_course_page_02110', { ts: now - 25 * 3600000, data: { ok: true } });
+    bg.storage.set('cache_lib_crowd_x', { ts: now - 6 * 60000, data: {} });
+    bg.storage.set('cache_grade_02110', { ts: now - 3600000, data: {} });
+    bg.storage.set('cache_eval_broken', { data: {} });
+    bg.storage.set('dtuDarkModeEnabled', false);
+    assert.equal(bg.startup.length, 1, 'one startup listener');
+    bg.startup[0]();
+    await new Promise((r) => setTimeout(r, 0));
+    assert.deepEqual([...bg.storage.keys()].sort(), ['cache_grade_02110', 'dtuDarkModeEnabled']);
+});
+
+test('cache: a write into full storage clears the cache and writes once more', async () => {
+    let calls = 0;
+    const bg = loadBackground({
+        fetchImpl: async () => ({ ok: true, status: 200, text: async () => EXAM_TABLE_PAGE }),
+        setImpl(obj, storage) {
+            calls++;
+            if ([...storage.keys()].some((k) => k.startsWith('cache_'))) return Promise.reject(new Error('QUOTA_BYTES quota exceeded'));
+            for (const [k, v] of Object.entries(obj)) storage.set(k, v);
+            return Promise.resolve();
+        }
+    });
+    bg.storage.set('cache_course_page_02110', { ts: Date.now(), data: { ok: true, html: 'x' } });
+    bg.storage.set('dtuDarkModeEnabled', true);
+    assert.equal(plain(await sendMessage(bg.listeners, { type: 'dtu-exam-table' })).ok, true);
+    await new Promise((r) => setTimeout(r, 0));
+    assert.equal(calls, 2);
+    assert.deepEqual([...bg.storage.keys()].sort(), ['cache_exam_table_en', 'dtuDarkModeEnabled']);
+});
+
+test('messages: no sender URL, or another extension, get no answer', async () => {
+    const bg = loadBackground();
+    const ask = (sender) => new Promise((resolve) => {
+        const timer = setTimeout(() => resolve('no_response'), 200);
+        bg.listeners[0]({ type: 'dtu-course-page', code: 'bad' }, sender, (v) => { clearTimeout(timer); resolve(v); });
+    });
+    assert.equal(await ask({}), 'no_response');
+    assert.equal(await ask(undefined), 'no_response');
+    assert.equal(await ask({ id: 'other@ext', url: 'https://kurser.dtu.dk/course/02110' }), 'no_response');
+    assert.deepEqual(plain(await ask({ id: 'after-dark@test', url: 'https://kurser.dtu.dk/course/02110' })), { ok: false, error: 'invalid_course' });
+    assert.deepEqual(plain(await ask({ url: 'moz-extension://x/exchange-permission.html' })), { ok: false, error: 'invalid_course' });
+});
+
+test('course codes in lower case reach the same page and cache entry as in capitals', async () => {
+    const bg = loadBackground({ fetchImpl: async () => ({ ok: true, status: 200, text: async () => coursePage('34K01') }) });
+    assert.equal(plain(await sendMessage(bg.listeners, { type: 'dtu-course-page', code: '34k01' })).ok, true);
+    assert.equal(plain(await sendMessage(bg.listeners, { type: 'dtu-course-page', code: '34K01' })).ok, true);
+    assert.deepEqual(bg.fetchCalls.map((c) => c.url), ['https://kurser.dtu.dk/course/34K01']);
+});
+
+test('evaluation cache: URLs that differ only in punctuation are cached apart', async () => {
+    const html = '<h2>Resultater : 02476 Machine Learning Operations Jan 26</h2>'
+        + '<div class="ResultCourseModelWrapper"><div class="QuestionPositionColumn">1.1</div>'
+        + '<div class="FinalEvaluation_QuestionText">q</div>'
+        + '<div class="RowWrapper"><div class="FinalEvaluation_Result_OptionColumn">Enig</div><div class="Answer_Result_Background"><span>5</span></div></div>'
+        + '</div>' + ' '.repeat(200);
+    const bg = loadBackground({ fetchImpl: async (url) => ({ ok: true, status: 200, url, text: async () => html }) });
+    const ask = (url) => sendMessage(bg.listeners, { type: 'dtu-course-evaluation', url });
+    assert.equal(plain(await ask('https://evaluering.dtu.dk/kursus/02476/a-b')).ok, true);
+    assert.equal(plain(await ask('https://evaluering.dtu.dk/kursus/02476/a_b')).cached, undefined, 'not served from the a-b entry');
+    assert.equal(plain(await ask('https://evaluering.dtu.dk/kursus/02476/a-b')).cached, true, 'its own entry is used');
+    assert.equal(bg.fetchCalls.length, 2);
 });
 
 test('exam schedule: failed fetches are reported and not cached', async () => {
@@ -645,4 +774,30 @@ test('the workload lookup picks the newest evaluation of the same course from th
     assert.equal(api.latestEvaluationUrl('<p>No evaluations</p>', '34034'), null);
     assert.deepEqual({ ...await api.fetchCourseWorkload('34034', async () => ({ ok: true, html: '<p>none</p>' })) }, { ok: true, none: true });
     assert.deepEqual({ ...await api.fetchCourseWorkload('34034', async () => ({ ok: false, error: 'login_required' })) }, { ok: false, error: 'info_failed' });
+});
+
+// A DTU server that never answers must end in an error reply, not leave a widget
+// on its loading bars forever: every background request goes through the time limit.
+test('background: every request goes through fetchWithTimeLimit', () => {
+    const bare = [];
+    for (const f of BACKGROUND_FILES) {
+        if (f === 'background.shared.js') continue;
+        readSource(f).split('\n').forEach((line, i) => {
+            if (/(^|[^\w.])fetch\(/.test(line) && !/^\s*\/\//.test(line)) bare.push(f + ':' + (i + 1));
+        });
+    }
+    assert.deepEqual(bare, []);
+});
+
+test('fetchWithTimeLimit: a request that never answers fails with TimeoutError', async () => {
+    let seenSignal = null;
+    const fetch = (url, init) => new Promise((resolve, reject) => {
+        seenSignal = init.signal;
+        init.signal.addEventListener('abort', () => reject(init.signal.reason));
+    });
+    const { api } = loadModuleInternals('background.shared.js', ['fetchWithTimeLimit'], { fetch });
+    const started = Date.now();
+    await assert.rejects(api.fetchWithTimeLimit('https://example.invalid/', { method: 'POST' }, 30), { name: 'TimeoutError' });
+    assert.ok(seenSignal, 'a signal is passed to fetch');
+    assert.ok(Date.now() - started < 2000);
 });

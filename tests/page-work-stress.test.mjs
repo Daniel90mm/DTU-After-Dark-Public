@@ -375,7 +375,7 @@ test('test_bug_shadow_host_processed_twice_each_dark_pass', () => {
         disconnect() {}
     }
 
-    const { api } = loadModuleInternals('darkmode.dark-engine.js', ['runDarkModeChecks'], {
+    const { api } = loadModuleInternals(['darkmode.dark-engine.page-cases.js', 'darkmode.dark-engine.styles.js', 'darkmode.dark-engine.js'], ['runDarkModeChecks'], {
         document: doc,
         window: { location: makeLocation('https://learn.inside.dtu.dk/d2l/home') },
         NodeFilter: NODE_FILTER,
@@ -527,7 +527,7 @@ test('test_bug_light_cell_detection_interleaves_layout_reads_and_writes', () => 
         cell.ownerDocument = doc;
     });
 
-    const { api } = loadModuleInternals('darkmode.dark-engine.js', ['markAuthoredLightTableCells'], {
+    const { api } = loadModuleInternals(['darkmode.dark-engine.page-cases.js', 'darkmode.dark-engine.styles.js', 'darkmode.dark-engine.js'], ['markAuthoredLightTableCells'], {
         document: doc,
         window: { location: makeLocation('https://learn.inside.dtu.dk/d2l/home') },
         NodeFilter: NODE_FILTER,

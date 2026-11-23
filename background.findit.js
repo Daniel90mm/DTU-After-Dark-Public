@@ -2,6 +2,7 @@
 (function() {
     'use strict';
 
+    const fetchWithTimeLimit = DTUAfterDarkShared.fetchWithTimeLimit;
     function isAllowedFinditUrl(rawUrl) {
         if (!rawUrl || typeof rawUrl !== 'string') return false;
         try {
@@ -20,7 +21,7 @@
             return { ok: false, error: 'invalid_url', onlineAccess: false };
         }
         try {
-            const res = await fetch(rawUrl, { cache: 'no-store', credentials: 'omit' });
+            const res = await fetchWithTimeLimit(rawUrl, { cache: 'no-store', credentials: 'omit' });
             if (!res || !res.ok) {
                 return { ok: false, error: 'fetch_failed', onlineAccess: false };
             }

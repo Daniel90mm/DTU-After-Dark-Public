@@ -2,6 +2,7 @@
 (function() {
     'use strict';
 
+    const fetchWithTimeLimit = DTUAfterDarkShared.fetchWithTimeLimit;
     const normalizeSpace = DTUAfterDarkShared.normalizeSpace;
     const stripHtmlTags = DTUAfterDarkShared.stripHtmlTags;
 
@@ -77,8 +78,7 @@
         }
 
         // --- Extract question blocks ---
-        const wrapperRegex = /<div\s+class="ResultCourseModelWrapper[^"]*"[^>]*>([\s\S]*?)<\/div>\s*<\/div>\s*<\/div>/gi;
-        // More robust: split by ResultCourseModelWrapper
+        // Split by ResultCourseModelWrapper
         const wrapperParts = html.split(/(?=<div\s+class="ResultCourseModelWrapper)/i);
 
         for (let i = 0; i < wrapperParts.length; i++) {
@@ -168,7 +168,7 @@
         }
 
         try {
-            const res = await fetch(evalUrl, { cache: 'no-store', credentials: 'omit' });
+            const res = await fetchWithTimeLimit(evalUrl, { cache: 'no-store', credentials: 'omit' });
             if (!res || !res.ok) {
                 return { ok: false, error: 'http', status: res ? res.status : 0 };
             }

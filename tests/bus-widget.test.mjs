@@ -3,15 +3,19 @@ import test from 'node:test';
 import { extractFunctions, makeLocalStorage, plain, readSource } from './_harness.mjs';
 
 const SRC = readSource('darkmode.bus.js');
-const NOW = new Date('2026-09-30T17:00:00').getTime();
+const API_SRC = readSource('darkmode.bus.api.js');
+const PRESETS_SRC = readSource('darkmode.bus.presets.js');
+const SETUP_SRC = readSource('darkmode.bus.setup.js');
+// Danish summer time, written with its offset so the suite passes in any time zone.
+const NOW = new Date('2026-09-30T17:00:00+02:00').getTime();
 
 const ui = extractFunctions('darkmode.bus.js', ['busMinutesNow', 'formatBusClock', 'buildBusWidgetModel']).api;
 const rt = extractFunctions('darkmode.bus.js', [
-    'copenhagenTimestamp', 'minutesUntilDeparture', 'isDelayed', 'getDelayMinutes', 'formatDepartureTime', 'formatDelayTag',
+    'copenhagenTimestamp', 'minutesUntilDeparture', 'getDelayMinutes', 'formatDepartureTime',
     'departureTimestamp', 'mapBusDepartureForDisplay'
 ], { globals: { Date: class extends Date { constructor(...a) { if (a.length) super(...a); else super(NOW); } static now() { return NOW; } } } }).api;
 
-const at = (hhmm) => new Date('2026-09-30T' + hhmm + ':00').getTime();
+const at = (hhmm) => new Date('2026-09-30T' + hhmm + ':00+02:00').getTime();
 
 test('departures keep their real time and delay, so the widget can count down', () => {
     const d = plain(rt.mapBusDepartureForDisplay({ line: '150S', direction: 'Nørreport St.', time: '17:05:00', date: '2026-09-30', rtTime: '17:08:00', rtDate: '2026-09-30' }));
@@ -62,7 +66,7 @@ test('cached departures from before this change (no timestamp) still render', ()
 });
 
 test('every line badge colour carries white text at 4.5:1 or better', () => {
-    const block = /const LINE_COLORS = \{([\s\S]*?)\};/.exec(SRC)[1];
+    const block = /const LINE_COLORS = \{([\s\S]*?)\};/.exec(PRESETS_SRC)[1];
     const lum = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255)
         .map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
         .reduce((acc, v, i) => acc + v * [0.2126, 0.7152, 0.0722][i], 0);
@@ -73,14 +77,15 @@ test('every line badge colour carries white text at 4.5:1 or better', () => {
 
 test('reaching the monthly limit pauses fetching but leaves your Bus setting on', () => {
     const local = makeLocalStorage({ dtuDarkModeBusEnabled: 'true' });
-    const { api } = extractFunctions('darkmode.bus.js', ['setApiQuotaExhausted'], {
-        prelude: "var _apiQuotaExhausted = false; var API_QUOTA_KEY = 'dtuDarkModeBusQuotaExhausted'; var BUS_ENABLED_KEY = 'dtuDarkModeBusEnabled';",
+    const { api } = extractFunctions('darkmode.bus.api.js', ['danishMonthKey', 'setApiQuotaExhausted'], {
+        prelude: "var DOM = globalThis.DTUAfterDarkDom; var _apiQuotaMonth = null; var API_QUOTA_KEY = 'dtuDarkModeBusQuotaExhausted'; var BUS_ENABLED_KEY = 'dtuDarkModeBusEnabled';",
         globals: { localStorage: local }
     });
     api.setApiQuotaExhausted();
     assert.equal(local.getItem('dtuDarkModeBusEnabled'), 'true');
     assert.ok(local.getItem('dtuDarkModeBusQuotaExhausted'));
     assert.doesNotMatch(SRC, /Bus departures have been turned off/);
+    assert.doesNotMatch(API_SRC, /Bus departures have been turned off/);
 });
 
 test('only HTTP 429 counts as a spent quota; 403 gets normal backoff', () => {
@@ -89,9 +94,9 @@ test('only HTTP 429 counts as a spent quota; 403 gets normal backoff', () => {
 });
 
 test('the setup prompt uses the extension theme and is marked as extension UI', () => {
-    const fn = /function showBusSetupPrompt\(\) \{[\s\S]*?\n    \}\n/.exec(SRC)[0];
+    const fn = /function showBusSetupPrompt\(\) \{[\s\S]*?\n    \}\n/.exec(SETUP_SRC)[0];
     assert.doesNotMatch(fn, /linear-gradient|#1a1a2e|\\uD83D/);
-    assert.doesNotMatch(SRC, /\.dtu-bus-setup-prompt\{[^}]*border-left/, 'no accent stripe on the prompt (Daniel, 2026-09-30)');
+    assert.doesNotMatch(SETUP_SRC, /\.dtu-bus-setup-prompt\{[^}]*border-left/, 'no accent stripe on the prompt (Daniel, 2026-09-30)');
     assert.match(fn, /markExt\(prompt\)/);
     assert.match(fn, /'Escape'/);
     assert.match(SRC, /'\.d2l-navigation-s-main-wrapper \.dtu-bus-departures \.dtu-bus-badge/, 'badge rule must outrank darkmode.css nav wrapper *');
@@ -135,13 +140,14 @@ function loadWidgetFetch({ fireTimeout }) {
         if (opts.signal.aborted) return fail();
         opts.signal.addEventListener('abort', fail);
     });
-    const { api } = extractFunctions('darkmode.bus.js', ['fetchBusWidgetDepartures'], {
+    const { api } = extractFunctions('darkmode.bus.js', ['startBusFetchGuard', 'fetchBusWidgetDepartures'], {
+        prelude: "var busApi = { isApiQuotaExhausted: () => false, consumeBusApiRequestBudget: () => true, setApiQuotaExhausted() {}, showQuotaExhaustedMessage() {} }; var BUS_FETCH_TIMEOUT_MS = 8000; var DEPS_PER_LINE = 3;",
         globals: {
-            isApiQuotaExhausted: () => false, LIVE_TRANSIT_API_BASE: 'https://proxy.invalid', consumeBusApiRequestBudget: () => true,
+            LIVE_TRANSIT_API_BASE: 'https://proxy.invalid',
             registerBusFetchController: (c) => { controller = c; }, unregisterBusFetchController() {},
-            BUS_FETCH_TIMEOUT_MS: 8000, DEPS_PER_LINE: 3, AbortController, fetch,
+            AbortController, fetch,
             setTimeout: (fn) => { if (fireTimeout) queueMicrotask(fn); return 1; }, clearTimeout() {},
-            setApiQuotaExhausted() {}, showQuotaExhaustedMessage() {}, mapBusDepartureForDisplay: (d) => d
+            mapBusDepartureForDisplay: (d) => d
         }
     });
     return { api, abort: () => controller.abort() };
@@ -192,8 +198,8 @@ test('bus badges are split tags: number on a chip, type letter in Movia\'s colou
 });
 
 test('the Letbane (line L) is a Lyngby line with a plain L badge and both termini', () => {
-    assert.match(SRC, /lyngby: \{[\s\S]*?lines: \['150S', 'L',/);
-    assert.match(SRC, /'L': \['Lundtofte St\. \(Letbane\)', 'Ishøj St\. \(Letbane\)'\]/);
+    assert.match(PRESETS_SRC, /lyngby: \{[\s\S]*?lines: \['150S', 'L',/);
+    assert.match(PRESETS_SRC, /'L': \['Lundtofte St\. \(Letbane\)', 'Ishøj St\. \(Letbane\)'\]/);
     const l = badges.createBusLineBadge('L');
     assert.deepEqual(l.children.map((c) => [c.className, c.textContent]), [['dtu-bus-badge-num', 'L']]);
 });
@@ -210,9 +216,85 @@ test('widget badges share one width so a shorter number leaves no gap after its 
 });
 
 test('line colours follow Movia bus types: every S line blue, every E line green', () => {
-    const block = /const LINE_COLORS = \{([\s\S]*?)\};/.exec(SRC)[1];
+    const block = /const LINE_COLORS = \{([\s\S]*?)\};/.exec(PRESETS_SRC)[1];
     for (const [, line, hex] of block.matchAll(/'([^']+)': '(#[0-9a-f]{6})'/gi)) {
         if (line.endsWith('S')) assert.equal(hex, '#1d62b3', line);
         if (line.endsWith('E')) assert.equal(hex, '#1e7a3c', line);
     }
+});
+
+
+test('a bus leaving now (0 min) sorts first; a missing time sorts last', () => {
+    const { api } = extractFunctions('darkmode.bus.js', ['busMinutesForSort']);
+    const deps = [{ line: 'a', minutes: 5 }, { line: 'b', minutes: 0 }, { line: 'c' }, { line: 'd', minutes: 2 }];
+    deps.sort((x, y) => api.busMinutesForSort(x) - api.busMinutesForSort(y));
+    assert.deepEqual(deps.map((d) => d.line), ['b', 'd', 'a', 'c']);
+    assert.doesNotMatch(SRC, /minutes \|\| 999/);
+});
+
+test('600S drops the Risø direction, also when written "Risø St."', () => {
+    const re = new RegExp(SRC.match(/lineNorm === '600S' && \/(.+?)\/\.test\(dirNorm\)/)[1]);
+    for (const dir of ['risø', 'risø st.', 'dtu risø campus', 'riso']) assert.equal(re.test(dir), true, dir);
+    assert.equal(re.test('risøvej'), false);
+});
+
+test('a spent daily or monthly limit keeps the shown buses instead of caching "no buses"', () => {
+    assert.match(SRC, /widgetResult\.reason === 'daily' \|\| widgetResult\.reason === 'quota'\)\) _busLastFetchFailed = true;/);
+});
+
+function loadBusQuotaApi(store, clock) {
+    const RealDate = Date;
+    // The bus limits read the time through Date and Date.now; both follow clock.now.
+    class ClockDate extends RealDate {
+        constructor(...a) { if (a.length) super(...a); else super(clock.now); }
+        static now() { return clock.now; }
+    }
+    return extractFunctions('darkmode.bus.api.js', ['danishDateIso', 'danishMonthKey', 'getDailyApiCount', 'isApiQuotaExhausted', 'setApiQuotaExhausted'], {
+        prelude: "var DOM = globalThis.DTUAfterDarkDom; var _apiQuotaMonth = null; var API_QUOTA_KEY = 'q'; var API_CALLS_KEY = 'calls';",
+        globals: { localStorage: store, Date: ClockDate }
+    }).api;
+}
+
+test('the monthly quota flag clears when the month changes, also in a long-open tab', () => {
+    const clock = { now: Date.parse('2026-09-30T12:00:00Z') };
+    const api = loadBusQuotaApi(makeLocalStorage(), clock);
+    api.setApiQuotaExhausted();
+    assert.equal(api.isApiQuotaExhausted(), true);
+    clock.now = Date.parse('2026-10-01T09:00:00Z');
+    assert.equal(api.isApiQuotaExhausted(), false);
+});
+
+test('a quota reset by another tab in a new month also ends it in this tab', () => {
+    const store = makeLocalStorage();
+    const clock = { now: Date.parse('2026-09-30T12:00:00Z') };
+    const api = loadBusQuotaApi(store, clock);
+    api.setApiQuotaExhausted();
+    clock.now = Date.parse('2026-10-01T09:00:00Z');
+    store.removeItem('q');
+    assert.equal(api.isApiQuotaExhausted(), false);
+});
+
+test('bus limits count Danish days and months, whatever the browser time zone', () => {
+    const store = makeLocalStorage({ calls: JSON.stringify({ date: '2026-11-23', count: 5 }) });
+    // 23:30 UTC on 22 Nov is 00:30 on 23 Nov in Denmark.
+    const clock = { now: Date.parse('2026-11-22T23:30:00Z') };
+    const api = loadBusQuotaApi(store, clock);
+    assert.equal(api.getDailyApiCount().count, 5);
+    // Spent at 23:30 UTC on 31 Oct = 00:30 on 1 Nov in Denmark: November's quota.
+    clock.now = Date.parse('2026-10-31T23:30:00Z');
+    api.setApiQuotaExhausted();
+    clock.now = Date.parse('2026-11-15T12:00:00Z');
+    assert.equal(api.isApiQuotaExhausted(), true);
+});
+
+test('changing campus clears the departures fetched for the old one', () => {
+    assert.match(SETUP_SRC, /saveBusConfig\(config\);\s*\/\/[^\n]*\n\s*writeUiState\(\{ lastBusFetch: 0, cachedDepartures: \[\] \}\);\s*return config;/);
+});
+
+test('the daily limit countdown ends at Danish midnight, whatever the browser time zone', () => {
+    const { api } = extractFunctions('darkmode.bus.api.js', ['msUntilDanishMidnight'], { prelude: 'var DOM = globalThis.DTUAfterDarkDom;' });
+    // 17:17 in Denmark on 22 Nov: 6 h 43 min left, also in a browser at UTC+14 where it is already 23 Nov.
+    assert.equal(api.msUntilDanishMidnight(Date.parse('2026-11-22T16:17:00Z')), (6 * 60 + 43) * 60000);
+    // 25 Oct has 25 hours in Denmark: from 01:00 CEST (23:00 UTC the day before) to midnight CET is 24 h.
+    assert.equal(api.msUntilDanishMidnight(Date.parse('2026-10-24T23:00:00Z')), 24 * 3600000);
 });

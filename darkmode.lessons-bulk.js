@@ -1,15 +1,18 @@
 (function () {
     'use strict';
 
+    var schedulePlacement = globalThis.DTUAfterDarkDom.schedulePlacement;
+    if (typeof schedulePlacement !== 'function') {
+        throw new Error('darkmode.lessons-bulk.js requires DTUAfterDarkDom.schedulePlacement');
+    }
+
     var _lessonsBulkCore = globalThis.DTUAfterDarkLessonsBulkCore;
-    var getDeps = _lessonsBulkCore.getDeps;
     var isTopWindow = _lessonsBulkCore.isTopWindow;
     var isFeatureFlagEnabled = _lessonsBulkCore.isFeatureFlagEnabled;
     var isDarkModeEnabled = _lessonsBulkCore.isDarkModeEnabled;
     var deepQueryAll = _lessonsBulkCore.deepQueryAll;
-    var normalizeWhitespace = _lessonsBulkCore.normalizeWhitespace;
+    var getDocHref = _lessonsBulkCore.getDocHref;
     var markExt = _lessonsBulkCore.markExt;
-    var isLessonsBulkDebugEnabled = _lessonsBulkCore.isLessonsBulkDebugEnabled;
     var logLessonsBulkDebug = _lessonsBulkCore.logLessonsBulkDebug;
 
     var _lessonsBulkState = globalThis.DTUAfterDarkLessonsBulkState;
@@ -17,92 +20,53 @@
     var _lessonsBulkUrlNameHints = _lessonsBulkState.urlNameHints;
     var _lessonsLegacyApiSectionsCache = _lessonsBulkState.legacyApiSectionsCache;
     var _lessonsLegacyModuleStructureCache = _lessonsBulkState.legacyModuleStructureCache;
-    var _lessonsLegacyBackgroundResolveState = _lessonsBulkState.legacyBackgroundResolveState;
 
     var downloadSingleBundledZipFromUrls = globalThis.DTUAfterDarkLessonsBulkZip.downloadSingleBundledZipFromUrls;
+    var getFilenameFromUrl = globalThis.DTUAfterDarkLessonsBulkZip.getFilenameFromUrl;
 
     var _lessonsBulkTree = globalThis.DTUAfterDarkLessonsBulkTree;
-    var getLessonsTreeLabel = _lessonsBulkTree.getLessonsTreeLabel;
-    var getLessonsSameOriginIframeDocuments = _lessonsBulkTree.getLessonsSameOriginIframeDocuments;
     var getLessonsCandidateDocuments = _lessonsBulkTree.getLessonsCandidateDocuments;
-    var scoreLessonsDocument = _lessonsBulkTree.scoreLessonsDocument;
     var getLessonsWorkingDocument = _lessonsBulkTree.getLessonsWorkingDocument;
     var getLessonsRuntimeDocument = _lessonsBulkTree.getLessonsRuntimeDocument;
     var getLessonsTocHost = _lessonsBulkTree.getLessonsTocHost;
     var hasModernLessonsTocStructure = _lessonsBulkTree.hasModernLessonsTocStructure;
     var getCurrentLessonsOrgUnitId = _lessonsBulkTree.getCurrentLessonsOrgUnitId;
-    var getLegacyLessonsTreeLabel = _lessonsBulkTree.getLegacyLessonsTreeLabel;
     var isLegacyLessonsTreeDocument = _lessonsBulkTree.isLegacyLessonsTreeDocument;
-    var expandLegacyLessonsTreeAll = _lessonsBulkTree.expandLegacyLessonsTreeAll;
-    var getLegacyTopSectionSeeds = _lessonsBulkTree.getLegacyTopSectionSeeds;
     var parseLegacySectionObjectId = _lessonsBulkTree.parseLegacySectionObjectId;
     var legacySectionHasOnlyUnitUrls = _lessonsBulkTree.legacySectionHasOnlyUnitUrls;
-    var getLegacyItemObjectId = _lessonsBulkTree.getLegacyItemObjectId;
-    var isLegacyUnitItem = _lessonsBulkTree.isLegacyUnitItem;
-    var getLegacyItemTreeBox = _lessonsBulkTree.getLegacyItemTreeBox;
-    var getLegacyDirectChildItems = _lessonsBulkTree.getLegacyDirectChildItems;
-    var clickLegacyExpandBox = _lessonsBulkTree.clickLegacyExpandBox;
-    var resolveLegacySectionUnitUrlsViaDomExpansion = _lessonsBulkTree.resolveLegacySectionUnitUrlsViaDomExpansion;
     var applyResolvedUrlsToLegacySections = _lessonsBulkTree.applyResolvedUrlsToLegacySections;
     var resolveLegacySectionUnitUrlsViaHiddenFrame = _lessonsBulkTree.resolveLegacySectionUnitUrlsViaHiddenFrame;
-    var getNumericIdString = _lessonsBulkTree.getNumericIdString;
-    var isValidLessonsContentId = _lessonsBulkTree.isValidLessonsContentId;
-    var getValidLessonsContentId = _lessonsBulkTree.getValidLessonsContentId;
-    var parseLessonsTopicIdFromUrl = _lessonsBulkTree.parseLessonsTopicIdFromUrl;
-    var parseLessonsUnitIdFromUrl = _lessonsBulkTree.parseLessonsUnitIdFromUrl;
     var sanitizeLessonsSectionUnitUrls = _lessonsBulkTree.sanitizeLessonsSectionUnitUrls;
-    var buildLegacyModuleTreeViaApi = _lessonsBulkTree.buildLegacyModuleTreeViaApi;
-    var flattenLegacyModuleTreeToSections = _lessonsBulkTree.flattenLegacyModuleTreeToSections;
-    var buildLegacyApiSectionsDeep = _lessonsBulkTree.buildLegacyApiSectionsDeep;
-    var getLegacySectionsQuality = _lessonsBulkTree.getLegacySectionsQuality;
     var normalizeLessonsBulkSections = _lessonsBulkTree.normalizeLessonsBulkSections;
-    var shouldAttemptLegacyHiddenSectionBuild = _lessonsBulkTree.shouldAttemptLegacyHiddenSectionBuild;
     var isLegacyQualityBetter = _lessonsBulkTree.isLegacyQualityBetter;
     var buildLegacySectionsViaHiddenFrame = _lessonsBulkTree.buildLegacySectionsViaHiddenFrame;
     var maybeStartLegacyApiSectionsHydration = _lessonsBulkTree.maybeStartLegacyApiSectionsHydration;
-    var buildLessonsTreeSectionsLegacy = _lessonsBulkTree.buildLessonsTreeSectionsLegacy;
     var buildLessonsTreeSections = _lessonsBulkTree.buildLessonsTreeSections;
 
     var _lessonsBulkFetch = globalThis.DTUAfterDarkLessonsBulkFetch;
     var toAbsoluteSamePageUrl = _lessonsBulkFetch.toAbsoluteSamePageUrl;
-    var decodeEscapedUrlText = _lessonsBulkFetch.decodeEscapedUrlText;
-    var isLikelyDownloadUrl = _lessonsBulkFetch.isLikelyDownloadUrl;
     var isStrictFileDownloadUrl = _lessonsBulkFetch.isStrictFileDownloadUrl;
-    var getApiObjectId = _lessonsBulkFetch.getApiObjectId;
-    var getApiTopicId = _lessonsBulkFetch.getApiTopicId;
     var getApiObjectTitle = _lessonsBulkFetch.getApiObjectTitle;
-    var getApiObjectArraysByKeyRegex = _lessonsBulkFetch.getApiObjectArraysByKeyRegex;
     var getDirectModuleChildrenFromStructure = _lessonsBulkFetch.getDirectModuleChildrenFromStructure;
     var getDirectTopicIdsFromStructure = _lessonsBulkFetch.getDirectTopicIdsFromStructure;
     var fetchLegacyModuleStructureApi = _lessonsBulkFetch.fetchLegacyModuleStructureApi;
     var collectTopicIdsFromJsonValue = _lessonsBulkFetch.collectTopicIdsFromJsonValue;
     var collectModuleIdsFromJsonValue = _lessonsBulkFetch.collectModuleIdsFromJsonValue;
-    var fetchUnitTopicUrlsViaApi = _lessonsBulkFetch.fetchUnitTopicUrlsViaApi;
-    var fetchUnitTopicUrlsFromUnitPage = _lessonsBulkFetch.fetchUnitTopicUrlsFromUnitPage;
-    var collectDownloadUrlsFromJsonValue = _lessonsBulkFetch.collectDownloadUrlsFromJsonValue;
-    var isHtmlLikeResponse = _lessonsBulkFetch.isHtmlLikeResponse;
-    var fetchTopicApiDownloadUrls = _lessonsBulkFetch.fetchTopicApiDownloadUrls;
-    var buildLessonsTocIndex = _lessonsBulkFetch.buildLessonsTocIndex;
-    var classifyTopicFromTocIndex = _lessonsBulkFetch.classifyTopicFromTocIndex;
     var loadLessonsTocIndex = _lessonsBulkFetch.loadLessonsTocIndex;
-    var fetchTopicViewContentDownloadUrls = _lessonsBulkFetch.fetchTopicViewContentDownloadUrls;
-    var probeTopicDownloadViaIframe = _lessonsBulkFetch.probeTopicDownloadViaIframe;
     var fetchLessonsUnitDownloadResult = _lessonsBulkFetch.fetchLessonsUnitDownloadResult;
-    var extractDownloadUrlsFromLessonsHtml = _lessonsBulkFetch.extractDownloadUrlsFromLessonsHtml;
-    var fetchLessonsUnitDownloadUrls = _lessonsBulkFetch.fetchLessonsUnitDownloadUrls;
     var parseLessonsTopicIds = _lessonsBulkFetch.parseLessonsTopicIds;
     var getTopicLabelHintFromTopicUrl = _lessonsBulkFetch.getTopicLabelHintFromTopicUrl;
-    var parseLessonsUnitIds = _lessonsBulkFetch.parseLessonsUnitIds;
-    var isTopicKeyHint = _lessonsBulkFetch.isTopicKeyHint;
-    var isModuleKeyHint = _lessonsBulkFetch.isModuleKeyHint;
-    var isLessonsBulkHeavyFallbackEnabled = _lessonsBulkFetch.isLessonsBulkHeavyFallbackEnabled;
-    var normalizeTopicCompareUrl = _lessonsBulkFetch.normalizeTopicCompareUrl;
-    var findTopicNavItem = _lessonsBulkFetch.findTopicNavItem;
     var collectTopicFileUrlsInCurrentPage = _lessonsBulkFetch.collectTopicFileUrlsInCurrentPage;
     var lessonsBulkFetch = _lessonsBulkFetch.lessonsBulkFetch;
     var lessonsBulkDelay = _lessonsBulkFetch.lessonsBulkDelay;
+    var _lessonsBulkActivity = globalThis.DTUAfterDarkLessonsBulkActivity;
+    if (!_lessonsBulkActivity) throw new Error('darkmode.lessons-bulk.js requires darkmode.lessons-bulk.activity.js');
+    var _lessonsBulkVideo = globalThis.DTUAfterDarkLessonsBulkVideo;
+    if (!_lessonsBulkVideo) throw new Error('darkmode.lessons-bulk.js requires darkmode.lessons-bulk.video.js');
+    var parseLessonsUnitIds = _lessonsBulkFetch.parseLessonsUnitIds;
+    // Section key to its video summary ({count, bytes, unknown}) for the course on screen.
+    var _lessonsVideoSummaries = new Map();
 
-    var FEATURE_LEARN_LESSONS_BULK_DOWNLOAD_KEY = 'dtuAfterDarkFeatureLearnLessonsBulkDownload';
     const LESSONS_BULK_ROOT_ID = 'dtu-lessons-bulk-download-root';
     const LESSONS_BULK_STYLE_ID = 'dtu-lessons-bulk-download-style';
 
@@ -111,12 +75,12 @@
     // their full shadow-DOM walks -- which is every mutation batch on pages that
     // have no lessons UI at all, such as /d2l/home.
     let _lessonsBulkUiInserted = false;
-    var _lessonsBulkBootstrapTimer = null;
+    var _lessonsBulkBootstrapWatch = null;
 
     var LESSONS_BULK_SCAN_CONCURRENCY = 4;
 
     function isLessonsBulkDownloadEnabled() {
-        return isFeatureFlagEnabled(FEATURE_LEARN_LESSONS_BULK_DOWNLOAD_KEY);
+        return isFeatureFlagEnabled(globalThis.DTUAfterDarkFeatureFlags.FEATURE_LEARN_LESSONS_BULK_DOWNLOAD_KEY);
     }
 
     function isDTULearnLessonsPage() {
@@ -227,7 +191,9 @@
             + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-cancel{display:none;}'
             + '#' + LESSONS_BULK_ROOT_ID + '.dtu-lbd-running .dtu-lbd-cancel{display:inline-block;}'
             + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-status{display:block;width:100%;max-width:100%;margin-top:8px;min-height:14px;font-size:11px;line-height:1.3;color:' + mutedColor + ';white-space:normal !important;overflow-wrap:anywhere !important;word-break:break-word !important;}'
-            + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-empty{font-size:11px;color:' + mutedColor + ';padding:4px 2px 6px;}';
+            + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-activity{margin-top:8px;padding-top:8px;border-top:1px solid ' + panelBorder + ';}'
+            + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-activity-head{margin:0 0 4px;font-weight:600;}'
+            + '#' + LESSONS_BULK_ROOT_ID + ' .dtu-lbd-empty{font-size:11px;color:' + mutedColor + ';padding:4px 2px 6px;white-space:normal;}';
     }
 
     function describeLessonsBulkEmptyResult(scanResults) {
@@ -236,6 +202,16 @@
         if (!unread) return 'No downloadable files found in selected sections.';
         return 'Could not read ' + unread + ' of ' + results.length + ' lesson page'
             + (results.length === 1 ? '' : 's') + '. Try again.';
+    }
+
+    function rememberLessonsBulkUrlNameHint(url, hint) {
+        if (!url || !hint) return;
+        if (!_lessonsBulkUrlNameHints.has(url)) _lessonsBulkUrlNameHints.set(url, hint);
+        try {
+            var u = new URL(url, window.location.href);
+            var canonical = u.origin + u.pathname;
+            if (!_lessonsBulkUrlNameHints.has(canonical)) _lessonsBulkUrlNameHints.set(canonical, hint);
+        } catch (e0) { }
     }
 
     function isLessonsBulkRunAborted() {
@@ -273,7 +249,7 @@
         var runBtn = rootEl.querySelector('.dtu-lbd-run');
         if (!runBtn) return;
         var selectedCount = 0;
-        rootEl.querySelectorAll('.dtu-lbd-list input[type="checkbox"][data-section-key]').forEach(function (cb) {
+        rootEl.querySelectorAll('.dtu-lbd-list input[type="checkbox"][data-section-key], .dtu-lbd-activity input[type="checkbox"]').forEach(function (cb) {
             if (cb.checked) selectedCount++;
         });
         runBtn.textContent = selectedCount > 0
@@ -283,7 +259,7 @@
 
     function setLessonsBulkControlsDisabled(rootEl, disabled) {
         if (!rootEl) return;
-        rootEl.querySelectorAll('.dtu-lbd-mini:not(.dtu-lbd-cancel), .dtu-lbd-run, .dtu-lbd-list input[type="checkbox"]').forEach(function (el) {
+        rootEl.querySelectorAll('.dtu-lbd-mini:not(.dtu-lbd-cancel), .dtu-lbd-run, .dtu-lbd-list input[type="checkbox"], .dtu-lbd-activity input[type="checkbox"]').forEach(function (el) {
             el.disabled = !!disabled;
         });
         rootEl.classList.toggle('dtu-lbd-running', !!disabled);
@@ -345,8 +321,13 @@
                 if (cb.checked) selectedKeys.push(cb.getAttribute('data-section-key'));
             });
 
-            if (!selectedKeys.length) {
-                setLessonsBulkStatus(rootEl, 'Select at least one section first.', 'error');
+            var activityKinds = [];
+            rootEl.querySelectorAll('.dtu-lbd-activity input[type="checkbox"][data-activity-key]').forEach(function (cb) {
+                if (cb.checked) activityKinds.push(cb.getAttribute('data-activity-key'));
+            });
+
+            if (!selectedKeys.length && !activityKinds.length) {
+                setLessonsBulkStatus(rootEl, 'Select at least one section or activity first.', 'error');
                 return;
             }
 
@@ -391,7 +372,6 @@
                     if (resolvedUrls && resolvedUrls.length) {
                         var beforeCount = currentUrls.length;
                         applyResolvedUrlsToLegacySections(String(sectionToResolve.key || ''), resolvedUrls);
-                        _lessonsLegacyBackgroundResolveState.resolvedKeys.add(String(sectionToResolve.key || ''));
                         if (resolvedUrls.length !== beforeCount || looksCollapsedOnly) legacyResolvedAny = true;
                     }
                 }
@@ -415,7 +395,7 @@
                 unitCount: unitUrls.length,
                 unitUrls: unitUrls
             });
-            if (!unitUrls.length) {
+            if (!unitUrls.length && !activityKinds.length) {
                 setLessonsBulkStatus(rootEl, 'No lesson pages found in selected sections.', 'error');
                 return;
             }
@@ -462,19 +442,21 @@
             await Promise.all(scanWorkers);
             throwIfLessonsBulkAborted();
 
+            var videoItems = [];
+            var videoTopicIds = new Set();
             for (var i = 0; i < unitUrls.length; i++) {
                 var result = scanResults[i] || { links: [] };
                 (result.links || []).forEach(function (url) { downloadUrlSet.add(url); });
+                (result.videos || []).forEach(function (v) {
+                    if (videoTopicIds.has(v.topicId)) return;
+                    videoTopicIds.add(v.topicId);
+                    videoItems.push({ orgUnitId: v.orgUnitId, topicId: v.topicId, name: v.title || ('video-' + v.topicId) });
+                });
                 if (/\/topics\//i.test(unitUrls[i]) && result && result.links && result.links.length) {
                     var topicHint = getTopicLabelHintFromTopicUrl(unitUrls[i]);
                     if (topicHint) {
                         result.links.forEach(function (u0) {
-                            if (!_lessonsBulkUrlNameHints.has(u0)) _lessonsBulkUrlNameHints.set(u0, topicHint);
-                            try {
-                                var uParsed = new URL(u0, window.location.href);
-                                var canonical = uParsed.origin + uParsed.pathname;
-                                if (!_lessonsBulkUrlNameHints.has(canonical)) _lessonsBulkUrlNameHints.set(canonical, topicHint);
-                            } catch (eUH0) { }
+                            rememberLessonsBulkUrlNameHint(u0, topicHint);
                         });
                     }
                 }
@@ -507,14 +489,7 @@
                     (recovered || []).forEach(function (u) {
                         if (isStrictFileDownloadUrl(u)) {
                             bundledUrlSet.add(u);
-                            if (topicHintRf) {
-                                if (!_lessonsBulkUrlNameHints.has(u)) _lessonsBulkUrlNameHints.set(u, topicHintRf);
-                                try {
-                                    var uParsed2 = new URL(u, window.location.href);
-                                    var canonical2 = uParsed2.origin + uParsed2.pathname;
-                                    if (!_lessonsBulkUrlNameHints.has(canonical2)) _lessonsBulkUrlNameHints.set(canonical2, topicHintRf);
-                                } catch (eUH1) { }
-                            }
+                            rememberLessonsBulkUrlNameHint(u, topicHintRf);
                         }
                     });
                     await lessonsBulkDelay(220);
@@ -527,8 +502,17 @@
                 nativeTopics: nativeFallbackTopics.length,
                 bundledResolved: bundledUrls.length
             });
-            if (!bundledUrls.length) {
-                setLessonsBulkStatus(rootEl, describeLessonsBulkEmptyResult(scanResults), 'error');
+            var activity = { entries: [], notes: [], failed: [] };
+            if (activityKinds.length) {
+                setLessonsBulkStatus(rootEl, 'Saving course activity...', 'work');
+                activity = await _lessonsBulkActivity.collectCourseActivity(tocOrgUnitId, activityKinds, function (text) {
+                    setLessonsBulkStatus(rootEl, text, 'work');
+                });
+                throwIfLessonsBulkAborted();
+            }
+            var activityNote = activity.notes.join(' ');
+            if (!bundledUrls.length && !videoItems.length && !activity.entries.length) {
+                setLessonsBulkStatus(rootEl, unitUrls.length ? describeLessonsBulkEmptyResult(scanResults) : ('Nothing to save in the selected course activity. ' + activityNote).trim(), 'error');
                 logLessonsBulkDebug('run_no_downloadable_files', {
                     selectedKeys: selectedKeys,
                     unitUrls: unitUrls,
@@ -537,18 +521,51 @@
                 return;
             }
 
-            setLessonsBulkStatus(rootEl, 'Building one ZIP bundle (' + bundledUrls.length + ' file(s))...', 'work');
-            var bundle = await downloadSingleBundledZipFromUrls(rootEl, bundledUrls);
-            if (bundle && bundle.ok) {
-                setLessonsBulkStatus(rootEl, describeLessonsBundleResult(bundle), (bundle.failedNames && bundle.failedNames.length) ? 'error' : 'ok');
-                logLessonsBulkDebug('run_single_zip_ok', bundle);
-            } else {
-                var bundleFail = (bundle && bundle.failByReason) ? bundle.failByReason : {};
-                var bundleParts = Object.keys(bundleFail).map(function (k) { return k + ':' + bundleFail[k]; });
-                var bundleTxt = bundleParts.length ? (' (' + bundleParts.join(', ') + ')') : '';
-                setLessonsBulkStatus(rootEl, 'Could not create bundled ZIP from selected topics.' + bundleTxt, 'error');
-                logLessonsBulkDebug('run_single_zip_fail', bundle || null);
+            // Videos are saved as their own downloads, never in the in-memory ZIP (see the video module).
+            bundledUrls.forEach(function (u) {
+                if (_lessonsBulkVideo.isVideoUrl(u)) videoItems.push({ url: u, name: getFilenameFromUrl(u) });
+            });
+            bundledUrls = bundledUrls.filter(function (u) { return !_lessonsBulkVideo.isVideoUrl(u); });
+            var resultText = '';
+            var failed = false;
+            var savedAny = false;
+            if (bundledUrls.length || activity.entries.length) {
+                setLessonsBulkStatus(rootEl, 'Building one ZIP bundle (' + (bundledUrls.length + activity.entries.length) + ' file(s))...', 'work');
+                var bundle = await downloadSingleBundledZipFromUrls(rootEl, bundledUrls, activity.entries);
+                if (bundle && bundle.ok) {
+                    bundle.failedNames = (bundle.failedNames || []).concat(activity.failed);
+                    resultText = describeLessonsBundleResult(bundle);
+                    savedAny = true;
+                    failed = bundle.failedNames.length > 0;
+                    logLessonsBulkDebug('run_single_zip_ok', bundle);
+                } else {
+                    var bundleFail = (bundle && bundle.failByReason) ? bundle.failByReason : {};
+                    var bundleParts = Object.keys(bundleFail).map(function (k) { return k + ':' + bundleFail[k]; });
+                    resultText = 'Could not create bundled ZIP from selected topics.' + (bundleParts.length ? (' (' + bundleParts.join(', ') + ')') : '');
+                    failed = true;
+                    logLessonsBulkDebug('run_single_zip_fail', bundle || null);
+                }
             }
+            if (videoItems.length) {
+                var videoFailed = [];
+                for (var vi = 0; vi < videoItems.length; vi++) {
+                    throwIfLessonsBulkAborted();
+                    setLessonsBulkStatus(rootEl, 'Starting video download ' + (vi + 1) + ' / ' + videoItems.length + '...', 'work');
+                    var saved = await _lessonsBulkVideo.saveVideo(videoItems[vi]);
+                    if (!saved.ok) videoFailed.push(videoItems[vi].name);
+                    if (vi < videoItems.length - 1) await new Promise(function (resolve) { setTimeout(resolve, 1500); });
+                }
+                var started = videoItems.length - videoFailed.length;
+                if (started) savedAny = true;
+                if (started) resultText += ' Started ' + started + ' video' + (started === 1 ? '' : 's') + ' as separate downloads; your browser shows the progress.';
+                if (videoFailed.length) {
+                    resultText += ' Could not save: ' + videoFailed.join(', ') + '.';
+                    failed = true;
+                }
+            }
+            // Course files and videos carry no footer of their own, so the run's last line repeats the rule.
+            if (savedAny) resultText += ' ' + _lessonsBulkActivity.FORWARD_NOTE;
+            setLessonsBulkStatus(rootEl, (resultText.trim() + ' ' + activityNote).trim(), (failed || activityNote) ? 'error' : 'ok');
         } catch (eRun) {
             if (!isLessonsBulkRunAborted()) throw eRun;
             setLessonsBulkStatus(rootEl, _lessonsBulkState.zipPartsSaved
@@ -570,6 +587,7 @@
 
         var rootDoc = (rootEl && rootEl.ownerDocument) ? rootEl.ownerDocument : getLessonsRuntimeDocument(document);
         var showTopicCounts = hasModernLessonsTocStructure(rootDoc);
+        var sizeOu = getCurrentLessonsOrgUnitId(rootDoc);
 
         list.textContent = '';
 
@@ -582,7 +600,7 @@
             var empty = document.createElement('div');
             markExt(empty);
             empty.className = 'dtu-lbd-empty';
-            empty.textContent = 'No section folders found yet. Please wait a moment and try again.';
+            empty.textContent = 'No content folders found.';
             list.appendChild(empty);
             updateLessonsBulkRunButton(rootEl);
             return;
@@ -623,9 +641,8 @@
                 var meta = document.createElement('span');
                 markExt(meta);
                 meta.className = 'dtu-lbd-meta';
-                var count = Number(section && section.unitCount || 0);
-                if (!isFinite(count) || count < 0) count = 0;
-                meta.textContent = String(count) + ' topic page' + (count === 1 ? '' : 's');
+                meta.setAttribute('data-section-meta', section.key);
+                meta.textContent = lessonsSectionMetaText(section, sizeOu);
                 txt.appendChild(meta);
             }
 
@@ -636,6 +653,61 @@
         list.appendChild(frag);
 
         updateLessonsBulkRunButton(rootEl);
+        if (showTopicCounts) fillLessonsBulkVideoSizes(rootEl, sections, sizeOu);
+    }
+
+    // "12 topic pages, 3 videos, 410 MB": the video part appears once its sizes are read.
+    function lessonsSectionMetaText(section, ou) {
+        var count = Number(section && section.unitCount || 0);
+        if (!isFinite(count) || count < 0) count = 0;
+        var text = String(count) + ' topic page' + (count === 1 ? '' : 's');
+        var videos = _lessonsBulkVideo.describe(_lessonsVideoSummaries.get(ou + '|' + section.key));
+        return videos ? text + ', ' + videos : text;
+    }
+
+    // The topics a section downloads, from the course TOC: its topic URLs, and every topic below
+    // its unit URLs.
+    function lessonsSectionTopicItems(section, index) {
+        var items = [];
+        var seen = new Set();
+        function add(topicId, entry) {
+            if (!entry || seen.has(topicId)) return;
+            seen.add(topicId);
+            items.push({ topicId: topicId, entry: entry });
+        }
+        (Array.isArray(section.unitUrls) ? section.unitUrls : []).forEach(function (u) {
+            var topic = parseLessonsTopicIds(u);
+            if (topic) { add(topic.topicId, index.get(topic.topicId)); return; }
+            var unit = parseLessonsUnitIds(u);
+            if (!unit) return;
+            index.forEach(function (entry, topicId) {
+                if (entry.modules && entry.modules.indexOf(String(unit.unitId)) >= 0) add(topicId, entry);
+            });
+        });
+        return items;
+    }
+
+    // Reads video sizes for the sections once the panel is open (one request per video, cached).
+    async function fillLessonsBulkVideoSizes(rootEl, sections, ou) {
+        if (!ou || _lessonsBulkUiState.videoSizesBusy || !rootEl.classList.contains('dtu-open')) return;
+        var todo = (sections || []).filter(function (s) { return !_lessonsVideoSummaries.has(ou + '|' + s.key); });
+        if (!todo.length) return;
+        _lessonsBulkUiState.videoSizesBusy = true;
+        try {
+            var index = await loadLessonsTocIndex(ou);
+            if (!index) return;
+            for (var i = 0; i < todo.length; i++) {
+                var section = todo[i];
+                _lessonsVideoSummaries.set(ou + '|' + section.key, await _lessonsBulkVideo.summarize(ou, lessonsSectionTopicItems(section, index)));
+                rootEl.querySelectorAll('[data-section-meta]').forEach(function (el) {
+                    if (el.getAttribute('data-section-meta') === section.key) el.textContent = lessonsSectionMetaText(section, ou);
+                });
+            }
+        } catch (eVid) {
+            logLessonsBulkDebug('video_sizes_failed', { error: String(eVid && eVid.message || eVid) });
+        } finally {
+            _lessonsBulkUiState.videoSizesBusy = false;
+        }
     }
 
     function refreshLessonsBulkDownloadUi(rootEl, force) {
@@ -675,7 +747,7 @@
             sections = domSections.slice();
         }
         logLessonsBulkDebug('sections_built', {
-            docUrl: (function () { try { return String(scopeDoc.location && scopeDoc.location.href ? scopeDoc.location.href : ''); } catch (e0) { return ''; } })(),
+            docUrl: getDocHref(scopeDoc),
             count: sections.length,
             source: usedLegacyApi ? 'legacy-api' : (isLegacy ? 'legacy-dom' : 'modern-dom'),
             sample: sections.slice(0, 12).map(function (s) { return { key: s.key, label: s.label, depth: s.depth, unitCount: s.unitCount }; })
@@ -695,7 +767,7 @@
             } else if (isLegacy) {
                 setLessonsBulkStatus(rootEl, 'No section folders found in the content tree yet.', '');
             } else {
-                setLessonsBulkStatus(rootEl, 'Open/expand the content tree to detect folders.', '');
+                setLessonsBulkStatus(rootEl, 'Tick course activity, then click "Download selected".', '');
             }
         } else if (!_lessonsBulkUiState.selectedKeys.size) {
             setLessonsBulkStatus(rootEl, 'Select folders and click "Download selected".', '');
@@ -705,13 +777,7 @@
     }
 
     function getLessonsBulkStateRefs() {
-        return {
-            uiState: _lessonsBulkUiState,
-            urlNameHints: _lessonsBulkUrlNameHints,
-            legacyApiSectionsCache: _lessonsLegacyApiSectionsCache,
-            legacyModuleStructureCache: _lessonsLegacyModuleStructureCache,
-            legacyBackgroundResolveState: _lessonsLegacyBackgroundResolveState
-        };
+        return { uiState: _lessonsBulkUiState };
     }
 
     function resetLessonsBulkState() {
@@ -722,7 +788,6 @@
         _lessonsBulkUiState.running = false;
         _lessonsBulkUiState.lastRefreshAt = 0;
         _lessonsBulkUiState.activeDoc = null;
-        _lessonsBulkUiState.lastLegacyExpandAt = 0;
         _lessonsBulkUrlNameHints.clear();
         _lessonsLegacyApiSectionsCache.orgUnitId = '';
         _lessonsLegacyApiSectionsCache.sections = [];
@@ -732,10 +797,20 @@
         _lessonsLegacyApiSectionsCache.lastAttemptTs = 0;
         _lessonsLegacyApiSectionsCache.source = '';
         _lessonsLegacyModuleStructureCache.clear();
-        _lessonsLegacyBackgroundResolveState.orgUnitId = '';
-        _lessonsLegacyBackgroundResolveState.running = false;
-        _lessonsLegacyBackgroundResolveState.token = 0;
-        _lessonsLegacyBackgroundResolveState.resolvedKeys = new Set();
+    }
+
+    function removeLessonsBulkElements(doc) {
+        if (!doc) return;
+        var roots = [];
+        try { roots = deepQueryAll('#' + LESSONS_BULK_ROOT_ID, doc); } catch (e0) { roots = []; }
+        roots.forEach(function (root) {
+            try { if (root && root.remove) root.remove(); } catch (e1) { }
+        });
+        var styles = [];
+        try { styles = deepQueryAll('#' + LESSONS_BULK_STYLE_ID, doc); } catch (e2) { styles = []; }
+        styles.forEach(function (styleEl) {
+            try { if (styleEl && styleEl.remove) styleEl.remove(); } catch (e3) { }
+        });
     }
 
     function removeLessonsBulkDownloadControl() {
@@ -743,19 +818,7 @@
             resetLessonsBulkState();
             return;
         }
-        var docs = getLessonsCandidateDocuments(document);
-        docs.forEach(function (doc) {
-            var roots = [];
-            try { roots = deepQueryAll('#' + LESSONS_BULK_ROOT_ID, doc); } catch (e0) { roots = []; }
-            roots.forEach(function (root) {
-                if (root && root.remove) root.remove();
-            });
-            var styles = [];
-            try { styles = deepQueryAll('#' + LESSONS_BULK_STYLE_ID, doc); } catch (e1) { styles = []; }
-            styles.forEach(function (styleEl) {
-                if (styleEl && styleEl.remove) styleEl.remove();
-            });
-        });
+        getLessonsCandidateDocuments(document).forEach(removeLessonsBulkElements);
         _lessonsBulkUiInserted = false;
         resetLessonsBulkState();
     }
@@ -766,16 +829,7 @@
         var docs = getLessonsCandidateDocuments(targetDoc);
         docs.forEach(function (doc) {
             if (!doc || doc === targetDoc) return;
-            var roots = [];
-            try { roots = deepQueryAll('#' + LESSONS_BULK_ROOT_ID, doc); } catch (e0) { roots = []; }
-            roots.forEach(function (root) {
-                try { root.remove(); } catch (e1) { }
-            });
-            var styles = [];
-            try { styles = deepQueryAll('#' + LESSONS_BULK_STYLE_ID, doc); } catch (e2) { styles = []; }
-            styles.forEach(function (styleEl) {
-                try { styleEl.remove(); } catch (e3) { }
-            });
+            removeLessonsBulkElements(doc);
         });
     }
 
@@ -789,6 +843,19 @@
         path.setAttribute('d', pathData);
         svg.appendChild(path);
         return svg;
+    }
+
+    function setAllLessonsBulkSelected(root, checked) {
+        var uiState = getLessonsBulkStateRefs().uiState;
+        root.querySelectorAll('.dtu-lbd-list input[type="checkbox"][data-section-key]').forEach(function (cb) {
+            cb.checked = checked;
+            if (!uiState || !uiState.selectedKeys) return;
+            var key = cb.getAttribute('data-section-key');
+            if (checked) uiState.selectedKeys.add(key);
+            else uiState.selectedKeys.delete(key);
+        });
+        if (!checked && uiState && uiState.selectedKeys) uiState.selectedKeys.clear();
+        updateLessonsBulkRunButton(root);
     }
 
     function insertLessonsBulkDownloadControl() {
@@ -806,7 +873,8 @@
         var uiState = getLessonsBulkStateRefs().uiState;
         if (uiState) uiState.activeDoc = scopeDoc;
 
-        if (!hasModernLessonsTocStructure(scopeDoc)) {
+        // A course with an empty content page still gets the panel, for its course activity.
+        if (!hasModernLessonsTocStructure(scopeDoc) && !getLessonsTocHost(scopeDoc)) {
             removeLessonsBulkDownloadControl();
             return;
         }
@@ -920,7 +988,7 @@
             toggle.appendChild(makeLessonsBulkIcon(scopeDoc, 'dtu-lbd-icon', 'M8 2.5v7.5M4.75 6.75 8 10l3.25-3.25M3 13.5h10'));
             var toggleLabel = scopeDoc.createElement('span');
             toggleLabel.className = 'dtu-lbd-toggle-label';
-            toggleLabel.textContent = 'Download content';
+            toggleLabel.textContent = 'Download course';
             toggle.appendChild(toggleLabel);
             toggle.appendChild(makeLessonsBulkIcon(scopeDoc, 'dtu-lbd-chevron', 'M4 6l4 4 4-4'));
 
@@ -931,7 +999,7 @@
             var hint = scopeDoc.createElement('div');
             markExt(hint);
             hint.className = 'dtu-lbd-hint';
-            hint.textContent = 'Pick section folders from the tree, then download all child files.';
+            hint.textContent = 'Pick content sections and course activity to save in one ZIP.';
 
             var list = scopeDoc.createElement('div');
             markExt(list);
@@ -947,14 +1015,7 @@
             allBtn.className = 'dtu-lbd-mini';
             allBtn.textContent = 'All';
             allBtn.addEventListener('click', function () {
-                var nextUiState = getLessonsBulkStateRefs().uiState;
-                root.querySelectorAll('.dtu-lbd-list input[type="checkbox"][data-section-key]').forEach(function (cb) {
-                    cb.checked = true;
-                    if (nextUiState && nextUiState.selectedKeys) {
-                        nextUiState.selectedKeys.add(cb.getAttribute('data-section-key'));
-                    }
-                });
-                updateLessonsBulkRunButton(root);
+                setAllLessonsBulkSelected(root, true);
             });
 
             var noneBtn = scopeDoc.createElement('button');
@@ -963,14 +1024,7 @@
             noneBtn.className = 'dtu-lbd-mini';
             noneBtn.textContent = 'None';
             noneBtn.addEventListener('click', function () {
-                var nextUiState = getLessonsBulkStateRefs().uiState;
-                root.querySelectorAll('.dtu-lbd-list input[type="checkbox"][data-section-key]').forEach(function (cb) {
-                    cb.checked = false;
-                });
-                if (nextUiState && nextUiState.selectedKeys) {
-                    nextUiState.selectedKeys.clear();
-                }
-                updateLessonsBulkRunButton(root);
+                setAllLessonsBulkSelected(root, false);
             });
 
             var runBtn = scopeDoc.createElement('button');
@@ -1000,8 +1054,45 @@
             actions.appendChild(noneBtn);
             actions.appendChild(runBtn);
             actions.appendChild(cancelBtn);
+            var activityBox = scopeDoc.createElement('div');
+            markExt(activityBox);
+            activityBox.className = 'dtu-lbd-activity';
+            var activityHead = scopeDoc.createElement('div');
+            markExt(activityHead);
+            activityHead.className = 'dtu-lbd-hint dtu-lbd-activity-head';
+            activityHead.textContent = 'Also save';
+            activityBox.appendChild(activityHead);
+            _lessonsBulkActivity.KINDS.forEach(function (kind) {
+                var row = scopeDoc.createElement('label');
+                markExt(row);
+                row.className = 'dtu-lbd-row';
+                var cb = scopeDoc.createElement('input');
+                markExt(cb);
+                cb.type = 'checkbox';
+                cb.checked = false;
+                cb.setAttribute('data-activity-key', kind.key);
+                cb.addEventListener('change', function () { updateLessonsBulkRunButton(root); });
+                var txt = scopeDoc.createElement('span');
+                markExt(txt);
+                txt.className = 'dtu-lbd-label';
+                var name = scopeDoc.createElement('span');
+                markExt(name);
+                name.className = 'dtu-lbd-name';
+                name.textContent = kind.label;
+                txt.appendChild(name);
+                var summary = scopeDoc.createElement('span');
+                markExt(summary);
+                summary.className = 'dtu-lbd-meta';
+                summary.textContent = kind.summary;
+                txt.appendChild(summary);
+                row.appendChild(cb);
+                row.appendChild(txt);
+                activityBox.appendChild(row);
+            });
+
             panel.appendChild(hint);
             panel.appendChild(list);
+            panel.appendChild(activityBox);
             panel.appendChild(actions);
             panel.appendChild(status);
 
@@ -1049,21 +1140,19 @@
     }
 
     function scheduleLessonsBulkBootstrap() {
-        if (_lessonsBulkUiInserted || _lessonsBulkBootstrapTimer) return;
-        var attempts = 0;
-        _lessonsBulkBootstrapTimer = setInterval(function () {
-            if (!isLessonsBulkDownloadEnabled() || !isDTULearnLessonsPage()) {
-                clearInterval(_lessonsBulkBootstrapTimer);
-                _lessonsBulkBootstrapTimer = null;
-                return;
+        if (_lessonsBulkUiInserted) return;
+        if (_lessonsBulkBootstrapWatch && _lessonsBulkBootstrapWatch.active()) {
+            _lessonsBulkBootstrapWatch.trigger();
+            return;
+        }
+        _lessonsBulkBootstrapWatch = schedulePlacement({
+            capMs: 30000,
+            run: function () {
+                if (!isLessonsBulkDownloadEnabled() || !isDTULearnLessonsPage()) return true;
+                insertLessonsBulkDownloadControl();
+                return _lessonsBulkUiInserted;
             }
-            attempts++;
-            insertLessonsBulkDownloadControl();
-            if (_lessonsBulkUiInserted || attempts >= 60) {
-                clearInterval(_lessonsBulkBootstrapTimer);
-                _lessonsBulkBootstrapTimer = null;
-            }
-        }, 400);
+        });
     }
 
     function runLessonsBulkDownloadChecks() {

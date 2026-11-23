@@ -1,10 +1,25 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
-import { loadDom } from './_harness.mjs';
+import { loadDom, makeLocalStorage } from './_harness.mjs';
 import vm from 'node:vm';
 
 const ROOT = new URL('../', import.meta.url);
+
+test("today is Denmark's date, whatever the browser's time zone", () => {
+    const ctx = loadDom({ window: {}, document: {} });
+    const iso = ctx.DTUAfterDarkDom.copenhagenDateIso;
+    assert.equal(iso(Date.UTC(2026, 10, 22, 22, 59)), '2026-11-22');
+    assert.equal(iso(Date.UTC(2026, 10, 22, 23, 0)), '2026-11-23', 'winter: UTC+1');
+    assert.equal(iso(Date.UTC(2026, 6, 1, 21, 59)), '2026-07-01');
+    assert.equal(iso(Date.UTC(2026, 6, 1, 22, 0)), '2026-07-02', 'summer: UTC+2');
+    const at = ctx.DTUAfterDarkDom.copenhagenTs;
+    assert.equal(at(2026, 11, 26, 8, 30), Date.UTC(2026, 10, 26, 7, 30), 'winter wall time');
+    assert.equal(at(2026, 7, 1, 8, 30), Date.UTC(2026, 6, 1, 6, 30), 'summer wall time');
+    assert.equal(at(2026, 10, 26, 0, 0) - at(2026, 10, 25, 0, 0), 25 * 3600000, 'the autumn change day has 25 hours');
+    assert.equal(at(2026, 11, 31, 0, 0), Date.UTC(2026, 11, 0, 23, 0), 'a day past the month rolls over');
+    assert.equal(ctx.DTUAfterDarkDom.copenhagenParts(Date.UTC(2026, 10, 22, 12, 0)).weekday, 0, '22 Nov 2026 is a Sunday');
+});
 
 class FakeElement {
     constructor(tagName) {
@@ -45,6 +60,14 @@ class FakeElement {
         return child;
     }
 
+    addEventListener(type, fn) {
+        (this.listeners ||= {})[type] = fn;
+    }
+
+    remove() {
+        if (this.parentNode) this.parentNode.removeChild(this);
+    }
+
     removeChild(child) {
         this.children = this.children.filter(item => item !== child);
         child.parentNode = null;
@@ -74,6 +97,8 @@ class FakeElement {
 
 function loadDeadlineUi({ dark = false, messages = null, storage = null, today = null, reply = null, clock = null } = {}) {
     const fileUrl = new URL('darkmode.deadlines.js', ROOT);
+    const dataUrl = new URL('darkmode.deadlines.data.js', ROOT);
+    const timelineUrl = new URL('darkmode.deadlines.timeline.js', ROOT);
     let source = fs.readFileSync(fileUrl, 'utf8');
     source = source.replace(
         /\}\)\(\);\s*$/,
@@ -81,25 +106,40 @@ function loadDeadlineUi({ dark = false, messages = null, storage = null, today =
             renderDeadlinesHomepageWidget,
             buildTopDeadlines,
             buildUpcomingDeadlineRows,
+            placeDeadlinesHomepageWidget,
+            setDeadlinesWidgetExpandedState,
+            scheduleDailyDeadlinesCheck,
+            requestStudentDeadlines
+        };})();`
+    );
+    let timelineSource = fs.readFileSync(timelineUrl, 'utf8');
+    timelineSource = timelineSource.replace(
+        /\}\)\(\);\s*$/,
+        `globalThis.__deadlineTimelineTestApi = {
             createDeadlinesTimeline,
             buildDeadlineTimelineAxis,
             selectDeadlineTimelineRows,
+            layoutDeadlinePeriodMarks,
+            formatDeadlinePeriodStatus
+        };})();`
+    );
+    let dataSource = fs.readFileSync(dataUrl, 'utf8');
+    dataSource = dataSource.replace(
+        /\}\)\(\);\s*$/,
+        `globalThis.__deadlineDataTestApi = {
             parseDeadlinePeriodHeading,
             buildDeadlinePeriodGroups,
             selectDeadlinePeriodGroups,
-            layoutDeadlinePeriodMarks,
-            formatDeadlinePeriodStatus,
-            placeDeadlinesHomepageWidget,
-            setDeadlinesWidgetExpandedState,
-            getDeadlinePeriodLabels,
-            getDeadlineState,
-            scheduleDailyDeadlinesCheck
+            getDeadlinePeriodLabels
         };})();`
     );
 
+    const head = new FakeElement('head');
     const document = {
         addEventListener() {},
-        createElement(tagName) { return new FakeElement(tagName); }
+        createElement(tagName) { return new FakeElement(tagName); },
+        getElementById(id) { return head.children.find((n) => n.id === id) || null; },
+        head
     };
     const sandbox = {
         console,
@@ -124,8 +164,10 @@ function loadDeadlineUi({ dark = false, messages = null, storage = null, today =
     if (today) sandbox.DTUAfterDarkDeadlinesDeps.startOfTodayUtcTs = () => today.value;
     sandbox.globalThis = sandbox;
     loadDom(sandbox);
+    vm.runInNewContext(dataSource, sandbox, { filename: dataUrl.pathname });
+    vm.runInNewContext(timelineSource, sandbox, { filename: timelineUrl.pathname });
     vm.runInNewContext(source, sandbox, { filename: fileUrl.pathname });
-    return sandbox.__deadlineTestApi;
+    return Object.assign({}, sandbox.__deadlineDataTestApi, sandbox.__deadlineTimelineTestApi, sandbox.__deadlineTestApi);
 }
 
 function loadBackgroundParser() {
@@ -155,7 +197,7 @@ function loadBackgroundParser() {
         if (file === 'background.deadlines.js') {
             source = source.replace(
                 /\}\)\(\);\s*$/,
-                'globalThis.__deadlineParserTestApi = { parseStudentDeadlinesGroupsFromHtml };})();'
+                'globalThis.__deadlineParserTestApi = { parseStudentDeadlinesGroupsFromHtml, parseExchangeDeadlineGroups };})();'
             );
         }
         vm.runInContext(source, context, { filename: fileUrl.pathname });
@@ -183,6 +225,47 @@ function responseWith({ course = [], exam = [] }) {
         exam: { groups: exam, url: 'https://student.dtu.dk/exam' }
     };
 }
+
+test('the widget refuses to load without its period data module', () => {
+    const source = fs.readFileSync(new URL('darkmode.deadlines.js', ROOT), 'utf8');
+    const sandbox = {
+        console,
+        Date,
+        document: {},
+        globalThis: null,
+        localStorage: { getItem() { return null; }, setItem() {} },
+        window: { addEventListener() {}, location: { hostname: 'test.invalid' } }
+    };
+    sandbox.globalThis = sandbox;
+    loadDom(sandbox);
+
+    assert.throws(
+        () => vm.runInNewContext(source, sandbox, { filename: 'darkmode.deadlines.js' }),
+        /requires darkmode\.deadlines\.data\.js loaded first/
+    );
+});
+
+test('the widget refuses to load without its timeline module', () => {
+    const rootUrl = new URL('../', import.meta.url);
+    const source = fs.readFileSync(new URL('darkmode.deadlines.js', ROOT), 'utf8');
+    const dataSource = fs.readFileSync(new URL('darkmode.deadlines.data.js', ROOT), 'utf8');
+    const sandbox = {
+        console,
+        Date,
+        document: {},
+        globalThis: null,
+        localStorage: { getItem() { return null; }, setItem() {} },
+        window: { addEventListener() {}, location: { hostname: 'test.invalid' } }
+    };
+    sandbox.globalThis = sandbox;
+    loadDom(sandbox);
+    vm.runInNewContext(dataSource, sandbox, { filename: new URL('darkmode.deadlines.data.js', rootUrl).pathname });
+
+    assert.throws(
+        () => vm.runInNewContext(source, sandbox, { filename: 'darkmode.deadlines.js' }),
+        /requires darkmode\.deadlines\.timeline\.js loaded first/
+    );
+});
 
 function flattenText(element) {
     return [element.textContent, ...element.children.flatMap(flattenText)].filter(Boolean);
@@ -246,7 +329,7 @@ test('a clipped active deadline range does not mask its tooltip', () => {
             items: [deadlineItem({ label: 'Supplementary registration period', start: '2026-06-01', end: '2026-10-01' })]
         }]
     }), utc('2026-09-02'), 3);
-    const timeline = api.createDeadlinesTimeline(rows, utc('2026-09-02'));
+    const timeline = api.createDeadlinesTimeline(rows, utc('2026-09-02'), false);
     const registrationBar = (function findByClass(element) {
         if (/\bdtu-deadline-timeline-bar\b/.test(element.className)) return element;
         for (const child of element.children) {
@@ -590,7 +673,7 @@ test('only periods with a deadline in the next 60 days get a row', () => {
     const api = loadDeadlineUi();
     const today = utc('2026-11-07');
     const rows = api.buildTopDeadlines(dtuNovemberResponse(), today, Infinity);
-    const timeline = api.createDeadlinesTimeline(rows, today);
+    const timeline = api.createDeadlinesTimeline(rows, today, false);
     const desktop = timeline.children.find(element => element.className === 'dtu-deadline-timeline-desktop');
     const names = findAll(desktop, /\bdtu-deadline-period-name\b/).map(el => el.textContent);
     assert.deepEqual(names, ['Winter exam 2026', 'January 2027', 'Spring 2027']);
@@ -659,7 +742,7 @@ test('a colliding label moves to the lower lane, and is dropped only when neithe
     const axis = api.buildDeadlineTimelineAxis(TODAY_SEP_30);
     const marks = api.layoutDeadlinePeriodMarks(api.buildDeadlinePeriodGroups(rows)[0], axis);
     assert.deepEqual(Array.from(marks, mark => [mark.lane, mark.showLabel]), [[0, true], [1, true], [0, false]]);
-    const timeline = api.createDeadlinesTimeline(rows, TODAY_SEP_30);
+    const timeline = api.createDeadlinesTimeline(rows, TODAY_SEP_30, false);
     const dates = findAll(timeline, /\bdtu-deadline-timeline-date-mark\b/);
     assert.equal(dates.length, 3);
     assert.ok(dates.every(mark => /Deadline for withdrawal from courses/.test(mark.getAttribute('aria-label'))));
@@ -671,7 +754,7 @@ test('a window running past the six months fades out at the right edge', () => {
     const rows = api.buildTopDeadlines(responseWith({
         course: [{ heading: 'Spring 2027', items: [deadlineItem({ label: 'Supplementary registration period', start: '2027-01-20', end: '2027-03-10' })] }]
     }), TODAY_SEP_30, 3);
-    const [bar] = findAll(api.createDeadlinesTimeline(rows, TODAY_SEP_30), /\bdtu-deadline-timeline-bar\b/);
+    const [bar] = findAll(api.createDeadlinesTimeline(rows, TODAY_SEP_30, false), /\bdtu-deadline-timeline-bar\b/);
     assert.match(bar.className, /\bis-clipped-end\b/);
     assert.match(bar.className, /\bis-soft\b/);
     assert.doesNotMatch(bar.className, /\bis-clipped-start\b/);
@@ -683,7 +766,7 @@ test('dates after the six months are absent from the rendered and accessible tim
         kind: 'course', label: index ? 'Hidden deadline' : 'Visible deadline', period: 'Spring 2027',
         startTs: utc(day), endTs: null, nextTs: utc(day), state: 'upcoming'
     }));
-    const timeline = api.createDeadlinesTimeline(rows, TODAY_SEP_30);
+    const timeline = api.createDeadlinesTimeline(rows, TODAY_SEP_30, false);
     const text = flattenText(timeline).join(' ');
     assert.match(text, /Visible deadline/);
     assert.doesNotMatch(text, /Hidden deadline/);
@@ -693,7 +776,7 @@ test('dates after the six months are absent from the rendered and accessible tim
 test('the timeline renders labelled period rows with no legend, and a text list for narrow widths', () => {
     const api = loadDeadlineUi({ dark: true });
     const { rows } = fallGroups(api);
-    const timeline = api.createDeadlinesTimeline(rows, TODAY_SEP_30);
+    const timeline = api.createDeadlinesTimeline(rows, TODAY_SEP_30, true);
     const text = flattenText(timeline);
     for (const expected of ['Fall 2026', 'Teaching 31 Aug to 4 Dec', 'Winter exam 2026', 'Exam period 6 to 22 Dec',
         'Today 30 Sep', 'Dec', 'Supplementary', 'until 1 Oct', 'Withdrawal', '1 Oct', 'Supplementary closes tomorrow',
@@ -724,7 +807,7 @@ test('a timeline mark names the deadline, the explainer, its period and dates', 
     const rows = api.buildTopDeadlines(responseWith({
         course: [{ heading: 'Fall 2026', items: [deadlineItem({ label: 'Supplementary registration period', start: '2026-08-23', end: '2026-10-01' })] }]
     }), utc('2026-08-27'), 3);
-    const [bar] = findAll(api.createDeadlinesTimeline(rows, utc('2026-08-27')), /\bdtu-deadline-timeline-bar\b/);
+    const [bar] = findAll(api.createDeadlinesTimeline(rows, utc('2026-08-27'), false), /\bdtu-deadline-timeline-bar\b/);
     assert.equal(bar.getAttribute('aria-label'),
         'Supplementary registration period. It will be possible to register for courses with vacant seats. Fall 2026. 23 Aug - 1 Oct 2026.');
     const tooltip = bar.children.find(child => child.className === 'dtu-deadline-mark-tooltip');
@@ -737,7 +820,7 @@ test('a timeline mark names the deadline, the explainer, its period and dates', 
 });
 
 test('timeline marks use the contrast-checked accent in both modes, not a fixed grey', () => {
-    const source = fs.readFileSync(new URL('darkmode.deadlines.js', ROOT), 'utf8');
+    const source = fs.readFileSync(new URL('darkmode.deadlines.timeline.js', ROOT), 'utf8');
     const rules = source.match(/'\.dtu-deadline-timeline(?:\[data-theme="dark"\])?\{--deadline-accent:[^;]+;/g);
     assert.equal(rules.length, 2);
     assert.ok(rules[0].includes('--deadline-accent:var(--dtu-ad-accent-mark-light,'), rules[0]);
@@ -745,4 +828,157 @@ test('timeline marks use the contrast-checked accent in both modes, not a fixed 
     assert.doesNotMatch(source, /--deadline-bar(?:-soft)?:/);
     assert.match(source, /'\.dtu-deadline-timeline-bar\{[^']*background:var\(--deadline-accent\)/);
     assert.match(source, /'\.dtu-deadline-timeline-date-mark::before\{[^']*background:var\(--deadline-accent\)/);
+});
+
+// Exchange deadline (Beyond Borders), opt-in under Settings.
+function exchangeStorage(extra = []) {
+    const stored = new Map([['dtuDarkModeExchangeDeadlineEnabled', 'true'], ...extra]);
+    return { getItem: k => stored.get(k) ?? null, setItem: (k, v) => stored.set(k, v) };
+}
+
+function allText(node) {
+    return [node.textContent || '', ...(node.children || []).map(allText)].join(' ');
+}
+
+function findButton(node) {
+    if (node.tagName === 'button') return node;
+    for (const child of node.children || []) {
+        const hit = findButton(child);
+        if (hit) return hit;
+    }
+    return null;
+}
+
+test('the exchange deadline is read from the date most partner universities give', () => {
+    const parser = loadBackgroundParser();
+    const uni = (text) => ({ PeriodOfStay: text });
+    const groups = JSON.parse(JSON.stringify(parser.parseExchangeDeadlineGroups([
+        uni("<span class='deadline'>dec 01, 2026</span> for Fall 2027<br/>"),
+        uni("<span class='deadline'>dec 01, 2026</span> for Fall 2027<br/>"),
+        uni("<span class='deadline'>nov 15, 2026</span> for Fall 2027<br/>"),
+        uni(null)
+    ])));
+    assert.deepEqual(groups, [{
+        heading: 'Exchange Fall 2027',
+        items: [{ label: 'Application', startIso: '2026-12-01', startTs: utc('2026-12-01'), endIso: null, endTs: null, raw: 'Exchange application deadline for Fall 2027' }]
+    }]);
+    assert.deepEqual(JSON.parse(JSON.stringify(parser.parseExchangeDeadlineGroups([uni('no deadline listed')]))), []);
+});
+
+test('the exchange lane appears only while the toggle is on', () => {
+    const resp = responseWith({});
+    resp.exchange = { ok: true, groups: [{ heading: 'Exchange Fall 2027', items: [deadlineItem({ label: 'Application', start: '2026-12-01' })] }] };
+    const on = loadDeadlineUi({ storage: exchangeStorage() }).buildTopDeadlines(resp, utc('2026-11-11'), 5);
+    assert.deepEqual(JSON.parse(JSON.stringify(on.map(row => [row.kind, row.label, row.nextTs]))), [['exchange', 'Application', utc('2026-12-01')]]);
+    assert.equal(on[0].sourceUrl, 'https://beyondborders.dtu.dk/Pages/searchUni.aspx');
+    assert.equal(loadDeadlineUi().buildTopDeadlines(resp, utc('2026-11-11'), 5).length, 0);
+});
+
+test('without the permission the widget says so and its button opens the permission page', () => {
+    const messages = [];
+    const response = goodRenderResponse();
+    response.exchange = { ok: false, error: 'no_permission' };
+    const stored = new Map([['dtuDarkModeDeadlinesCacheV2', JSON.stringify(response)], ['dtuDarkModeExchangeDeadlineEnabled', 'true']]);
+    const storage = { getItem: k => stored.get(k) ?? null, setItem: (k, v) => stored.set(k, v) };
+    const widget = new FakeElement('section');
+    const parts = new Map(['summary', 'next', 'more', 'footer', 'meta', 'chevron', 'sources', 'content'].map(k =>
+        ['[data-dtu-deadlines-' + k + ']', new FakeElement('div')]));
+    widget.querySelector = k => parts.get(k) || null;
+    parts.get('[data-dtu-deadlines-sources]').querySelectorAll = () => [];
+    // The stored copy alone may predate a grant: it shows Loading until this page's own answer.
+    const stale = loadDeadlineUi({ storage, today: { value: utc('2026-09-30') } });
+    stale.renderDeadlinesHomepageWidget(widget);
+    assert.match(allText(parts.get('[data-dtu-deadlines-next]')), /Loading the exchange deadline/);
+    widget._dtuDeadlinesRenderState = null;
+    const api = loadDeadlineUi({ storage, messages, reply: response, today: { value: utc('2026-09-30') } });
+    api.renderDeadlinesHomepageWidget(widget);
+    const next = parts.get('[data-dtu-deadlines-next]');
+    assert.match(allText(next), /needs access to beyondborders\.dtu\.dk/);
+    findButton(next).listeners.click();
+    assert.ok(messages.some(m => m.type === 'dtu-open-exchange-permission'));
+    assert.match(allText(parts.get('[data-dtu-deadlines-sources]')), /Exchange/);
+});
+
+test('after the exchange deadline the widget says when the next one is, or that none is listed', () => {
+    function render(exchange, todayIso) {
+        const response = goodRenderResponse();
+        response.exchange = exchange;
+        const stored = new Map([['dtuDarkModeDeadlinesCacheV2', JSON.stringify(response)], ['dtuDarkModeExchangeDeadlineEnabled', 'true']]);
+        const storage = { getItem: k => stored.get(k) ?? null, setItem: (k, v) => stored.set(k, v) };
+        const widget = new FakeElement('section');
+        const parts = new Map(['summary', 'next', 'more', 'footer', 'meta', 'chevron', 'sources', 'content'].map(k =>
+            ['[data-dtu-deadlines-' + k + ']', new FakeElement('div')]));
+        widget.querySelector = k => parts.get(k) || null;
+        parts.get('[data-dtu-deadlines-sources]').querySelectorAll = () => [];
+        loadDeadlineUi({ storage, reply: response, today: { value: utc(todayIso) } }).renderDeadlinesHomepageWidget(widget);
+        return allText(parts.get('[data-dtu-deadlines-next]'));
+    }
+    const passed = { ok: true, groups: [{ heading: 'Exchange Fall 2027', items: [deadlineItem({ label: 'Application', start: '2026-12-01' })] }] };
+    assert.match(render(passed, '2026-12-02'), /Beyond Borders lists no upcoming exchange deadline/);
+    assert.doesNotMatch(render(passed, '2026-11-23'), /no upcoming exchange deadline|Next exchange deadline/);
+    const later = { ok: true, groups: [{ heading: 'Exchange Fall 2028', items: [deadlineItem({ label: 'Application', start: '2027-12-01' })] }] };
+    assert.match(render(later, '2026-12-02'), /Next exchange deadline: 1 Dec 2027 \(Exchange Fall 2028\)/);
+});
+
+test('Add to calendar: a window becomes an "opens" and a "closes" day, a single date one day, all within 12 months', () => {
+    const sandbox = { DTUAfterDarkDom: { normalizeWhitespace: (s) => String(s).replace(/\s+/g, ' ').trim() } };
+    sandbox.globalThis = sandbox;
+    vm.runInNewContext(fs.readFileSync(new URL('darkmode.deadlines.data.js', ROOT), 'utf8'), sandbox);
+    vm.runInNewContext(fs.readFileSync(new URL('darkmode.ics.js', ROOT), 'utf8'), sandbox);
+    const rows = [
+        { kind: 'course', label: 'Registration period', startIso: '2026-11-15', endIso: '2026-12-01', periods: ['January 2027 (3-weeks period): 4 January - 22 January'], sourceUrl: 'https://student.dtu.dk/c' },
+        { kind: 'course', label: 'Deadline for withdrawal from courses', startIso: '2027-03-01', endIso: null, periods: ['Spring 2027 (13-weeks period): 1 February - 12 May'], sourceUrl: 'https://student.dtu.dk/c' },
+        { kind: 'exam', label: 'Period for withdrawal from exams', startIso: '2026-10-15', endIso: '2026-11-25', periods: ['Ordinary winter exam 2026: 6 December - 22 December'], sourceUrl: 'https://student.dtu.dk/e' },
+        { kind: 'course', label: 'Registration period', startIso: '2028-05-01', endIso: '2028-05-15', periods: ['June 2028 (3-weeks period): 4 June - 24 June'] }
+    ];
+    const events = JSON.parse(JSON.stringify(sandbox.DTUAfterDarkDeadlinesData.buildDeadlineCalendarEvents(rows, '2026-11-19', '2027-11-19')));
+    assert.deepEqual(events.map((e) => [e.date, e.summary]), [
+        ['2026-11-25', 'Winter exam 2026: Period for withdrawal from exams closes'],
+        ['2026-12-01', 'January 2027 courses: Registration period closes'],
+        ['2027-03-01', 'Spring 2027 courses: Deadline for withdrawal from courses']
+    ]);
+    assert.match(events[0].description, /Copied on 2026-11-19\..*downloading the calendar file again updates these events/);
+    assert.equal(new Set(events.map((e) => e.uid)).size, 3);
+    const again = sandbox.DTUAfterDarkDeadlinesData.buildDeadlineCalendarEvents(rows, '2026-11-19', '2027-11-19');
+    assert.deepEqual(JSON.parse(JSON.stringify(again.map((e) => e.uid))), events.map((e) => e.uid), 'a second download updates, it does not duplicate');
+    const ics = sandbox.DTUAfterDarkIcs.buildCalendar(events, '20261119T120000Z', 'DTU deadlines');
+    assert.equal((ics.match(/BEGIN:VEVENT/g) || []).length, 3);
+    assert.ok(ics.includes('X-WR-CALNAME:DTU deadlines\r\n'));
+});
+
+test('the deadlines widget footer has an Add to calendar button, hidden until deadlines have loaded', () => {
+    const src = fs.readFileSync(new URL('darkmode.deadlines.js', ROOT), 'utf8');
+    assert.match(src, /sources\.appendChild\(createDeadlinesCalendarButton\(dark\)\);/);
+    assert.match(src, /calendarBtn\.style\.display = \(resp && resp\.ok\) \? '' : 'none';/);
+});
+
+test('a source that fails keeps the copy already held for it, and its age', () => {
+    const held = { ok: true, fetchedAt: Date.now() - 5 * 3600000, course: { ok: true, groups: [{ heading: 'Fall 2029', items: [] }] }, exam: { ok: true, groups: [] } };
+    const storage = makeLocalStorage({ dtuDarkModeDeadlinesCacheV2: JSON.stringify(held) });
+    // The background worker restarted, so the failed course page arrives with nothing held.
+    const reply = { ok: true, fetchedAt: Date.now(), course: { ok: false, error: 'http' }, exam: { ok: true, groups: [{ heading: 'Exam', items: [] }] } };
+    const api = loadDeadlineUi({ storage, reply });
+    api.requestStudentDeadlines(true, () => {});
+    const saved = JSON.parse(storage.getItem('dtuDarkModeDeadlinesCacheV2'));
+    assert.deepEqual(saved.course, held.course, 'the held course deadlines stay');
+    assert.equal(saved.exam.groups[0].heading, 'Exam', 'the new exam page is used');
+    assert.equal(saved.fetchedAt, held.fetchedAt, 'the answer is as old as the copy kept');
+});
+
+test('a failed DTU page is asked for again, at most once per 10 minutes across pages', () => {
+    const storage = makeLocalStorage();
+    const today = utc('2026-09-30');
+    const course = [{ heading: 'Fall 2029', items: [deadlineItem({ label: 'Registration period', start: '2029-07-08', end: '2029-08-05' })] }];
+    const failed = Object.assign(responseWith({ course }), { ok: true, fetchedAt: Date.now() - 3600000, exam: { ok: false, error: 'http' } });
+    const messages = [];
+    loadDeadlineUi({ messages, storage: makeLocalStorage() }).scheduleDailyDeadlinesCheck({}, failed, today);
+    assert.equal(messages.length, 1, 'a fresh answer with a failed page is refetched');
+    messages.length = 0;
+    loadDeadlineUi({ messages, storage, reply: failed }).requestStudentDeadlines(false, () => {});
+    assert.equal(messages.length, 1);
+    loadDeadlineUi({ messages, storage }).scheduleDailyDeadlinesCheck({}, failed, today);
+    assert.equal(messages.length, 1, 'the next page load waits out the pause');
+    storage.setItem('dtuDarkModeDeadlinesFailedAt', String(Date.now() - 11 * 60000));
+    loadDeadlineUi({ messages, storage }).scheduleDailyDeadlinesCheck({}, failed, today);
+    assert.equal(messages.length, 2, 'after 10 minutes it is asked for again');
 });

@@ -80,7 +80,7 @@ function loadDeadlines(cacheText) {
         removeItem(key) { store.delete(key); }
     };
 
-    const { api } = loadModuleInternals('darkmode.deadlines.js', ['renderDeadlinesHomepageWidget'], {
+    const { api } = loadModuleInternals(['darkmode.deadlines.data.js', 'darkmode.deadlines.timeline.js', 'darkmode.deadlines.js'], ['renderDeadlinesHomepageWidget'], {
         document,
         localStorage,
         window,

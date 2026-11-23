@@ -43,7 +43,7 @@ The public extension operates locally in your browser and stores settings/caches
 
 - Theme and feature preferences (dark mode mirror, accent theme, toggle states).
 - Study Planner exam schedule entries you save (course code, format, dates, and the DTU date they were based on), under `dtuAfterDarkExamScheduleV1`. They stay until you reset them.
-- Feature caches:
+- Feature caches (expired entries are deleted when the browser starts; if storage is full, all caches are cleared):
   - Grade stats cache (24h)
   - Course evaluation cache (24h)
   - Course workload rating cache for the Study Planner exam schedule (7 days): the average and number of answers to the workload question of a course's latest public evaluation
@@ -63,6 +63,9 @@ The public extension operates locally in your browser and stores settings/caches
 - Course map depth (how many steps back and forward) on `kurser.dtu.dk`.
 - Deadlines widget cache/state.
 - GPA simulator entries and some UI state flags.
+- Lessons Download course: announcements, assignments (with their rubric assessment), quizzes, discussions (with the files attached to posts) and your grades are read with your DTU Learn session only when you press Download, and go straight into the ZIP on your device; nothing is kept in storage or sent anywhere. Discussions are saved as DTU Learn shows them to you, with the names of the people who posted. To mark staff posts it reads the course class list (roles only); to find your group's submissions it reads the course's group list. Both stay in memory for that run. Videos: when you open the panel it reads each video's size (one small request per video; for videos hosted by Brightspace it asks DTU Learn for a session token, as DTU Learn's own player does, and asks Brightspace's content service, api.eu-west-1.content-service.brightspace.com). Pressing Download starts each video as its own browser download, not inside the ZIP; a video the teacher has not allowed to be downloaded is skipped. Nothing is stored.
+- Study Planner exam schedule: your planned exams with DTU's grading deadline (course code, name, exam day, deadline) in extension storage, so CampusNet Grades can say which grades are not out after the deadline. Kept until 200 days after the deadline; never sent anywhere.
+- CampusNet Grades: the grade rows seen on your last visit (course code, grade, ECTS), so a new grade gets a "New" mark once. Kept in your browser only.
 
 Note: origin-scoped `localStorage` keys can be readable by scripts running on that same site origin.
 
@@ -85,7 +88,7 @@ Note: origin-scoped `localStorage` keys can be readable by scripts running on th
 
 Grade Statistics uses anonymous public DTU requests. A failed request is not cached as an empty course; while its course page remains open, the extension waits 10 minutes before retrying. Switching the feature off cancels that retry.
 
-The Study Planner exam schedule reads DTU's public exam table (`student.dtu.dk/en/exam/exam-dates`, no cookies, cached 12 h) and the kurser.dtu.dk page of each course in the periods being shown (with your browser's DTU cookies, cached 24 h) when you open the panel. The courses in your planner basket are read from the page itself, and their kurser.dtu.dk pages are fetched the same way. Only course codes are sent; failed reads are not cached. "Add to calendar (.ics)" builds the calendar file in your browser and saves it as a download; nothing is uploaded. kurser.dtu.dk course pages read the same exam table (same 12 h cache) for their Exam date row; the course's own exam fields are read from the open page, so no course page is fetched.
+The Study Planner exam schedule reads DTU's public exam table (`student.dtu.dk/en/exam/exam-dates`, no cookies, cached 12 h) and the kurser.dtu.dk page of each course in the periods being shown (with your browser's DTU cookies, cached 24 h) when you open the panel. The courses in your planner basket are read from the page itself, and their kurser.dtu.dk pages are fetched the same way. Only course codes are sent; failed reads, and an exam dates page without the exam table, are not cached. "Add to calendar (.ics)" builds the calendar file in your browser and saves it as a download; nothing is uploaded. kurser.dtu.dk course pages read the same exam table (same 12 h cache) for their Exam date row; the course's own exam fields are read from the open page, so no course page is fetched. The Grades widget reads a file shipped inside the extension (DTU's published exam totals per course) to ask karakterer.dtu.dk only for exam terms the course had.
 
 Course Evaluation waits 10 minutes after repeated fetch failures while its course page remains open. Switching the feature off cancels pending retries and discards late responses before rendering or starting another lookup.
 
@@ -121,6 +124,10 @@ Some features render optional outbound links (opened only when you click), inclu
 - `https://www.dtu.dk/*`
 - `https://www.bibliotek.dtu.dk/*`
 
+Optional, asked for only when you switch on Exchange Deadline in Settings:
+
+- `https://beyondborders.dtu.dk/*`: reads DTU's public list of partner universities at most once a day to find the exchange application deadline. The request carries no cookies and nothing about you.
+
 ### Content script injection hosts
 
 - `learn.inside.dtu.dk`
@@ -154,5 +161,9 @@ You can remove stored data by clearing extension storage and site storage in you
 Information shown by the extension (exam dates, deadlines, grades, GPA calculations, bus times, course evaluations, and library data) can be inaccurate, incomplete, or outdated. Always verify critical information through official DTU channels.
 
 ## Contact
+
+The Settings feedback link opens a draft in your own mail program. The draft lists the page address (without its query or fragment), the extension version, your browser and version, your theme and accent, and which features are switched off. Nothing is sent until you send the mail, and you can delete any line first.
+
+The Deadlines widget's "Add to calendar" builds its calendar file in your browser and saves it as a download; nothing is uploaded.
 
 For privacy/security questions, open an issue on the GitHub repository or contact: `Daniel-yttesen@hotmail.com`.

@@ -1,9 +1,13 @@
 (function () {
     'use strict';
-    var markExt = globalThis.DTUAfterDarkDom.markExt;
+    var dom = globalThis.DTUAfterDarkDom;
+    if (!dom || typeof dom.markExt !== 'function') {
+        throw new Error('DTU After Dark: darkmode.dom.js must load before darkmode.library.js');
+    }
+    var markExt = dom.markExt;
 
     function getDeps() {
-        try { return globalThis.DTUAfterDarkLibraryDeps || null; } catch (e0) { return null; }
+        return globalThis.DTUAfterDarkLibraryDeps || null;
     }
 
     function readState() {
@@ -37,15 +41,6 @@
         return hits && hits.length ? hits[0] : null;
     }
 
-    function formatLibraryOccupancyCount(value) {
-        var deps = getDeps();
-        if (deps && typeof deps.formatLibraryOccupancyCount === 'function') {
-            return deps.formatLibraryOccupancyCount(value);
-        }
-        if (typeof value !== 'number' || !isFinite(value)) return '--';
-        try { return value.toLocaleString('en-GB'); } catch (e0) { return String(value); }
-    }
-
     function ensureLibraryFallbackStyles() {
         if (document.getElementById('dtu-library-fallback-style')) return;
         var host = document.head || document.documentElement;
@@ -76,12 +71,6 @@
             + '.dtu-library-item-title{font-size:13px!important;font-weight:700!important;color:#e8e8e8!important;}'
             + '@media(max-width:900px){.dtu-library-link-grid,.dtu-library-feed-grid{grid-template-columns:1fr!important;}}';
         host.appendChild(style);
-    }
-
-    function extractLibraryCurrentSnapshot(crowdingResp, fallbackOccupancyResp) {
-        var deps = getDeps();
-        if (!deps || typeof deps.extractLibraryCurrentSnapshot !== 'function') return null;
-        return deps.extractLibraryCurrentSnapshot(crowdingResp, fallbackOccupancyResp);
     }
 
     function removeLibraryNavDropdown() {
@@ -421,30 +410,26 @@
         trendSection.onRetry = function () { fetchLibraryCrowdingAndRender(true); };
         headerOccupancy.onRefresh = function () { fetchLibraryCrowdingAndRender(true); };
 
-        if (typeof deps.requestLibraryEvents === 'function') {
-            try {
-                deps.requestLibraryEvents(function (resp) {
-                    latestEventsResp = resp || null;
-                    renderLibraryFeedItems(eventsSection, resp, 'events');
-                    renderLibraryCrowdingViews();
-                });
-            } catch (eEvents) {
-                renderLibraryFeedItems(eventsSection, { ok: false, error: 'fetch_error', message: String(eEvents && eEvents.message || eEvents) }, 'events');
+        function loadLibraryFeed(section, type, onLoaded) {
+            if (typeof deps.requestLibraryFeed !== 'function') {
+                renderLibraryFeedItems(section, null, type);
+                return;
             }
-        } else {
-            renderLibraryFeedItems(eventsSection, null, 'events');
-        }
-        if (typeof deps.requestLibraryNews === 'function') {
             try {
-                deps.requestLibraryNews(function (resp) {
-                    renderLibraryFeedItems(newsSection, resp, 'news');
+                deps.requestLibraryFeed(type, function (resp) {
+                    renderLibraryFeedItems(section, resp, type);
+                    if (onLoaded) onLoaded(resp);
                 });
-            } catch (eNews) {
-                renderLibraryFeedItems(newsSection, { ok: false, error: 'fetch_error', message: String(eNews && eNews.message || eNews) }, 'news');
+            } catch (err) {
+                renderLibraryFeedItems(section, { ok: false, error: 'fetch_error', message: String(err && err.message || err) }, type);
             }
-        } else {
-            renderLibraryFeedItems(newsSection, null, 'news');
         }
+
+        loadLibraryFeed(eventsSection, 'events', function (resp) {
+            latestEventsResp = resp || null;
+            renderLibraryCrowdingViews();
+        });
+        loadLibraryFeed(newsSection, 'news');
         fetchLibraryCrowdingAndRender(false);
 
         state = readState();
@@ -484,42 +469,24 @@
         var container = document.createElement('div');
         container.className = 'dtu-library-header-occupancy';
 
-        var nowItem = document.createElement('span');
-        nowItem.className = 'dtu-library-header-occ-item';
-        var nowLabel = document.createElement('span');
-        nowLabel.className = 'dtu-library-header-occ-label';
-        nowLabel.textContent = 'Now';
-        var nowValue = document.createElement('span');
-        nowValue.className = 'dtu-library-header-occ-value';
-        nowValue.textContent = '--';
-        nowItem.appendChild(nowLabel);
-        nowItem.appendChild(nowValue);
+        function createOccupancyItem(labelText) {
+            var item = document.createElement('span');
+            item.className = 'dtu-library-header-occ-item';
+            var label = document.createElement('span');
+            label.className = 'dtu-library-header-occ-label';
+            label.textContent = labelText;
+            var value = document.createElement('span');
+            value.className = 'dtu-library-header-occ-value';
+            value.textContent = '--';
+            item.appendChild(label);
+            item.appendChild(value);
+            container.appendChild(item);
+            return value;
+        }
 
-        var todayItem = document.createElement('span');
-        todayItem.className = 'dtu-library-header-occ-item';
-        var todayLabel = document.createElement('span');
-        todayLabel.className = 'dtu-library-header-occ-label';
-        todayLabel.textContent = 'Today';
-        var todayValue = document.createElement('span');
-        todayValue.className = 'dtu-library-header-occ-value';
-        todayValue.textContent = '--';
-        todayItem.appendChild(todayLabel);
-        todayItem.appendChild(todayValue);
-
-        var freeItem = document.createElement('span');
-        freeItem.className = 'dtu-library-header-occ-item';
-        var freeLabel = document.createElement('span');
-        freeLabel.className = 'dtu-library-header-occ-label';
-        freeLabel.textContent = 'Free';
-        var freeValue = document.createElement('span');
-        freeValue.className = 'dtu-library-header-occ-value';
-        freeValue.textContent = '--';
-        freeItem.appendChild(freeLabel);
-        freeItem.appendChild(freeValue);
-
-        container.appendChild(nowItem);
-        container.appendChild(todayItem);
-        container.appendChild(freeItem);
+        var nowValue = createOccupancyItem('Now');
+        var todayValue = createOccupancyItem('Today');
+        var freeValue = createOccupancyItem('Free');
 
         var updatedEl = document.createElement('span');
         updatedEl.className = 'dtu-library-header-updated';
@@ -544,7 +511,11 @@
 
     function renderLibraryHeaderOccupancy(slot, resp) {
         var deps = getDeps();
-        if (!slot || !slot.container || !deps) return;
+        if (!slot || !slot.container) return;
+        if (!deps) throw new Error('DTU After Dark: library dependencies are missing');
+        if (typeof deps.extractLibraryCurrentSnapshot !== 'function' || typeof deps.formatLibraryOccupancyCount !== 'function') {
+            throw new Error('DTU After Dark: library occupancy helpers are missing');
+        }
 
         if (!slot._dtuRefreshHooked && slot.refreshBtn) {
             slot._dtuRefreshHooked = true;
@@ -559,7 +530,7 @@
             });
         }
 
-        var snap = extractLibraryCurrentSnapshot(
+        var snap = deps.extractLibraryCurrentSnapshot(
             (resp && resp.current) || (resp && resp.latest) || (resp && resp.historical) ? resp : null,
             (resp && resp.occupancy) ? resp : null
         );
@@ -576,13 +547,13 @@
             return;
         }
 
-        if (slot.nowValue) slot.nowValue.textContent = formatLibraryOccupancyCount(snap.visitors);
-        if (slot.todayValue) slot.todayValue.textContent = formatLibraryOccupancyCount(snap.today);
-        if (slot.freeValue) slot.freeValue.textContent = formatLibraryOccupancyCount(snap.freeSeats);
+        if (slot.nowValue) slot.nowValue.textContent = deps.formatLibraryOccupancyCount(snap.visitors);
+        if (slot.todayValue) slot.todayValue.textContent = deps.formatLibraryOccupancyCount(snap.today);
+        if (slot.freeValue) slot.freeValue.textContent = deps.formatLibraryOccupancyCount(snap.freeSeats);
 
         var updated = '';
         if (snap.fetchedAt) {
-            try { updated = new Date(snap.fetchedAt).toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit', hour12: false }); } catch (e1) { updated = ''; }
+            try { updated = new Date(snap.fetchedAt).toLocaleTimeString('da-DK', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Europe/Copenhagen' }); } catch (e1) { updated = ''; }
         }
         if (slot.updatedEl) slot.updatedEl.textContent = updated ? ('Updated ' + updated) : 'Updated just now';
 
@@ -590,6 +561,23 @@
             slot.container.title = 'Source: ' + snap.source;
             if (slot.updatedEl) slot.updatedEl.title = 'Source: ' + snap.source;
         }
+    }
+
+    function skeletonApi() {
+        var skel = globalThis.DTUAfterDarkSkeleton;
+        if (!skel) throw new Error('DTUAfterDarkSkeleton missing: load darkmode.skeleton.js before darkmode.library.js');
+        return skel;
+    }
+
+    // Three placeholder items shaped like the feed's own: a date badge beside a
+    // title and a meta line for events; tag, title and date for news.
+    function feedSkeleton(type) {
+        var item = type === 'events'
+            ? [['30px', '34px'], [['72%', '13px'], ['48%', '11px']]]
+            : { className: 'dtu-skel-stack', bars: [['84px', '10px'], ['82%', '13px'], ['96px', '11px']] };
+        var box = skeletonApi().block(type === 'events' ? 'Loading events' : 'Loading library news', [item, item, item], markExt);
+        box.style.cssText = 'gap:24px;padding:10px 0';
+        return box;
     }
 
     function createLibraryFeedSection(title, type) {
@@ -622,40 +610,19 @@
         var body = document.createElement('div');
         body.className = 'dtu-library-feed-list';
 
-        var loading = document.createElement('div');
-        loading.className = 'dtu-library-state-msg';
-        loading.textContent = 'Loading...';
-        body.appendChild(loading);
+        body.appendChild(feedSkeleton(type));
 
         container.appendChild(body);
 
         return { container: container, body: body, refreshBtn: refreshBtn, itemEls: [] };
     }
 
-    // DTU posts library news a few times a term, so its latest ten reach back many
-    // months and read as stale. Only the last three months are shown; when nothing
-    // is that recent, the newest item stays so the section is never blank.
-    var LIBRARY_NEWS_MAX_AGE_MS = 92 * 86400000;
-
-    function selectRecentLibraryNews(news, nowTs) {
-        var list = Array.isArray(news) ? news : [];
-        var recent = list.filter(function (item) {
-            var ts = Date.parse(item && (item.dateIso || item.date) || '');
-            return !isFinite(ts) || (nowTs - ts) <= LIBRARY_NEWS_MAX_AGE_MS;
-        });
-        return recent.length ? recent : list.slice(0, 1);
-    }
-
     function renderLibraryFeedItems(section, resp, type) {
-        renderLibraryFeedItemsInto(section, resp, type);
-        if (section) markLibrarySubtree(section.container || section.body);
-    }
-
-    function renderLibraryFeedItemsInto(section, resp, type) {
         var deps = getDeps() || {};
         if (!section || !section.body) return;
 
         var body = section.body;
+        var wasLoading = !!body.querySelector('[data-dtu-skel-block]');
         while (body.firstChild) body.removeChild(body.firstChild);
         section.itemEls = [];
 
@@ -664,17 +631,10 @@
             section.refreshBtn.addEventListener('click', function (e) {
                 try { e.preventDefault(); } catch (e0) { }
                 while (body.firstChild) body.removeChild(body.firstChild);
-                var loading = document.createElement('div');
-                loading.className = 'dtu-library-state-msg';
-                loading.textContent = 'Loading...';
-                body.appendChild(loading);
+                body.appendChild(feedSkeleton(type));
 
-                if (type === 'events' && typeof deps.requestLibraryEvents === 'function') {
-                    deps.requestLibraryEvents(function (r) {
-                        renderLibraryFeedItems(section, r, type);
-                    }, true);
-                } else if (type !== 'events' && typeof deps.requestLibraryNews === 'function') {
-                    deps.requestLibraryNews(function (r) {
+                if (typeof deps.requestLibraryFeed === 'function') {
+                    deps.requestLibraryFeed(type, function (r) {
                         renderLibraryFeedItems(section, r, type);
                     }, true);
                 }
@@ -683,7 +643,14 @@
 
         var items = null;
         if (resp && resp.ok) {
-            items = type === 'events' ? resp.events : selectRecentLibraryNews(resp.news, Date.now());
+            if (type === 'events') {
+                items = resp.events;
+            } else {
+                if (typeof deps.selectRecentLibraryNews !== 'function') {
+                    throw new Error('DTU After Dark: library news selector is missing');
+                }
+                items = deps.selectRecentLibraryNews(resp.news, Date.now());
+            }
         }
 
         if (resp && resp.ok === false) {
@@ -702,6 +669,7 @@
                 msg.style.cssText = 'font-size: 10px; margin-top: 4px; opacity: 0.7;';
                 err.appendChild(msg);
             }
+            markLibrarySubtree(section.container || section.body);
             return;
         }
 
@@ -710,6 +678,7 @@
             empty.className = 'dtu-library-state-msg';
             empty.textContent = type === 'events' ? 'No upcoming events' : 'No news available';
             body.appendChild(empty);
+            markLibrarySubtree(section.container || section.body);
             return;
         }
 
@@ -779,6 +748,8 @@
             itemEls.push(row);
         });
         section.itemEls = itemEls;
+        markLibrarySubtree(section.container || section.body);
+        if (wasLoading) skeletonApi().reveal(body, markExt);
     }
 
     try {

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 import vm from 'node:vm';
-import { extractFunctions, plain, loadDom } from './_harness.mjs';
+import { extractFunctions, plain, loadDom, readSource } from './_harness.mjs';
 
 const ROOT = new URL('../', import.meta.url);
 
@@ -107,7 +107,10 @@ function loadLibraryTestApi() {
         getLibraryUiState() { return {}; },
         setLibraryUiState() {},
         ensureLibraryRuntimeStyles() {},
-        markExt(element) { element.setAttribute('data-dtu-ext', '1'); }
+        markExt(element) { element.setAttribute('data-dtu-ext', '1'); },
+        extractLibraryCurrentSnapshot() { return { hasCurrent: false }; },
+        formatLibraryOccupancyCount(value) { return String(value); },
+        selectRecentLibraryNews(news) { return Array.isArray(news) ? news : []; }
     };
     return { ...sandbox.__libraryModalTestApi, document, intervalDelays };
 }
@@ -160,7 +163,7 @@ test('closing the library panel gives the page its scrolling back, whatever the 
     assert.equal(api.document.body.style.overflow, 'auto');
 });
 
-const { api: newsApi } = extractFunctions('darkmode.library.js', ['selectRecentLibraryNews'], {
+const { api: newsApi } = extractFunctions('darkmode.library-data.js', ['selectRecentLibraryNews'], {
     prelude: 'var LIBRARY_NEWS_MAX_AGE_MS = 92 * 86400000;'
 });
 const NEWS_NOW = Date.UTC(2026, 10, 7);
@@ -181,6 +184,39 @@ test('the newest item stays when nothing is recent, and undated items are kept',
     assert.deepEqual(plain(newsApi.selectRecentLibraryNews(old, NEWS_NOW)).map(item => item.date), ['May 26, 2026']);
     assert.equal(newsApi.selectRecentLibraryNews([{ title: 'Undated', date: '' }], NEWS_NOW).length, 1);
     assert.equal(newsApi.selectRecentLibraryNews(null, NEWS_NOW).length, 0);
+});
+
+// The library's hours are Danish. Run in a browser far from Denmark (UTC+14),
+// event times, the minute of day and the date key must not move.
+test('library times are Danish hours whatever the browser time zone', () => {
+    const before = process.env.TZ;
+    process.env.TZ = 'Pacific/Kiritimati';
+    try {
+        const { api: tz } = extractFunctions('darkmode.library-data.js', [
+            'copenhagenMinuteOfDay', 'toLibraryDateKey', 'parseLibraryMinuteOfDay',
+            'isLibraryEventAtDtuLibrary', 'parseLibraryTimeRangeFromText', 'buildLibraryEventIntervals'
+        ], {
+            globals: { window: {}, document: {} },
+            prelude: readSource('darkmode.dom.js') + '\nvar dom = globalThis.DTUAfterDarkDom;'
+        });
+        assert.equal(new Date(Date.UTC(2026, 10, 26, 9, 0)).getHours(), 23, 'the sandbox runs at UTC+14');
+        assert.equal(tz.toLibraryDateKey(Date.UTC(2026, 10, 22, 22, 30)), '2026-11-22');
+        assert.equal(tz.parseLibraryMinuteOfDay('2026-11-26T07:30:00Z'), 8 * 60 + 30);
+        assert.equal(tz.parseLibraryMinuteOfDay('10:15'), 10 * 60 + 15);
+        // DTU Library's feed on 22 Nov 2026: "26. Nov 08:30 - 12:30", sent as UTC.
+        const model = { nowTs: Date.UTC(2026, 10, 26, 9, 0), startHour: 8, endHour: 22 };
+        const events = { ok: true, events: [
+            { title: 'Workshop', location: 'DTU Library, Lyngby', startIso: '2026-11-26T07:30:00Z', endIso: '2026-11-26T11:30:00Z' },
+            { title: 'Talk', location: 'DTU Library', startIso: '2026-11-26T16:00:00Z', endIso: '', formattedDate: '26. Nov 17:00 - 20:00' },
+            { title: 'Tomorrow', location: 'DTU Library', startIso: '2026-11-27T10:30:00Z', endIso: '2026-11-27T12:30:00Z' }
+        ] };
+        assert.deepEqual(plain(tz.buildLibraryEventIntervals(events, model)).map(e => [e.title, e.startMinute, e.endMinute]), [
+            ['Workshop', 510, 750],
+            ['Talk', 1020, 1200]
+        ]);
+    } finally {
+        if (before === undefined) delete process.env.TZ; else process.env.TZ = before;
+    }
 });
 
 const { api: crowdApi } = extractFunctions('darkmode.library-data.js', [

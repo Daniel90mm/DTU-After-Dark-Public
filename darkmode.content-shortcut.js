@@ -3,12 +3,16 @@
     var markExt = globalThis.DTUAfterDarkDom.markExt;
     var isTopWindow = globalThis.DTUAfterDarkDom.isTopWindow;
     var normalizeWhitespace = globalThis.DTUAfterDarkDom.normalizeWhitespace;
+    var schedulePlacement = globalThis.DTUAfterDarkDom.schedulePlacement;
+    if (typeof schedulePlacement !== 'function') {
+        throw new Error('darkmode.content-shortcut.js requires DTUAfterDarkDom.schedulePlacement');
+    }
 
     var CONTENT_SHORTCUT_OVERRIDES_KEY = 'dtuAfterDarkContentShortcutOverridesV1';
     var contentShortcutOverrides = readContentShortcutOverridesFromLocalStorage();
     var contentShortcutOverridesStorageSubscribed = false;
     var contentShortcutsLastEnabled = null;
-    var contentButtonBootstrapTimer = null;
+    var contentButtonBootstrapWatch = null;
 
     function getDeps() {
         try { return globalThis.DTUAfterDarkContentShortcutDeps || null; } catch (e0) { return null; }
@@ -934,28 +938,22 @@
 
     function startContentButtonBootstrap() {
         if (!isTopWindow() || !isDTULearnHomepage()) return;
-        if (contentButtonBootstrapTimer) return;
-
-        var attempts = 0;
-        contentButtonBootstrapTimer = setInterval(function () {
-            if (!isDTULearnHomepage()) {
-                clearInterval(contentButtonBootstrapTimer);
-                contentButtonBootstrapTimer = null;
-                return;
+        if (contentButtonBootstrapWatch && contentButtonBootstrapWatch.active()) {
+            contentButtonBootstrapWatch.trigger();
+            return;
+        }
+        contentButtonBootstrapWatch = schedulePlacement({
+            capMs: 30000,
+            run: function () {
+                if (!isDTULearnHomepage()) return true;
+                if (!isContentShortcutEnabled()) {
+                    removeContentButtons();
+                    return true;
+                }
+                insertContentButtons();
+                return deepQueryAll('.dtu-dark-content-btn', document).length > 0;
             }
-            if (!isContentShortcutEnabled()) {
-                removeContentButtons();
-                clearInterval(contentButtonBootstrapTimer);
-                contentButtonBootstrapTimer = null;
-                return;
-            }
-            insertContentButtons();
-            attempts++;
-            if (deepQueryAll('.dtu-dark-content-btn', document).length || attempts >= 60) {
-                clearInterval(contentButtonBootstrapTimer);
-                contentButtonBootstrapTimer = null;
-            }
-        }, 500);
+        });
     }
 
     function removeContentButtons(rootNode) {

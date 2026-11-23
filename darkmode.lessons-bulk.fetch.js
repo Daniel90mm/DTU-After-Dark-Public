@@ -32,6 +32,9 @@
 
     var _lessonsTocIndex = _lessonsBulkState.lessonsTocIndex;
 
+    var LESSONS_API_VERSIONS = ['1.75', '1.74', '1.73', '1.72', '1.71', '1.70', '1.69', '1.68', '1.67'];
+    var LESSONS_FILE_EXT_RE = /\.(?:pdf|doc|docx|ppt|pptx|xls|xlsx|zip|rar|7z|txt|csv|md|m|mlx|ipynb|py|java|c|cpp|h|json|xml|jpg|jpeg|png|gif|mp4|mov|webm|avi)(?:$|[?#])/i;
+
     function toAbsoluteSamePageUrl(rawUrl, baseUrl) {
         if (!rawUrl) return '';
         var v = String(rawUrl).trim();
@@ -81,7 +84,7 @@
             if (/\/content\/enforced\//i.test(path)) return true;
 
             // Secondary: explicit file URLs only (avoid generic "/download" endpoints that often redirect to 404).
-            if (/\.(?:pdf|doc|docx|ppt|pptx|xls|xlsx|zip|rar|7z|txt|csv|md|m|mlx|ipynb|py|java|c|cpp|h|json|xml|jpg|jpeg|png|gif|mp4|mov|webm|avi)(?:$|[?#])/i.test(path)) return true;
+            if (LESSONS_FILE_EXT_RE.test(path)) return true;
         } catch (e0) {
             return false;
         }
@@ -89,17 +92,7 @@
     }
 
     function isStrictFileDownloadUrl(absUrl) {
-        if (!isLikelyDownloadUrl(absUrl)) return false;
-        try {
-            var u = new URL(absUrl, window.location.href);
-            var p = (u.pathname || '').toLowerCase();
-            if (/\/d2l\/error\//i.test(p)) return false;
-            if (/\/content\/enforced\//i.test(p)) return true;
-            if (/\.(?:pdf|doc|docx|ppt|pptx|xls|xlsx|zip|rar|7z|txt|csv|md|m|mlx|ipynb|py|java|c|cpp|h|json|xml|jpg|jpeg|png|gif|mp4|mov|webm|avi)(?:$|[?#])/i.test(p)) return true;
-        } catch (e0) {
-            return false;
-        }
-        return false;
+        return isLikelyDownloadUrl(absUrl);
     }
 
     function getApiObjectId(obj) {
@@ -213,7 +206,7 @@
 
         var entry = existing || { json: null, ts: 0, promise: null };
         entry.promise = (async function () {
-            var versions = ['1.75', '1.74', '1.73', '1.72', '1.71', '1.70', '1.69', '1.68', '1.67'];
+            var versions = LESSONS_API_VERSIONS;
             for (var i = 0; i < versions.length; i++) {
                 var endpoint = '/d2l/api/le/' + versions[i] + '/' + orgUnitId + '/content/modules/' + moduleId + '/structure/';
                 try {
@@ -407,7 +400,7 @@
 
         // Fallback for unexpected API payloads.
         if (!outTopicIds.size) {
-            var versions = ['1.75', '1.74', '1.73', '1.72', '1.71', '1.70', '1.69', '1.68', '1.67'];
+            var versions = LESSONS_API_VERSIONS;
             for (var v = 0; v < versions.length; v++) {
                 var base = '/d2l/api/le/' + versions[v] + '/' + ids.orgUnitId + '/content/modules/' + ids.unitId;
                 var endpoints = [
@@ -557,7 +550,7 @@
         }
 
         var out = new Set();
-        var versions = ['1.75', '1.74', '1.73', '1.72', '1.71', '1.70', '1.69', '1.68', '1.67'];
+        var versions = LESSONS_API_VERSIONS;
         if (_lessonsBulkState.lessonsTopicApiVersion) versions = [_lessonsBulkState.lessonsTopicApiVersion];
         for (var i = 0; i < versions.length; i++) {
             var apiUrl = '/d2l/api/le/' + versions[i] + '/' + ids.orgUnitId + '/content/topics/' + ids.topicId;
@@ -606,22 +599,25 @@
 
     function buildLessonsTocIndex(toc) {
         var index = new Map();
-        function walk(modules) {
+        // modules: the ids of every module above the topic, so a unit URL finds its topics.
+        function walk(modules, above) {
             if (!Array.isArray(modules)) return;
             modules.forEach(function (mod) {
                 if (!mod || typeof mod !== 'object') return;
+                var path = above.concat(mod.ModuleId != null ? [String(mod.ModuleId)] : []);
                 (Array.isArray(mod.Topics) ? mod.Topics : []).forEach(function (topic) {
                     if (!topic || topic.TopicId == null) return;
                     index.set(String(topic.TopicId), {
                         type: String(topic.TypeIdentifier || ''),
                         url: String(topic.Url || ''),
-                        title: String(topic.Title || '')
+                        title: String(topic.Title || ''),
+                        modules: path
                     });
                 });
-                walk(mod.Modules);
+                walk(mod.Modules, path);
             });
         }
-        walk(toc && toc.Modules);
+        walk(toc && toc.Modules, []);
         return index;
     }
 
@@ -632,6 +628,10 @@
         var entry = index.get(ids.topicId);
         if (!entry) return null;
         if (/^link$/i.test(entry.type)) return { links: [], notFile: true };
+        // A Brightspace-hosted video has no file URL; the run fetches it through the video module.
+        if (/^contentservice$/i.test(entry.type) && /:video:/i.test(entry.url)) {
+            return { links: [], notFile: true, videos: [{ orgUnitId: ids.orgUnitId, topicId: ids.topicId, title: entry.title }] };
+        }
         if (/^file$/i.test(entry.type)) {
             var abs = toAbsoluteSamePageUrl(entry.url, window.location.origin);
             if (abs && isStrictFileDownloadUrl(abs)) return { links: [abs], notFile: false };
@@ -642,7 +642,7 @@
     async function loadLessonsTocIndex(orgUnitId) {
         if (!orgUnitId) return null;
         if (_lessonsTocIndex.orgUnitId === orgUnitId && _lessonsTocIndex.index) return _lessonsTocIndex.index;
-        var versions = ['1.75', '1.74', '1.73', '1.72', '1.71', '1.70', '1.69', '1.68', '1.67'];
+        var versions = LESSONS_API_VERSIONS;
         if (_lessonsBulkState.lessonsTopicApiVersion) versions = [_lessonsBulkState.lessonsTopicApiVersion].concat(versions.filter(function (v) { return v !== _lessonsBulkState.lessonsTopicApiVersion; }));
         for (var i = 0; i < versions.length; i++) {
             throwIfLessonsBulkAborted();
@@ -877,7 +877,7 @@
         var doc = null;
         try { doc = new DOMParser().parseFromString(text, 'text/html'); } catch (e0) { doc = null; }
 
-        function maybeAdd(rawUrl, sourceText) {
+        function maybeAdd(rawUrl) {
             var decoded = decodeEscapedUrlText(rawUrl);
             if (!decoded) return;
             if (/[<>"']/.test(decoded)) return;
@@ -892,7 +892,7 @@
         if (doc && doc.querySelectorAll) {
             doc.querySelectorAll('a[href], iframe[src], embed[src], source[src], object[data]').forEach(function (el) {
                 var raw = el.getAttribute('href') || el.getAttribute('src') || el.getAttribute('data') || '';
-                maybeAdd(raw, normalizeWhitespace(el.textContent || ''));
+                maybeAdd(raw);
             });
         }
 
@@ -904,7 +904,7 @@
         regexes.forEach(function (re) {
             var m;
             while ((m = re.exec(text)) !== null) {
-                maybeAdd(m[0], '');
+                maybeAdd(m[0]);
             }
         });
 

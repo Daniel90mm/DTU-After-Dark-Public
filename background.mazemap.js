@@ -2,6 +2,7 @@
 (function() {
     'use strict';
 
+    const fetchWithTimeLimit = DTUAfterDarkShared.fetchWithTimeLimit;
     // =========================
     // MazeMap resolver (DTU)
     // =========================
@@ -117,7 +118,7 @@
         }
         const url = `https://api.mazemap.com/search/equery/?q=${encodeURIComponent(q)}&campusid=${MAZEMAP_CAMPUS_ID}`;
         try {
-            const res = await fetch(url, { cache: 'no-store', credentials: 'omit' });
+            const res = await fetchWithTimeLimit(url, { cache: 'no-store', credentials: 'omit' });
             if (!res || !res.ok) {
                 return { ok: false, error: 'http', status: res ? res.status : 0 };
             }

@@ -2,6 +2,7 @@
 (function() {
     'use strict';
 
+    const fetchWithTimeLimit = DTUAfterDarkShared.fetchWithTimeLimit;
     const decodeBasicHtmlEntities = DTUAfterDarkShared.decodeBasicHtmlEntities;
 
     const GRADES = ['12', '10', '7', '4', '02', '00', '-3'];
@@ -262,7 +263,7 @@
 
     async function fetchGradePage(codeVariant, semester) {
         const url = `https://karakterer.dtu.dk/Histogram/1/${encodeURIComponent(codeVariant)}/${semester}`;
-        const res = await fetch(url, { cache: 'no-store', credentials: 'omit' });
+        const res = await fetchWithTimeLimit(url, { cache: 'no-store', credentials: 'omit' });
         if (res && res.status === 404) return null;
         if (!res || !res.ok) throw new Error('grade_http_' + (res ? res.status : 'unknown'));
         return await res.text();

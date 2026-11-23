@@ -563,6 +563,7 @@
         });
         styleLegacyFloatingButtons(scope, true);
         styleLegacySortButtonShadows(scope);
+        styleLegacyNavTooltips(scope);
     }
 
     // On legacy heavy pages the dark engine skips Brightspace shadow-DOM
@@ -581,6 +582,28 @@
             style.textContent =
                 'button{background-color:transparent !important;color:#e0e0e0 !important;}'
                 + 'button:hover,button:focus,button:active{background-color:#3d3d3d !important;color:#e0e0e0 !important;}';
+            sr.appendChild(style);
+        });
+    }
+
+    // Navbar tooltips ("Message alerts") sit in each navbar button's shadow root,
+    // out of reach of darkmode.css, and default to --d2l-color-ferrite, which
+    // darkmode.css remaps to light text. A rule in the button's shadow root beats
+    // the tooltip's own :host rule, and also covers tooltips rendered later.
+    function styleLegacyNavTooltips(scope) {
+        var root = (scope && scope.querySelectorAll) ? scope : document;
+        var hosts;
+        try {
+            hosts = root.querySelectorAll('d2l-labs-navigation-button-icon, d2l-labs-navigation-dropdown-button-icon, d2l-labs-navigation-link-image');
+        } catch (e) { return; }
+        hosts.forEach(function (host) {
+            var sr = host && host.shadowRoot;
+            if (!sr || sr.getElementById('dtu-dark-nav-tooltip')) return;
+            var style = document.createElement('style');
+            style.id = 'dtu-dark-nav-tooltip';
+            style.textContent = 'd2l-tooltip:not([state="error"]){'
+                + '--d2l-tooltip-background-color:#2d2d2d !important;--d2l-tooltip-border-color:#404040 !important;'
+                + '--d2l-popover-foreground-color:#e0e0e0 !important;}';
             sr.appendChild(style);
         });
     }

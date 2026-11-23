@@ -44,7 +44,8 @@
             host.appendChild(style);
         }
 
-        var panelBg = isDarkModeEnabled() ? 'rgba(24,24,24,0.97)' : 'rgba(255,255,255,0.98)';
+        // Opaque: Firefox does not blur the page under a translucent panel, so DTU Learn showed through it.
+        var panelBg = isDarkModeEnabled() ? '#181818' : '#ffffff';
         var panelBorder = isDarkModeEnabled() ? '#404040' : '#d6dce7';
         var panelText = isDarkModeEnabled() ? '#e8e8e8' : '#1f2937';
         var muted = isDarkModeEnabled() ? '#9aa0aa' : '#6b7280';
@@ -664,8 +665,10 @@
         progress.setAttribute('aria-valuemax', '100');
         progress.setAttribute('aria-valuenow', '0');
         progress.setAttribute('aria-valuetext', 'Unknown');
+        markExt(progress);
         var progressFill = document.createElement('div');
         progressFill.className = 'dtu-library-crowd-progress-fill';
+        markExt(progressFill);
         progress.appendChild(progressFill);
 
         heroTop.appendChild(heroMain);
@@ -779,7 +782,6 @@
 
         var sectionRef = {
             container: container,
-            titleEl: h3,
             retryBtn: retryBtn,
             hero: hero,
             freeValue: freeValue,
@@ -830,7 +832,6 @@
         var shownToday = showLiveOccupancy ? snap.today : null;
         var shownFreeSeats = showLiveOccupancy ? snap.freeSeats : null;
 
-        if (section.titleEl) section.titleEl.textContent = '';
         // isFinite(null) === true in JS — must check for null explicitly
         var pct = (showLiveOccupancy && model.occupancyRatio != null && isFinite(model.occupancyRatio) ? Math.round(model.occupancyRatio * 100) : null);
         // After hours the live numbers are hidden, so say that once instead of
@@ -935,7 +936,6 @@
             if (chartFlags.hasToday) section.chartLegend.appendChild(makeLegItem('Today', legColors.today, false));
             if (section.usualInfo) section.chartLegend.appendChild(section.usualInfo);
         }
-        syncLibraryUsualInfo(section);
 
         if (section.chartCanvas) {
             if (showLiveOccupancy) {

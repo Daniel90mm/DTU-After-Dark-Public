@@ -98,11 +98,16 @@
         });
     }
 
+    // A key that is not a flag reads as off, with an error: reading it as on
+    // left a renamed flag's feature running with its switch dead.
     function isFeatureFlagEnabled(key) {
         if (!key) return true;
+        if (!Object.prototype.hasOwnProperty.call(FEATURE_FLAG_DEFAULTS, key)) {
+            console.error('DTU After Dark: unknown feature flag ' + key);
+            return false;
+        }
         if (_featureFlagsLoaded) return !!_featureFlags[key];
-        if (Object.prototype.hasOwnProperty.call(FEATURE_FLAG_DEFAULTS, key)) return !!FEATURE_FLAG_DEFAULTS[key];
-        return true;
+        return !!FEATURE_FLAG_DEFAULTS[key];
     }
 
     function setFeatureFlagEnabled(key, enabled) {

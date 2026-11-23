@@ -39,8 +39,20 @@
     // badges and retention tracking.
     // All data stays in browser.storage.local -- nothing leaves the browser.
     var _participantIntelAnnotateTimer = null;
+    var _warnedMissingApis = {};
+    function warnMissingApi(name) {
+        if (_warnedMissingApis[name]) return;
+        _warnedMissingApis[name] = true;
+        try {
+            console.warn('[DTU After Dark] ' + name + ' is missing; participant features use a fallback until it loads.');
+        } catch (e0) { }
+    }
+
     function getParticipantIntelHostApi() {
-        try { return globalThis.DTUAfterDarkParticipantIntelHost || null; } catch (e0) { return null; }
+        var api;
+        try { api = globalThis.DTUAfterDarkParticipantIntelHost || null; } catch (e0) { api = null; }
+        if (!api) warnMissingApi('DTUAfterDarkParticipantIntelHost');
+        return api;
     }
 
     function normalizeIntelCourseCode(code) {
@@ -62,7 +74,9 @@
     }
 
     function getParticipantIntelCoreApi() {
-        return globalThis.DTUAfterDarkParticipantIntelCore || null;
+        var api = globalThis.DTUAfterDarkParticipantIntelCore || null;
+        if (!api) warnMissingApi('DTUAfterDarkParticipantIntelCore');
+        return api;
     }
 
     function dedupeIntelCourseList(courses) {
@@ -160,12 +174,6 @@
         return api.readParticipantProgram(infoDiv);
     }
 
-    function readExportProgram(text) {
-        var api = getParticipantIntelHostApi();
-        if (!api || typeof api.readExportProgram !== 'function') return '';
-        return api.readExportProgram(text);
-    }
-
     function getCampusnetRetentionKey() {
         var api = getParticipantIntelHostApi();
         if (!api || typeof api.getCampusnetRetentionKey !== 'function') return '';
@@ -248,7 +256,9 @@
     // ---- Feature 1: Room Intelligence (Demographics) ----
 
     function getParticipantIntelUiApi() {
-        return globalThis.DTUAfterDarkParticipantIntelUi || null;
+        var api = globalThis.DTUAfterDarkParticipantIntelUi || null;
+        if (!api) warnMissingApi('DTUAfterDarkParticipantIntelUi');
+        return api;
     }
 
     function insertParticipantDemographics() {
@@ -280,7 +290,9 @@
     }
 
     function getParticipantIntelBackfillApi() {
-        return globalThis.DTUAfterDarkParticipantIntelBackfill || null;
+        var api = globalThis.DTUAfterDarkParticipantIntelBackfill || null;
+        if (!api) warnMissingApi('DTUAfterDarkParticipantIntelBackfill');
+        return api;
     }
 
     function insertCampusnetArchiveBackfillWidget() {
@@ -319,7 +331,6 @@
             return;
         }
 
-        var demographicsEnabled = isFeatureFlagEnabled(FEATURE_PARTICIPANT_INTEL_DEMOGRAPHICS_KEY);
         var sharedHistoryEnabled = isFeatureFlagEnabled(FEATURE_PARTICIPANT_INTEL_SHARED_HISTORY_KEY);
         var retentionEnabled = isFeatureFlagEnabled(FEATURE_PARTICIPANT_INTEL_RETENTION_KEY);
 
@@ -381,7 +392,6 @@
         getCampusnetCourseNameFromPage: getCampusnetCourseNameFromPage,
         normalizeProgramLabel: normalizeProgramLabel,
         readParticipantProgram: readParticipantProgram,
-        readExportProgram: readExportProgram,
         isCampusnetParticipantPage: isCampusnetParticipantPage,
         storageLocalGet: storageLocalGet,
         storageLocalSet: storageLocalSet,

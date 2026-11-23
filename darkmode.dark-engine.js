@@ -1,5 +1,7 @@
 (() => {
     const deps = globalThis.DTUAfterDarkDarkEngineDeps || {};
+    const pageCases = globalThis.DTUAfterDarkDarkEnginePageCases;
+    if (!pageCases) throw new Error('darkmode.dark-engine.js loaded before darkmode.dark-engine.page-cases.js');
 
     function isDarkModeEnabled() {
         return !!(deps.isDarkModeEnabled && deps.isDarkModeEnabled());
@@ -42,6 +44,13 @@
         if (deps.scheduleSmartRoomLinkerScan) return deps.scheduleSmartRoomLinkerScan(root, delayMs);
     }
 
+    function invalidateDeepRoots() {
+        if (typeof deps.invalidateDeepRoots !== 'function') {
+            throw new Error('darkmode.dark-engine.js needs deps.invalidateDeepRoots');
+        }
+        deps.invalidateDeepRoots();
+    }
+
     function insertContentButtons(root) {
         if (deps.insertContentButtons) return deps.insertContentButtons(root);
     }
@@ -64,415 +73,54 @@
         el.style.setProperty('border-color', color, 'important');
     }
 
-    const DARK_BG = '#2d2d2d';
-    const DARK_TEXT = '#e0e0e0';
-    const DARK_BORDER = '#404040';
-
-    const shadowDOMStyles = `
-        :host {
-            --d2l-popover-default-background-color: ${DARK_BG} !important;
-            --d2l-popover-background-color: ${DARK_BG} !important;
-            --d2l-popover-default-foreground-color: ${DARK_TEXT} !important;
-            --d2l-popover-foreground-color: ${DARK_TEXT} !important;
-            --d2l-popover-default-border-color: ${DARK_BORDER} !important;
-            --d2l-popover-border-color: ${DARK_BORDER} !important;
-        }
-        * { color: ${DARK_TEXT} !important; }
-        .dropdown-header,
-        .dropdown-header.dropdown-no-header {
-            background: ${DARK_BG} !important;
-            background-color: ${DARK_BG} !important;
-            background-image: none !important;
-            color: ${DARK_TEXT} !important;
-            border-color: ${DARK_BORDER} !important;
-        }
-        .d2l-labs-navigation-notification-icon-indicator {
-            background-color: var(--dtu-ad-accent) !important;
-            background: var(--dtu-ad-accent) !important;
-            background-image: none !important;
-        }
-        .d2l-w2d-count,
-        .d2l-w2d-heading-3-count {
-            background-color: var(--dtu-ad-accent) !important;
-            background: var(--dtu-ad-accent) !important;
-            color: var(--dtu-ad-accent-on) !important;
-            border-color: var(--dtu-ad-accent) !important;
-        }
-        .d2l-count-badge-number {
-            background-color: var(--dtu-ad-accent-deep) !important;
-            background: var(--dtu-ad-accent-deep) !important;
-            color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
-            border-color: #ffffff !important;
-        }
-        .d2l-count-badge-number > div {
-            background: transparent !important;
-            background-color: transparent !important;
-            color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
-        }
-        .uw-text {
-            color: var(--dtu-ad-accent-soft) !important;
-        }
-        .d2l-navigation-s-main-wrapper,
-        .d2l-navigation-s-main-wrapper *,
-        .d2l-navigation-s-main-wrapper a,
-        .d2l-navigation-s-main-wrapper a:link,
-        .d2l-navigation-s-main-wrapper a:visited,
-        .d2l-navigation-s-main-wrapper a:hover,
-        .d2l-navigation-s-main-wrapper a:active,
-        .d2l-navigation-s-link,
-        .d2l-navigation-s-link:link,
-        .d2l-navigation-s-link:visited,
-        .d2l-navigation-s-link:hover,
-        .d2l-navigation-s-link:active,
-        .d2l-navigation-s-mobile-menu,
-        .d2l-navigation-s-mobile-menu * {
-            background: #1a1a1a !important;
-            background-color: #1a1a1a !important;
-            background-image: none !important;
-            color: ${DARK_TEXT} !important;
-            border-color: ${DARK_BORDER} !important;
-        }
-        .d2l-widget,
-        .d2l-widget-content,
-        .d2l-widget-content-padding,
-        .d2l-box,
-        .d2l-box-layout,
-        .d2l-tile,
-        .d2l-typography,
-        .d2l-page-main,
-        .d2l-page-main *:not(img):not(svg):not(canvas):not(video),
-        .d2l-page-collapsepane-content,
-        .d2l-page-collapsepane-content-inner,
-        .d2l-page-collapsepane-content-padding,
-        .d2l-personal-tools-list,
-        .d2l-datalist,
-        .d2l-datalist-container,
-        li.d2l-datalist-item,
-        .d2l-widget-header,
-        .d2l-widget-header *,
-        .d2l-collapsepane-header,
-        .d2l-collapsepane-content {
-            background: ${DARK_BG} !important;
-            background-color: ${DARK_BG} !important;
-            background-image: none !important;
-            color: ${DARK_TEXT} !important;
-            border-color: ${DARK_BORDER} !important;
-        }
-        .d2l-collapsible-panel-header,
-        .d2l-collapsible-panel.scrolled .d2l-collapsible-panel-header,
-        .d2l-collapsible-panel-before,
-        .d2l-collapsible-panel-header-primary,
-        .d2l-collapsible-panel-header-secondary {
-            background-color: #2d2d2d !important;
-            background: #2d2d2d !important;
-            background-image: none !important;
-            color: ${DARK_TEXT} !important;
-            border-color: ${DARK_BORDER} !important;
-        }
-        .d2l-collapsible-panel-title,
-        .d2l-collapsible-panel-opener,
-        .d2l-collapsible-panel-opener:hover,
-        .d2l-collapsible-panel-opener:focus,
-        .d2l-collapsible-panel-opener:focus-visible,
-        .d2l-collapsible-panel-header d2l-icon-custom,
-        .d2l-collapsible-panel-header svg,
-        .d2l-collapsible-panel-header path {
-            background-color: transparent !important;
-            background: transparent !important;
-            background-image: none !important;
-            color: ${DARK_TEXT} !important;
-        }
-        button[aria-haspopup="true"][aria-label^="Actions for"],
-        button[aria-haspopup="true"][aria-label^="Actions for"]:hover,
-        button[aria-haspopup="true"][aria-label^="Actions for"]:focus,
-        button[aria-haspopup="true"][aria-label^="Actions for"]:focus-visible,
-        button[aria-label^="Actions for"],
-        button[aria-label^="Actions for"]:hover,
-        button[aria-label^="Actions for"]:focus,
-        button[aria-label^="Actions for"]:focus-visible,
-        .d2l-tabs-scroll-next-container,
-        .d2l-tabs-scroll-previous-container,
-        .d2l-tabs-scroll-button,
-        .d2l-tabs-scroll-button:hover,
-        .d2l-tabs-scroll-button:focus,
-        .d2l-tabs-scroll-button:focus-visible {
-            background: ${DARK_BG} !important;
-            background-color: ${DARK_BG} !important;
-            background-image: none !important;
-            color: ${DARK_TEXT} !important;
-            border-color: ${DARK_BORDER} !important;
-            box-shadow: none !important;
-        }
-        button[aria-haspopup="true"][aria-label^="Actions for"] d2l-icon,
-        button[aria-haspopup="true"][aria-label^="Actions for"] d2l-icon *,
-        button[aria-label^="Actions for"] d2l-icon,
-        button[aria-label^="Actions for"] d2l-icon *,
-        .property-icon,
-        .property-icon *,
-        .d2l-tabs-scroll-button d2l-icon,
-        .d2l-tabs-scroll-button d2l-icon * {
-            background: transparent !important;
-            background-color: transparent !important;
-            background-image: none !important;
-            color: ${DARK_TEXT} !important;
-            fill: currentColor !important;
-            stroke: currentColor !important;
-        }
-    `;
-
-    // Keep the shared button/icon baseline for every d2l-button-icon. The
-    // targeted Lessons overrides below must not replace it for unrelated
-    // controls such as Content Browser's Actions chevron.
-    const buttonIconShadowStyles = shadowDOMStyles + `
-        button {
-            background: transparent !important;
-            background-color: transparent !important;
-            background-image: none !important;
-            color: ${DARK_TEXT} !important;
-            border-color: transparent !important;
-            box-shadow: none !important;
-        }
-        button:hover:not([disabled]),
-        button:focus:not([disabled]),
-        button:focus-visible:not([disabled]),
-        button:active:not([disabled]),
-        :host([active]) button:not([disabled]) {
-            background: #3d3d3d !important;
-            background-color: #3d3d3d !important;
-            background-image: none !important;
-            color: ${DARK_TEXT} !important;
-        }
-        button:focus-visible:not([disabled]) {
-            outline: 2px solid var(--dtu-ad-accent-soft, #99ccff) !important;
-            outline-offset: 2px !important;
-        }
-        button:disabled,
-        button[aria-disabled="true"] {
-            background: transparent !important;
-            background-color: transparent !important;
-            opacity: 0.55 !important;
-        }
-        :host([slot="pressed"]) button {
-            background: var(--dtu-ad-accent) !important;
-            background-color: var(--dtu-ad-accent) !important;
-            background-image: none !important;
-            color: var(--dtu-ad-accent-on) !important;
-        }
-        :host([slot="pressed"]) button:hover:not([disabled]),
-        :host([slot="pressed"]) button:focus:not([disabled]),
-        :host([slot="pressed"]) button:focus-visible:not([disabled]),
-        :host([slot="pressed"]) button:active:not([disabled]),
-        :host([slot="pressed"][active]) button:not([disabled]) {
-            background: var(--dtu-ad-accent-hover) !important;
-            background-color: var(--dtu-ad-accent-hover) !important;
-            background-image: none !important;
-            color: var(--dtu-ad-accent-on) !important;
-        }
-        :host([slot="pressed"]) d2l-icon,
-        :host([slot="pressed"]) slot[name="icon"]::slotted(d2l-icon-custom) {
-            color: var(--dtu-ad-accent-on) !important;
-            fill: currentColor !important;
-            stroke: currentColor !important;
-        }
-        :host([icon="tier1:search"]),
-        :host([icon="tier1:arrow-collapse-small"]),
-        :host([icon="tier1:arrow-expand-small"]) {
-            color: ${DARK_TEXT} !important;
-        }
-        :host([icon="tier1:search"]) button,
-        :host([icon="tier1:arrow-collapse-small"]) button,
-        :host([icon="tier1:arrow-expand-small"]) button {
-            background-color: transparent !important;
-            color: ${DARK_TEXT} !important;
-        }
-        :host([icon="tier1:search"]) button:hover,
-        :host([icon="tier1:search"]) button:focus,
-        :host([icon="tier1:search"]) button:focus-visible,
-        :host([icon="tier1:search"]) button:active,
-        :host([icon="tier1:arrow-collapse-small"]) button:hover,
-        :host([icon="tier1:arrow-collapse-small"]) button:focus,
-        :host([icon="tier1:arrow-collapse-small"]) button:focus-visible,
-        :host([icon="tier1:arrow-collapse-small"]) button:active,
-        :host([icon="tier1:arrow-expand-small"]) button:hover,
-        :host([icon="tier1:arrow-expand-small"]) button:focus,
-        :host([icon="tier1:arrow-expand-small"]) button:focus-visible,
-        :host([icon="tier1:arrow-expand-small"]) button:active {
-            background-color: #3d3d3d !important;
-            background-image: none !important;
-            color: ${DARK_TEXT} !important;
-        }
-    `;
-
-    const iframeStyles = `
-        body,
-        html,
-        #app,
-        #app > *,
-        .d2l-typography,
-        .d2l-typography > * {
-            background-color: #1a1a1a !important;
-            color: ${DARK_TEXT} !important;
-        }
-        .box-section.bg-white.rounded,
-        .panel-section .box-section {
-            background-color: ${DARK_BG} !important;
-            color: ${DARK_TEXT} !important;
-            border-color: ${DARK_BORDER} !important;
-        }
-        .navigation-container,
-        .navigation-menu,
-        .navigation-search,
-        .navigation-tree,
-        .navigation-tree > div,
-        .navigation-item,
-        .navigation-item > div,
-        .navigation-item div,
-        .unit,
-        .unit-box,
-        [role="treeitem"],
-        d2l-lessons-toc {
-            background-color: #1a1a1a !important;
-            color: ${DARK_TEXT} !important;
-            border-color: ${DARK_BORDER} !important;
-        }
-        /* darkmode.css paints these wrappers dark 2, and which of the two style
-           elements lands later in the Lessons frame varies per load. Out-rank
-           it so the TOC panel is dark 1 every time. */
-        html body .navigation-container,
-        html body .navigation-menu,
-        html body .navigation-search {
-            background-color: #1a1a1a !important;
-        }
-        d2l-list,
-        d2l-list-item,
-        d2l-list-item-nav {
-            background-color: #2d2d2d !important;
-            color: ${DARK_TEXT} !important;
-            border-color: ${DARK_BORDER} !important;
-        }
-        d2l-list-item-nav[current] {
-            background-color: #2d2d2d !important;
-        }
-        ::-webkit-scrollbar-track,
-        ::-webkit-scrollbar {
-            background: #1a1a1a !important;
-        }
-        .co-content,
-        .title-container,
-        .title,
-        .title-text,
-        .text-wrapper,
-        .date-container,
-        .due-date-container {
-            background-color: transparent !important;
-            color: ${DARK_TEXT} !important;
-        }
-        .unit-box .fadeout,
-        .fadeout {
-            background: transparent !important;
-            display: none !important;
-        }
-        a {
-            color: #66b3ff !important;
-        }
-        h1, h2, h3, h4, h5, h6,
-        .d2l-heading-1,
-        .d2l-heading-2,
-        .d2l-heading-3,
-        .module-header,
-        h1.module-header,
-        h1.d2l-heading-1 {
-            color: #ffffff !important;
-        }
-        p, div, b, i {
-            color: ${DARK_TEXT} !important;
-        }
-        span:not([style^="color"]):not([style*="; color"]):not([style*=";color"]),
-        em:not([style^="color"]):not([style*="; color"]):not([style*=";color"]),
-        strong:not([style^="color"]):not([style*="; color"]):not([style*=";color"]) {
-            color: ${DARK_TEXT} !important;
-        }
-        [style*="color: #202122"], [style*="color:#202122"],
-        [style*="color: rgb(32, 33, 34"] {
-            color: ${DARK_TEXT} !important;
-        }
-        .d2l-multiselect,
-        ul.d2l-multiselect,
-        ul[id*="$control"],
-        [id*="Addresses$control"] {
-            background-color: #3d3d3d !important;
-            border-color: #505050 !important;
-        }
-        .d2l-multiselect-choice,
-        li.d2l-multiselect-choice,
-        ul[id*="$control"] li.d2l-multiselect-choice,
-        li[class*="d2l-multiselect-choice"] {
-            background-color: #4a4a4a !important;
-            color: ${DARK_TEXT} !important;
-            border-color: #606060 !important;
-        }
-        .d2l-multiselect-choice span,
-        li.d2l-multiselect-choice span,
-        ul[id*="$control"] li span,
-        li[class*="d2l-multiselect-choice"] span {
-            color: ${DARK_TEXT} !important;
-        }
-        .d2l-multiselect-choice a,
-        .d2l-multiselect-clearicon,
-        .d2l-imagelink,
-        ul[id*="$control"] li a {
-            color: ${DARK_TEXT} !important;
-        }
-        .d2l-multiselect-input,
-        .d2l-multiselect-input input,
-        .d2l-multiselect input.d2l-edit,
-        ul[id*="$control"] input,
-        input.d2l-edit {
-            background-color: #3d3d3d !important;
-            color: ${DARK_TEXT} !important;
-            border-color: #505050 !important;
-        }
-        .d2l-autocomplete-dynamic,
-        [id*="AutoComplete"],
-        .d2l-autocomplete-message {
-            background-color: ${DARK_BG} !important;
-            color: ${DARK_TEXT} !important;
-            border-color: #505050 !important;
-        }
-        .d2l-popup-title,
-        .d2l-popup-title h1 {
-            background-color: ${DARK_BG} !important;
-            color: #ffffff !important;
-        }
-        .d2l-w2d-count,
-        .d2l-w2d-heading-3-count {
-            background-color: var(--dtu-ad-accent) !important;
-            background: var(--dtu-ad-accent) !important;
-            color: var(--dtu-ad-accent-on) !important;
-            border-color: var(--dtu-ad-accent) !important;
-        }
-        .d2l-count-badge-number {
-            background-color: var(--dtu-ad-accent-deep) !important;
-            background: var(--dtu-ad-accent-deep) !important;
-            color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
-        }
-        .d2l-count-badge-number > div {
-            background: transparent !important;
-            background-color: transparent !important;
-            color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
-        }
-        .uw-text {
-            color: var(--dtu-ad-accent-soft) !important;
-        }
-        [data-dtu-authored-light-bg] {
-            color: #202122 !important;
-        }
-        [data-dtu-authored-light-bg] *:not(a),
-        [data-dtu-authored-light-bg] *::before,
-        [data-dtu-authored-light-bg] *::after {
-            color: #202122 !important;
-        }
-    `;
+    const styles = globalThis.DTUAfterDarkDarkEngineStyles;
+    if (!styles) throw new Error('darkmode.dark-engine.js loaded before darkmode.dark-engine.styles.js');
+    const requiredStyleNames = [
+        'DARK_BG',
+        'DARK_TEXT',
+        'DARK_BORDER',
+        'shadowDOMStyles',
+        'buttonIconShadowStyles',
+        'iframeStyles',
+        'iconShadowStyles',
+        'enrollmentCardShadowStyles',
+        'myCoursesEnrollmentCardShadowStyles',
+        'cardShadowStyles',
+        'breadcrumbShadowStyles',
+        'expandCollapseStyles',
+        'lessonsTocExpandCollapseStyles',
+        'htmlEditorShadowStyles',
+        'menuStyles',
+        'buttonSubtleStyles',
+        'listItemNavStyles',
+        'w2dListStyles',
+        'htmlBlockStyles',
+    ];
+    const missingStyleName = requiredStyleNames.find(function (name) {
+        return typeof styles[name] !== 'string';
+    });
+    if (missingStyleName) throw new Error('darkmode.dark-engine.styles.js is missing ' + missingStyleName);
+    const {
+        DARK_BG,
+        DARK_TEXT,
+        DARK_BORDER,
+        shadowDOMStyles,
+        buttonIconShadowStyles,
+        iframeStyles,
+        iconShadowStyles,
+        enrollmentCardShadowStyles,
+        myCoursesEnrollmentCardShadowStyles,
+        cardShadowStyles,
+        breadcrumbShadowStyles,
+        expandCollapseStyles,
+        lessonsTocExpandCollapseStyles,
+        htmlEditorShadowStyles,
+        menuStyles,
+        buttonSubtleStyles,
+        listItemNavStyles,
+        w2dListStyles,
+        htmlBlockStyles,
+    } = styles;
 
     function markAuthoredLightTableCells(root, cellSelector) {
         if (!root || !root.querySelectorAll) return;
@@ -515,580 +163,6 @@
             }
         });
     }
-
-    const iconShadowStyles = `
-        :host { color: ${DARK_TEXT} !important; }
-        svg, path, * {
-            fill: ${DARK_TEXT} !important;
-            color: ${DARK_TEXT} !important;
-        }
-    `;
-
-    const enrollmentCardShadowStyles = `
-        :host {
-            background-color: ${DARK_BG} !important;
-            color: ${DARK_TEXT} !important;
-        }
-        .d2l-enrollment-card-container,
-        .d2l-enrollment-card-content,
-        .d2l-enrollment-card-content-flex {
-            background-color: ${DARK_BG} !important;
-            color: ${DARK_TEXT} !important;
-        }
-        .d2l-enrollment-card-status-indicator {
-            background-color: ${DARK_BG} !important;
-            box-shadow: 0 0 0 2px ${DARK_BG} !important;
-        }
-        .d2l-enrollment-card-icon-container {
-            background-color: ${DARK_BG} !important;
-        }
-        .d2l-enrollment-card-image-container {
-            background-color: transparent !important;
-        }
-        .d2l-enrollment-card-overlay {
-            background-color: rgba(0, 0, 0, 0.7) !important;
-        }
-        img,
-        svg,
-        d2l-organization-image,
-        d2l-course-image {
-            background-color: transparent !important;
-            filter: none !important;
-        }
-    `;
-
-    const myCoursesEnrollmentCardShadowStyles = enrollmentCardShadowStyles + `
-        d2l-card,
-        d2l-card * {
-            visibility: visible !important;
-        }
-
-        d2l-card [slot="header"],
-        d2l-card [slot="header"] *,
-        .d2l-enrollment-card-image-container,
-        .d2l-organization-image,
-        .d2l-organization-image *,
-        .d2l-organization-image-main,
-        img {
-            background: transparent !important;
-            background-color: transparent !important;
-            background-image: initial !important;
-            filter: none !important;
-            opacity: 1 !important;
-        }
-
-        d2l-card [slot="content"],
-        .d2l-enrollment-card-content-flex,
-        .d2l-organization-name,
-        d2l-card-content-meta,
-        d2l-card-content-meta *,
-        .d2l-body-small,
-        .d2l-organization-code,
-        .d2l-organization-date {
-            background: ${DARK_BG} !important;
-            background-color: ${DARK_BG} !important;
-            background-image: none !important;
-            color: ${DARK_TEXT} !important;
-            opacity: 1 !important;
-        }
-
-        d2l-card-footer-link,
-        d2l-dropdown-more,
-        d2l-button-icon,
-        d2l-status-indicator {
-            opacity: 1 !important;
-        }
-    `;
-
-    const cardShadowStyles = `
-        :host {
-            background-color: ${DARK_BG} !important;
-            color: ${DARK_TEXT} !important;
-            border-color: ${DARK_BORDER} !important;
-        }
-        .d2l-card-container,
-        .d2l-card-link-container,
-        .d2l-card-content {
-            background: ${DARK_BG} !important;
-            color: ${DARK_TEXT} !important;
-            border-color: ${DARK_BORDER} !important;
-        }
-        .d2l-card-container a,
-        .d2l-card-container a:link,
-        .d2l-card-container a:visited {
-            background: transparent !important;
-            background-color: transparent !important;
-            background-image: none !important;
-            color: ${DARK_TEXT} !important;
-            border-color: ${DARK_BORDER} !important;
-        }
-        .d2l-card-footer {
-            background: ${DARK_BG} !important;
-            color: ${DARK_TEXT} !important;
-            border-color: ${DARK_BORDER} !important;
-        }
-        .d2l-card-header,
-        .d2l-card-actions,
-        .d2l-card-badge,
-        img,
-        svg,
-        d2l-organization-image,
-        d2l-course-image,
-        [slot="header"] {
-            background-color: transparent !important;
-            filter: none !important;
-        }
-        .d2l-card-title,
-        .d2l-card-subtitle,
-        .d2l-card-link-text,
-        .d2l-card-text {
-            color: ${DARK_TEXT} !important;
-            background-color: transparent !important;
-        }
-        .d2l-card-divider,
-        .d2l-card-separator {
-            border-color: ${DARK_BORDER} !important;
-        }
-    `;
-
-    const breadcrumbShadowStyles = `
-        :host,
-        nav[aria-label="Breadcrumb"],
-        nav[aria-label="Breadcrumb"] div[role="list"],
-        nav[aria-label="Breadcrumb"] [role="list"],
-        nav[aria-label="Breadcrumb"] a,
-        nav[aria-label="Breadcrumb"] d2l-icon {
-            background: #1a1a1a !important;
-            background-color: #1a1a1a !important;
-            background-image: none !important;
-            color: ${DARK_TEXT} !important;
-            border-color: ${DARK_BORDER} !important;
-        }
-    `;
-
-    const expandCollapseStyles = `
-        :host,
-        .d2l-expand-collapse-content-container,
-        .d2l-expand-collapse-content-inner,
-        .d2l-widget-content,
-        .d2l-widget-content-padding {
-            background-color: ${DARK_BG} !important;
-        }
-        iframe {
-            background-color: transparent !important;
-        }
-    `;
-
-    // Nested topics in the Lessons TOC sit in an expand-collapse region. Filled,
-    // it drew a square dark-2 block around the rows; the rows' own rounded pills
-    // carry all the state, so the region stays see-through.
-    const lessonsTocExpandCollapseStyles = `
-        :host,
-        .d2l-expand-collapse-content-container,
-        .d2l-expand-collapse-content-inner {
-            background-color: transparent !important;
-        }
-    `;
-
-    function isInsideLessonsTocItem(element) {
-        try {
-            const root = element.getRootNode && element.getRootNode();
-            return !!(root && root.host && root.host.tagName === 'D2L-LIST-ITEM-NAV');
-        } catch (e) {
-            return false;
-        }
-    }
-
-    const htmlEditorShadowStyles = `
-        :host {
-            color: ${DARK_TEXT} !important;
-        }
-        .d2l-htmleditor-container,
-        .d2l-htmleditor-flex-container,
-        .d2l-htmleditor-toolbar-container,
-        d2l-htmleditor-toolbar,
-        .tox-tinymce,
-        .tox-editor-container,
-        .tox-editor-header,
-        .tox-toolbar-overlord,
-        .tox-toolbar__primary,
-        .tox-statusbar {
-            background: ${DARK_BG} !important;
-            background-color: ${DARK_BG} !important;
-            background-image: none !important;
-            color: ${DARK_TEXT} !important;
-            border-color: ${DARK_BORDER} !important;
-        }
-        .tox-edit-area,
-        .tox-edit-area iframe {
-            background: #1a1a1a !important;
-            background-color: #1a1a1a !important;
-            background-image: none !important;
-            color: ${DARK_TEXT} !important;
-            border-color: ${DARK_BORDER} !important;
-        }
-        .tox-statusbar,
-        .tox-statusbar__path,
-        .tox-statusbar__wordcount,
-        .tox-statusbar__resize-handle {
-            color: ${DARK_TEXT} !important;
-        }
-    `;
-
-    const menuStyles = `
-        :host,
-        .d2l-menu,
-        .d2l-menu-mvc,
-        .d2l-contextmenu,
-        .d2l-menu-item,
-        .d2l-menu-item-text {
-            background-color: #1a1a1a !important;
-            color: ${DARK_TEXT} !important;
-            border-color: ${DARK_BORDER} !important;
-        }
-        .d2l-menu-item:hover,
-        .d2l-menu-item:focus {
-            background-color: #2d2d2d !important;
-            color: ${DARK_TEXT} !important;
-        }
-        a {
-            color: ${DARK_TEXT} !important;
-            background-color: transparent !important;
-        }
-        button,
-        button[aria-haspopup="true"][aria-label^="Actions for"],
-        button:hover,
-        button:focus,
-        button:focus-visible,
-        button[aria-haspopup="true"][aria-label^="Actions for"]:hover,
-        button[aria-haspopup="true"][aria-label^="Actions for"]:focus,
-        button[aria-haspopup="true"][aria-label^="Actions for"]:focus-visible {
-            color: ${DARK_TEXT} !important;
-            background-color: #2d2d2d !important;
-            background: #2d2d2d !important;
-            background-image: none !important;
-            border-color: ${DARK_BORDER} !important;
-            box-shadow: none !important;
-        }
-        div[role="list"],
-        nav[aria-label="Breadcrumb"],
-        nav[aria-label="Breadcrumb"] div[role="list"],
-        nav[aria-label="Breadcrumb"] [role="list"] {
-            background: #1a1a1a !important;
-            background-color: #1a1a1a !important;
-            background-image: none !important;
-        }
-        .d2l-w2d-count,
-        .d2l-w2d-heading-3-count {
-            background-color: var(--dtu-ad-accent) !important;
-            background: var(--dtu-ad-accent) !important;
-            background-image: none !important;
-            color: var(--dtu-ad-accent-on) !important;
-            border-color: var(--dtu-ad-accent) !important;
-        }
-        .d2l-count-badge-number {
-            background-color: var(--dtu-ad-accent-deep) !important;
-            background: var(--dtu-ad-accent-deep) !important;
-            background-image: none !important;
-            color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
-            border: 0 !important;
-            outline: 0 !important;
-            box-shadow: none !important;
-        }
-        .d2l-count-badge-number > div {
-            background: transparent !important;
-            background-color: transparent !important;
-            color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
-        }
-        .uw-text {
-            color: var(--dtu-ad-accent-text, var(--dtu-ad-accent)) !important;
-        }
-    `;
-
-    const buttonSubtleStyles = `
-        :host {
-            color: ${DARK_TEXT} !important;
-        }
-        button {
-            background: ${DARK_BG} !important;
-            background-color: ${DARK_BG} !important;
-            background-image: none !important;
-            color: ${DARK_TEXT} !important;
-            border-color: ${DARK_BORDER} !important;
-            box-shadow: none !important;
-        }
-        .d2l-button-subtle-content-wrapper,
-        .d2l-button-subtle-content {
-            background: transparent !important;
-            background-color: transparent !important;
-            color: ${DARK_TEXT} !important;
-        }
-        button:hover,
-        button:focus,
-        button:focus-visible,
-        button:active {
-            background: #3d3d3d !important;
-            background-color: #3d3d3d !important;
-            background-image: none !important;
-            color: ${DARK_TEXT} !important;
-        }
-        button:disabled,
-        button[disabled],
-        button[aria-disabled="true"],
-        button:disabled .d2l-button-subtle-content-wrapper,
-        button:disabled .d2l-button-subtle-content,
-        button[disabled] .d2l-button-subtle-content-wrapper,
-        button[disabled] .d2l-button-subtle-content,
-        button[aria-disabled="true"] .d2l-button-subtle-content-wrapper,
-        button[aria-disabled="true"] .d2l-button-subtle-content {
-            background: ${DARK_BG} !important;
-            background-color: ${DARK_BG} !important;
-            background-image: none !important;
-            color: #b0b0b0 !important;
-            border-color: ${DARK_BORDER} !important;
-            opacity: 0.65 !important;
-        }
-        ::slotted(*) {
-            color: ${DARK_TEXT} !important;
-            background: transparent !important;
-            background-color: transparent !important;
-        }
-    `;
-
-    const listItemNavStyles = `
-        :host {
-            background-color: transparent !important;
-            color: ${DARK_TEXT} !important;
-        }
-        * {
-            color: ${DARK_TEXT} !important;
-        }
-        .co-content,
-        .title-container,
-        .title,
-        .title > div,
-        .title-text,
-        .title-text span,
-        .text-wrapper,
-        .overflow-detector,
-        .overflow-detector span,
-        .date-container,
-        .due-date-container,
-        .title::before,
-        .title::after,
-        d2l-icon.module-triangle,
-        d2l-icon[icon="tier1:arrow-collapse-small"],
-        d2l-icon[icon="tier1:arrow-expand-small"],
-        d2l-icon[icon="tier1:dragger"],
-        d2l-icon[icon="tier2:upload"] {
-            background-color: #1a1a1a !important;
-            background: #1a1a1a !important;
-            background-image: none !important;
-            color: ${DARK_TEXT} !important;
-        }
-        /* No fill of its own: a filled glyph box showed as a square on rows
-           whose rounded pill is unfilled. */
-        d2l-icon[icon="tier2:file-document"] {
-            background-color: transparent !important;
-            background: transparent !important;
-            background-image: none !important;
-            color: ${DARK_TEXT} !important;
-        }
-        a {
-            color: #66b3ff !important;
-        }
-        /* Iframe-aware nested shadow processing now reaches the restricted-text
-           label inside these controls, so the old light-pill contrast workaround
-           is no longer needed. Keep contained/current items on dark 2 and use the
-           shared raised hover while leaving D2L's semantic selection borders. */
-        [slot="outside-control-container"],
-        ::slotted([slot="outside-control-container"]),
-        :host([current]) [slot="outside-control-container"] {
-            background-color: ${DARK_BG} !important;
-            background: ${DARK_BG} !important;
-            background-image: none !important;
-        }
-        [slot="outside-control-container"]:hover,
-        ::slotted([slot="outside-control-container"]):hover,
-        :host([current]) [slot="outside-control-container"]:hover {
-            background-color: #3d3d3d !important;
-            background: #3d3d3d !important;
-            background-image: none !important;
-        }
-        /* Lessons TOC rows: D2L paints only the rounded outside-control-container
-           pill; the host and the list stay transparent. Keep that shape on the
-           dark-1 panel -- resting pills unfilled, hovered/focused and current
-           pills raised to dark 2. Hover arrives as host attributes: the pill
-           itself sits under the action layer and never matches :hover. */
-        :host(d2l-list-item-nav) [slot="outside-control-container"] {
-            background-color: transparent !important;
-            background: transparent !important;
-        }
-        /* Row separators are border-top: var(--d2l-color-mica) pseudo-elements
-           (near-white on dark). Recolour the token, not the borders, so D2L's
-           own rules that hide them on hover/focus/current keep working. */
-        :host(d2l-list-item-nav) {
-            --d2l-color-mica: ${DARK_BORDER} !important;
-        }
-        :host(d2l-list-item-nav[_hovering-primary-action]) [slot="outside-control-container"],
-        :host(d2l-list-item-nav[_hovering-control]) [slot="outside-control-container"],
-        :host(d2l-list-item-nav[_hovering-selection]) [slot="outside-control-container"],
-        :host(d2l-list-item-nav[_focusing-primary-action]) [slot="outside-control-container"],
-        :host(d2l-list-item-nav[current]) [slot="outside-control-container"] {
-            background-color: ${DARK_BG} !important;
-            background: ${DARK_BG} !important;
-            background-image: none !important;
-        }
-        :host(d2l-list-item-nav:not([current])[_hovering-primary-action]) [slot="outside-control-container"],
-        :host(d2l-list-item-nav:not([current])[_hovering-control]) [slot="outside-control-container"],
-        :host(d2l-list-item-nav:not([current])[_hovering-selection]) [slot="outside-control-container"],
-        :host(d2l-list-item-nav:not([current])[_focusing-primary-action]) [slot="outside-control-container"] {
-            border-color: ${DARK_BORDER} !important;
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.35) !important;
-        }
-        [slot="supporting-info"],
-        [slot="content"],
-        div, span, p, h1, h2, h3, h4, h5, h6 {
-            color: ${DARK_TEXT} !important;
-        }
-        .d2l-w2d-count,
-        .d2l-w2d-heading-3-count {
-            background-color: var(--dtu-ad-accent) !important;
-            background: var(--dtu-ad-accent) !important;
-            background-image: none !important;
-            color: var(--dtu-ad-accent-on) !important;
-            border-color: var(--dtu-ad-accent) !important;
-        }
-        .d2l-count-badge-number {
-            background-color: var(--dtu-ad-accent-deep) !important;
-            background: var(--dtu-ad-accent-deep) !important;
-            background-image: none !important;
-            color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
-            border: 0 !important;
-            outline: 0 !important;
-            box-shadow: none !important;
-        }
-        .d2l-count-badge-number > div {
-            background: transparent !important;
-            background-color: transparent !important;
-            color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
-        }
-        .uw-text {
-            color: var(--dtu-ad-accent-text, var(--dtu-ad-accent)) !important;
-        }
-    `;
-
-    const w2dListStyles = `
-        :host,
-        .d2l-list-item,
-        .d2l-list-item-content,
-        d2l-list-item,
-        d2l-list-item-content {
-            background-color: ${DARK_BG} !important;
-            color: ${DARK_TEXT} !important;
-        }
-        * {
-            color: ${DARK_TEXT} !important;
-        }
-        p, span, div, h1, h2, h3, h4, h5, h6,
-        strong, em, b, i, ul, ol, li,
-        .d2l-body-compact, .d2l-body-standard, .d2l-label-text {
-            color: ${DARK_TEXT} !important;
-        }
-        a {
-            color: #66b3ff !important;
-        }
-        .d2l-w2d-count,
-        .d2l-w2d-heading-3-count {
-            background-color: var(--dtu-ad-accent) !important;
-            background: var(--dtu-ad-accent) !important;
-            color: var(--dtu-ad-accent-on) !important;
-            border-color: var(--dtu-ad-accent) !important;
-        }
-        .d2l-count-badge-number {
-            background-color: var(--dtu-ad-accent-deep) !important;
-            background: var(--dtu-ad-accent-deep) !important;
-            color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
-            border-color: #ffffff !important;
-        }
-        .d2l-count-badge-number > div {
-            background: transparent !important;
-            background-color: transparent !important;
-            color: var(--dtu-ad-accent-deep-on, #ffffff) !important;
-        }
-    `;
-
-    const htmlBlockStyles = `
-        :host {
-            color: #e0e0e0 !important;
-        }
-        *:not(a):not(a *):not([style^="color"]):not([style*="; color"]):not([style*=";color"]),
-        *::before, *::after {
-            color: #e0e0e0 !important;
-        }
-        [style*="color: #000"], [style*="color:#000"],
-        [style*="color: black"], [style*="color:black"],
-        [style*="color: rgb(0, 0, 0"], [style*="color:rgb(0,0,0"],
-        [style*="color: rgb(0,0,0"],
-        [style*="color: #202122"], [style*="color:#202122"],
-        [style*="color: rgb(32, 33, 34"] {
-            color: #e0e0e0 !important;
-        }
-        div.d2l-html-block-rendered,
-        div.d2l-html-block-rendered *:not(a):not(a *):not([style^="color"]):not([style*="; color"]):not([style*=";color"]),
-        .d2l-html-block-rendered,
-        .d2l-html-block-rendered *:not(a):not(a *):not([style^="color"]):not([style*="; color"]):not([style*=";color"]) {
-            color: #e0e0e0 !important;
-        }
-        span, p, div, strong, em, b, i {
-            background-color: transparent !important;
-            background: transparent !important;
-        }
-        a {
-            color: #66b3ff !important;
-        }
-        /* Text pasted from Word wraps link text in styled spans; let it take
-           the link colour instead of the body text or its authored colour. */
-        .d2l-html-block-rendered a * {
-            color: inherit !important;
-        }
-        /* Underline links in course text so they read as links without relying
-           on colour. MazeMap links keep their own dotted underline and pin. */
-        .d2l-html-block-rendered a[href]:not([data-dtu-mazemap-link]) {
-            text-decoration: underline !important;
-            text-decoration-color: rgba(102, 179, 255, 0.5) !important;
-            text-underline-offset: 2px !important;
-        }
-        .d2l-html-block-rendered a[href]:not([data-dtu-mazemap-link]):hover {
-            text-decoration-color: currentColor !important;
-        }
-        a:hover, a:hover * {
-            color: #99ccff !important;
-        }
-        .uw-text {
-            color: var(--dtu-ad-accent-soft) !important;
-        }
-        /* Repeats the light-text rule's :not() list so it outranks it on the
-           cell itself; a plain [marker] selector lost and left grey on white. */
-        div.d2l-html-block-rendered [data-dtu-authored-light-bg]:not(a):not(a *):not([style^="color"]):not([style*="; color"]):not([style*=";color"]),
-        .d2l-html-block-rendered [data-dtu-authored-light-bg] {
-            color: #202122 !important;
-        }
-        .d2l-html-block-rendered [data-dtu-authored-light-bg] *:not(a):not([style^="color"]):not([style*="; color"]):not([style*=";color"]),
-        .d2l-html-block-rendered [data-dtu-authored-light-bg] *::before,
-        .d2l-html-block-rendered [data-dtu-authored-light-bg] *::after {
-            color: #202122 !important;
-        }
-        .d2l-html-block-rendered [data-dtu-authored-light-bg] [style*="color: #000"],
-        .d2l-html-block-rendered [data-dtu-authored-light-bg] [style*="color:#000"],
-        .d2l-html-block-rendered [data-dtu-authored-light-bg] [style*="color: black"],
-        .d2l-html-block-rendered [data-dtu-authored-light-bg] [style*="color:black"],
-        .d2l-html-block-rendered [data-dtu-authored-light-bg] [style*="color: rgb(0, 0, 0"],
-        .d2l-html-block-rendered [data-dtu-authored-light-bg] [style*="color:rgb(0,0,0"],
-        .d2l-html-block-rendered [data-dtu-authored-light-bg] [style*="color: rgb(0,0,0"] {
-            color: #202122 !important;
-        }
-    `;
 
     const EXCLUDED_ELEMENTS = [
         'd2l-image-banner-overlay',
@@ -1169,7 +243,7 @@
                 || tagName === 'd2l-breadcrumb-current-page') {
                 styleId = 'dark-mode-shadow-styles-breadcrumb';
                 styleText = breadcrumbShadowStyles;
-            } else if (tagName === 'd2l-expand-collapse-content' && isInsideLessonsTocItem(element)) {
+            } else if (tagName === 'd2l-expand-collapse-content' && pageCases.isInsideLessonsTocItem(element)) {
                 styleId = 'dark-mode-shadow-styles-expand-collapse-toc';
                 styleText = lessonsTocExpandCollapseStyles;
             } else if (tagName === 'd2l-expand-collapse-content' || tagName === 'd2l-lti-launch') {
@@ -1375,14 +449,15 @@
         try { seedSmartRoomLinkerShadowRoot(shadowRoot); } catch (e1) { }
     }
 
-    const _pendingShadowHostRetry = new WeakMap();
-    const _shadowHostRetryCount = new WeakMap();
     const _watchedUndefinedTags = new Set();
     let _definitionSweepTimer = null;
 
     // Custom-element upgrades attach shadow roots without any observable
-    // mutation. whenDefined() is the only reliable signal, so re-sweep
-    // (debounced) whenever a d2l-* tag we saw in the DOM gets defined.
+    // mutation. darkmode.shadow-hook.page.js reports each one as it happens
+    // (handleShadowAttachedEvent). This debounced sweep, run when a d2l-* tag
+    // we saw gets defined, is the fallback for pages where that hook did not
+    // load. It replaced a per-element 350 ms retry (20 tries), which styled no
+    // root first once the hook existed (measured 2026-11-14, Chromium and Firefox).
     function scheduleDefinitionSweep() {
         if (_definitionSweepTimer) return;
         _definitionSweepTimer = setTimeout(function () {
@@ -1403,36 +478,72 @@
         } catch (eDefWatch) { }
     }
     const _observedShadowRoots = new WeakSet();
-    const SHADOW_HOST_RETRY_DELAY_MS = 350;
-    const SHADOW_HOST_MAX_RETRIES = 20;
 
     function isShadowHostCandidate(element) {
         if (!element || !element.tagName) return false;
         return element.tagName.toLowerCase().startsWith('d2l-');
     }
 
-    function scheduleShadowHostRetry(element) {
+    // A d2l-* element: style its root now, or, before it has one, watch for its
+    // tag being defined (the hook reports the root itself when it is attached).
+    function handleShadowHostCandidate(element) {
         if (!isShadowHostCandidate(element)) return;
         if (element.shadowRoot) {
-            var existingTimer = _pendingShadowHostRetry.get(element);
-            if (existingTimer) {
-                clearTimeout(existingTimer);
-                _pendingShadowHostRetry.delete(element);
-            }
             injectStylesIntoShadowRoot(element.shadowRoot, element);
             return;
         }
         watchTagDefinition(element.tagName.toLowerCase());
-        if (_pendingShadowHostRetry.has(element)) return;
-        var retryCount = _shadowHostRetryCount.get(element) || 0;
-        if (retryCount >= SHADOW_HOST_MAX_RETRIES) return;
-        _shadowHostRetryCount.set(element, retryCount + 1);
-        var retryTimer = setTimeout(function () {
-            _pendingShadowHostRetry.delete(element);
-            if (!element.isConnected) return;
-            scheduleShadowHostRetry(element);
-        }, SHADOW_HOST_RETRY_DELAY_MS);
-        _pendingShadowHostRetry.set(element, retryTimer);
+    }
+
+    const _shadowAttachedHosts = new Set();
+    let _shadowAttachedListenerRegistered = false;
+
+    function flushShadowAttachedHosts() {
+        if (!_shadowAttachedHosts.size) return;
+        const hosts = Array.from(_shadowAttachedHosts);
+        _shadowAttachedHosts.clear();
+        if (!isDarkModeEnabled()) return;
+        if (!shouldUseBrightspaceShadowDomProcessing()) return;
+
+        let injected = false;
+        for (let i = 0; i < hosts.length; i++) {
+            const host = hosts[i];
+            if (!host || !host.isConnected || !host.shadowRoot) continue;
+            if (!isShadowHostCandidate(host)) continue;
+            if (shouldExcludeElement(host) || isInsideExcludedHostChain(host)) continue;
+            injectStylesIntoShadowRoot(host.shadowRoot, host);
+            injected = true;
+        }
+
+        if (injected) invalidateDeepRoots();
+    }
+
+    // The hook reports hosts deep inside other shadow roots, which the tree walks
+    // never reach once they stop at an excluded container (the course banner).
+    // isInsideExcludedContainer follows parentElement only, so also climb through
+    // each enclosing shadow host.
+    function isInsideExcludedHostChain(host) {
+        let node = host;
+        while (node) {
+            if (isInsideExcludedContainer(node)) return true;
+            const root = node.getRootNode ? node.getRootNode() : null;
+            node = root && root.host ? root.host : null;
+            if (node && shouldExcludeElement(node)) return true;
+        }
+        return false;
+    }
+
+    function handleShadowAttachedEvent(event) {
+        const host = event.composedPath()[0];
+        _shadowAttachedHosts.add(host);
+        if (_shadowAttachedHosts.size === 1) queueMicrotask(flushShadowAttachedHosts);
+    }
+
+    function registerShadowAttachedListener() {
+        if (_shadowAttachedListenerRegistered) return;
+        if (!usesBrightspaceShadowDom()) return;
+        _shadowAttachedListenerRegistered = true;
+        document.addEventListener('dtu-after-dark-shadow-attached', handleShadowAttachedEvent, true);
     }
 
     function processShadowMutationNode(node) {
@@ -1441,14 +552,14 @@
         if (node.shadowRoot) {
             injectStylesIntoShadowRoot(node.shadowRoot, node);
         } else {
-            scheduleShadowHostRetry(node);
+            handleShadowHostCandidate(node);
         }
         const walker = document.createTreeWalker(node, NodeFilter.SHOW_ELEMENT, null);
         let child = walker.nextNode();
         while (child) {
             if (!shouldExcludeElement(child) && !isInsideExcludedContainer(child)) {
                 if (child.shadowRoot) injectStylesIntoShadowRoot(child.shadowRoot, child);
-                else scheduleShadowHostRetry(child);
+                else handleShadowHostCandidate(child);
             }
             child = walker.nextNode();
         }
@@ -1499,37 +610,20 @@
         let element = walker.nextNode();
         while (element) {
             if (element.shadowRoot) injectStylesIntoShadowRoot(element.shadowRoot, element);
-            else scheduleShadowHostRetry(element);
+            else handleShadowHostCandidate(element);
             element = walker.nextNode();
         }
     }
 
     const _styledHtmlBlocks = new WeakSet();
-    const _pendingHtmlBlockRetry = new WeakMap();
-    const _htmlBlockRetryCount = new WeakMap();
-    const HTML_BLOCK_MAX_RETRIES = 8;
 
+    // A block without its shadow root yet needs no retry: the page-world shadow hook
+    // reports the root when it is attached (measured 2026-11-15: the old 400 ms retry
+    // styled 0 roots first on 10 pages in Chromium and Firefox).
     function ensureHtmlBlockStyled(block) {
-        if (!block || _styledHtmlBlocks.has(block)) return;
-        if (block.shadowRoot) {
-            var pendingTimer = _pendingHtmlBlockRetry.get(block);
-            if (pendingTimer) {
-                clearTimeout(pendingTimer);
-                _pendingHtmlBlockRetry.delete(block);
-            }
-            injectStylesIntoShadowRoot(block.shadowRoot, block);
-            _styledHtmlBlocks.add(block);
-            return;
-        }
-        if (_pendingHtmlBlockRetry.has(block)) return;
-        var retryCount = _htmlBlockRetryCount.get(block) || 0;
-        if (retryCount >= HTML_BLOCK_MAX_RETRIES) return;
-        _htmlBlockRetryCount.set(block, retryCount + 1);
-        const retryTimer = setTimeout(function () {
-            _pendingHtmlBlockRetry.delete(block);
-            ensureHtmlBlockStyled(block);
-        }, 400);
-        _pendingHtmlBlockRetry.set(block, retryTimer);
+        if (!block || _styledHtmlBlocks.has(block) || !block.shadowRoot) return;
+        injectStylesIntoShadowRoot(block.shadowRoot, block);
+        _styledHtmlBlocks.add(block);
     }
 
     function processHtmlBlocks(root) {
@@ -1540,50 +634,6 @@
 
     function pollForHtmlBlocks() {
         document.querySelectorAll('d2l-html-block').forEach(ensureHtmlBlockStyled);
-    }
-
-    function styleMultiselectElements(root) {
-        root.querySelectorAll('.d2l-multiselect, ul.d2l-multiselect').forEach(function (el) {
-            el.style.setProperty('background', '#3d3d3d', 'important');
-            el.style.setProperty('background-color', '#3d3d3d', 'important');
-            el.style.setProperty('background-image', 'none', 'important');
-            el.style.setProperty('border-color', '#505050', 'important');
-            el.style.setProperty('box-shadow', 'none', 'important');
-        });
-        root.querySelectorAll('.d2l-multiselect-choice').forEach(function (el) {
-            el.style.setProperty('background', '#4a4a4a', 'important');
-            el.style.setProperty('background-color', '#4a4a4a', 'important');
-            el.style.setProperty('background-image', 'none', 'important');
-            el.style.setProperty('color', '#e0e0e0', 'important');
-            el.style.setProperty('border-color', '#606060', 'important');
-            el.style.setProperty('box-shadow', 'none', 'important');
-            el.style.setProperty('text-shadow', 'none', 'important');
-        });
-        root.querySelectorAll('.d2l-multiselect-choice span').forEach(function (el) {
-            el.style.setProperty('color', '#e0e0e0', 'important');
-        });
-        root.querySelectorAll('.d2l-multiselect-clearicon, .d2l-multiselect-choice a').forEach(function (el) {
-            el.style.setProperty('color', '#e0e0e0', 'important');
-        });
-        root.querySelectorAll('.d2l-multiselect input, input.d2l-edit, .d2l-multiselect-input input').forEach(function (el) {
-            el.style.setProperty('background-color', '#3d3d3d', 'important');
-            el.style.setProperty('color', '#e0e0e0', 'important');
-            el.style.setProperty('border-color', '#505050', 'important');
-        });
-        root.querySelectorAll('.d2l-popup-title, .d2l-popup-title h1').forEach(function (el) {
-            el.style.setProperty('background-color', '#2d2d2d', 'important');
-            el.style.setProperty('color', '#ffffff', 'important');
-        });
-    }
-
-    function pollForMultiselects() {
-        styleMultiselectElements(document);
-        document.querySelectorAll('iframe').forEach(function (iframe) {
-            try {
-                const doc = iframe.contentDocument;
-                if (doc && doc.body) styleMultiselectElements(doc);
-            } catch (e4) { }
-        });
     }
 
     const DARK_SELECTORS = `
@@ -1801,186 +851,9 @@
         article.nav__dropdown
     `;
 
-    const LESSONS_TOC_DARK1_SELECTORS = `
-        .navigation-container .navigation-tree .co-content,
-        .navigation-container .navigation-tree .title-container,
-        .navigation-container .navigation-tree .title,
-        .navigation-container .navigation-tree .title > div,
-        .navigation-container .navigation-tree .title-text,
-        .navigation-container .navigation-tree .title-text span,
-        .navigation-container .navigation-tree .overflow-detector,
-        .navigation-container .navigation-tree .overflow-detector span,
-        .navigation-container .navigation-tree .text-wrapper,
-        .navigation-container .navigation-tree .date-container,
-        .navigation-container .navigation-tree .due-date-container
-    `;
-
-    function normalizeInlineStyleValue(value) {
-        return String(value || '').replace(/\s+/g, '').toLowerCase();
-    }
-
-    function inlineStyleHasDarkFill(el, hexValue, rgbValue) {
-        if (!el || !el.style) return false;
-        var bgColor = normalizeInlineStyleValue(el.style.getPropertyValue('background-color'));
-        var bg = normalizeInlineStyleValue(el.style.getPropertyValue('background'));
-        var bgImage = normalizeInlineStyleValue(el.style.getPropertyValue('background-image'));
-        var hasPriority = el.style.getPropertyPriority('background-color') === 'important'
-            || el.style.getPropertyPriority('background') === 'important';
-        var hasFill = bgColor === hexValue || bgColor === rgbValue || bg === hexValue || bg === rgbValue;
-        var hasNoImage = (bgImage === '' || bgImage === 'none');
-        return hasFill && hasNoImage && hasPriority;
-    }
-
-    function inlineStyleHasTextColor(el, hexValue, rgbValue) {
-        if (!el || !el.style) return false;
-        var color = normalizeInlineStyleValue(el.style.getPropertyValue('color'));
-        var hasPriority = el.style.getPropertyPriority('color') === 'important';
-        return hasPriority && (color === hexValue || color === rgbValue);
-    }
-
-    function forceLessonsTocDark1Element(el) {
-        if (!el || !el.style) return;
-        el.style.setProperty('background', '#1a1a1a', 'important');
-        el.style.setProperty('background-color', '#1a1a1a', 'important');
-        el.style.setProperty('background-image', 'none', 'important');
-        if (el.tagName !== 'A') el.style.setProperty('color', '#e0e0e0', 'important');
-    }
-
-    function forceLessonsTocDark1(root) {
-        if (!isDarkModeEnabled()) return;
-        if (window.location.hostname !== 'learn.inside.dtu.dk') return;
-        if (!root) return;
-        var scope = root;
-        if (scope.nodeType !== 1 && scope.nodeType !== 9 && scope.nodeType !== 11) return;
-        try {
-            if (scope.matches && scope.matches(LESSONS_TOC_DARK1_SELECTORS)) forceLessonsTocDark1Element(scope);
-        } catch (e5) { }
-        if (!scope.querySelectorAll) return;
-        try {
-            scope.querySelectorAll(LESSONS_TOC_DARK1_SELECTORS).forEach(forceLessonsTocDark1Element);
-        } catch (e6) { }
-    }
-
-    function forceD2LActionButtonsDark1(root) {
-        if (!isDarkModeEnabled()) return;
-        if (window.location.hostname !== 'learn.inside.dtu.dk') return;
-        if (!root) return;
-        var scope = root;
-        if (scope.nodeType !== 1 && scope.nodeType !== 9 && scope.nodeType !== 11) return;
-        try {
-            if (scope.matches && scope.matches('.d2l-action-buttons, .d2l-action-buttons-list, ul.d2l-action-buttons-list, .d2l-action-buttons-item')) {
-                forceLessonsTocDark1Element(scope);
-            }
-        } catch (e7) { }
-        if (!scope.querySelectorAll) return;
-        try {
-            scope.querySelectorAll('.d2l-action-buttons, .d2l-action-buttons-list, ul.d2l-action-buttons-list, .d2l-action-buttons-item').forEach(forceLessonsTocDark1Element);
-            scope.querySelectorAll('.d2l-action-buttons .d2l-button, .d2l-action-buttons-item .d2l-button').forEach(function (btn) {
-                if (!btn || !btn.style) return;
-                btn.style.setProperty('background', 'var(--dtu-ad-accent)', 'important');
-                btn.style.setProperty('background-color', 'var(--dtu-ad-accent)', 'important');
-                btn.style.setProperty('background-image', 'none', 'important');
-                btn.style.setProperty('color', 'var(--dtu-ad-accent-on, #ffffff)', 'important');
-                btn.style.setProperty('border-color', 'var(--dtu-ad-accent-border)', 'important');
-            });
-        } catch (e8) { }
-    }
-
-    function disableLegacyLessonsSidebarGradient(root) {
-        if (!isDarkModeEnabled()) return;
-        if (window.location.hostname !== 'learn.inside.dtu.dk') return;
-        if (!root) return;
-        var scope = root;
-        if (scope.nodeType !== 1 && scope.nodeType !== 9 && scope.nodeType !== 11) return;
-        var separatorSelector = '.d2l-box.d2l-box-h.d2l-twopanelselector-side.d2l-twopanelselector-side-sep, '
-            + '.d2l-twopanelselector-side.d2l-twopanelselector-side-sep, '
-            + '.d2l-twopanelselector-side-bg.d2l-twopanelselector-side-sep, '
-            + '#D2L_LE_Content_Dashboard_Collapsed_Separator';
-        var selectedAnchorSelector = '#ContentModuleTree #D2L_LE_Content_TreeBrowser .d2l-le-TreeAccordionItem.d2l-le-TreeAccordionItem-Selected > a.d2l-le-TreeAccordionItem-anchor, '
-            + '#ContentModuleTree #ContentPluginTree .d2l-le-TreeAccordionItem.d2l-le-TreeAccordionItem-Selected > a.d2l-le-TreeAccordionItem-anchor';
-        function neutralizeSeparator(el) {
-            if (!el || !el.style) return;
-            el.style.setProperty('border-right', 'none', 'important');
-            el.style.setProperty('background', '#1a1a1a', 'important');
-            el.style.setProperty('background-color', '#1a1a1a', 'important');
-            el.style.setProperty('background-image', 'none', 'important');
-            el.style.setProperty('box-shadow', 'none', 'important');
-            el.style.setProperty('--d2l-color-regolith', '#1a1a1a', 'important');
-            el.style.setProperty('--d2l-color-gypsum', '#1a1a1a', 'important');
-        }
-        function neutralizeSelectedAnchor(el) {
-            if (!el || !el.style) return;
-            el.style.setProperty('position', 'relative', 'important');
-            el.style.setProperty('overflow', 'hidden', 'important');
-            el.style.setProperty('background', '#2d2d2d', 'important');
-            el.style.setProperty('background-color', '#2d2d2d', 'important');
-            el.style.setProperty('background-image', 'none', 'important');
-            el.style.setProperty('box-shadow', 'none', 'important');
-        }
-        try {
-            if (scope.matches && scope.matches(separatorSelector)) neutralizeSeparator(scope);
-            if (scope.matches && scope.matches(selectedAnchorSelector)) neutralizeSelectedAnchor(scope);
-        } catch (e9) { }
-        if (!scope.querySelectorAll) return;
-        try {
-            scope.querySelectorAll(separatorSelector).forEach(neutralizeSeparator);
-            scope.querySelectorAll(selectedAnchorSelector).forEach(neutralizeSelectedAnchor);
-        } catch (e10) { }
-    }
-
-    function isWithinNotificationIconComponent(el) {
-        if (!el) return false;
-        var probe = el;
-        var hops = 0;
-        while (probe && hops < 8) {
-            try {
-                if (probe.matches && probe.matches('d2l-labs-navigation-notification-icon')) return true;
-                if (probe.closest && probe.closest('d2l-labs-navigation-notification-icon')) return true;
-            } catch (e11) { }
-            var root = null;
-            try { root = probe.getRootNode ? probe.getRootNode() : null; } catch (e12) { root = null; }
-            if (!root || !root.host) break;
-            probe = root.host;
-            hops++;
-        }
-        return false;
-    }
-
-    function isStudyplanModalBackgroundExemptElement(el) {
-        if (!el) return false;
-        if (window.location.hostname !== 'studieplan.dtu.dk') return false;
-        try {
-            if (el.id === 'searchCourseCatalogDialog' || el.id === 'createActivity') return true;
-            if (el.closest && el.closest('#searchCourseCatalogDialog, #createActivity')) return true;
-        } catch (e13) { }
-        return false;
-    }
-
-    // Survey answer rows use legacy hover/focus styling that can repaint an
-    // entire table cell white. Their controls and text are layout, not cards,
-    // so keep the complete row on the dark-1 canvas with guarded inline styles.
-    function forceSurveyAttemptAnswerRowDark1(row) {
-        if (!row || !row.style) return;
-        var nodes = [row];
-        try {
-            row.querySelectorAll('td').forEach(function (cell) { nodes.push(cell); });
-        } catch (e0) { }
-        nodes.forEach(function (node) {
-            if (!node || !node.style) return;
-            if (inlineStyleHasDarkFill(node, '#1a1a1a', 'rgb(26,26,26)')
-                && inlineStyleHasTextColor(node, '#e0e0e0', 'rgb(224,224,224)')) return;
-            node.style.setProperty('background', '#1a1a1a', 'important');
-            node.style.setProperty('background-color', '#1a1a1a', 'important');
-            node.style.setProperty('background-image', 'none', 'important');
-            node.style.setProperty('color', '#e0e0e0', 'important');
-            node.style.setProperty('border-color', '#404040', 'important');
-            node.style.setProperty('outline-color', '#404040', 'important');
-        });
-    }
-
     function applyDarkStyle(el) {
         if (!el || !el.style) return;
-        if (isStudyplanModalBackgroundExemptElement(el)) return;
+        if (pageCases.isStudyplanModalBackgroundExemptElement(el)) return;
         if (window.location.hostname === 'learn.inside.dtu.dk' && el.matches) {
             try {
                 var isQuizAttemptStructure = window.location.pathname.indexOf('/d2l/lms/quizzing/user/attempt/quiz_attempt_page') !== -1
@@ -2004,7 +877,7 @@
                 var isSurveyAttemptAnswerRowStructure = window.location.pathname.indexOf('/d2l/lms/survey/user/attempt/') !== -1
                     && surveyAnswerRow
                     && surveyAnswerRow.querySelector('.d2l-qc-controls-container input.d2l-radio');
-                if (isSurveyAttemptAnswerRowStructure) forceSurveyAttemptAnswerRowDark1(surveyAnswerRow);
+                if (isSurveyAttemptAnswerRowStructure) pageCases.forceSurveyAttemptAnswerRowDark1(surveyAnswerRow);
                 var surveyRadioWrapper = el.closest && el.closest('.dco_c');
                 var isSurveyAttemptRadioStructure = window.location.pathname.indexOf('/d2l/lms/survey/user/attempt/') !== -1
                     && (el.matches('.d2l-radio')
@@ -2021,8 +894,8 @@
                     && el.closest('tr')
                     && el.closest('tr').querySelector('.d2l-grades-score');
                 if (isQuizAttemptStructure || isQuizListRowStructure || isSurveyListRowStructure || isGradesMainStructuralCell || isGradesFeedbackStructure || isSurveyAttemptAnswerRowStructure || isSurveyAttemptRadioStructure || isQuizSubmissionScoreStructure || isQuizSubmissionAttemptStructure || isQuizSubmissionScoreRowStructure) {
-                    if (inlineStyleHasDarkFill(el, '#1a1a1a', 'rgb(26,26,26)')
-                        && inlineStyleHasTextColor(el, '#e0e0e0', 'rgb(224,224,224)')) return;
+                    if (pageCases.inlineStyleHasDarkFill(el, '#1a1a1a', 'rgb(26,26,26)')
+                        && pageCases.inlineStyleHasTextColor(el, '#e0e0e0', 'rgb(224,224,224)')) return;
                     el.style.setProperty('background', '#1a1a1a', 'important');
                     el.style.setProperty('background-color', '#1a1a1a', 'important');
                     el.style.setProperty('background-image', 'none', 'important');
@@ -2041,7 +914,7 @@
                     el.style.setProperty('background-image', 'none', 'important');
                     return;
                 }
-                if (isWithinNotificationIconComponent(el)) {
+                if (pageCases.isWithinNotificationIconComponent(el)) {
                     el.style.setProperty('background', 'transparent', 'important');
                     el.style.setProperty('background-color', 'transparent', 'important');
                     el.style.setProperty('background-image', 'none', 'important');
@@ -2079,14 +952,14 @@
         if (isDTULearnQuizSubmissionsPage() && el.matches) {
             if (el.matches('img.d2l-histogram-barblue, td.d2l-histogram-disback1, td.d2l-histogram-disyimg2, td.d2l-histogram-xside2')) return;
         }
-        if (el.closest && el.closest('.d2l-navigation-s-main-wrapper')) return;
+        if (el.closest && el.closest('.d2l-navigation-s-main-wrapper, .d2l-navigation-main-ib')) return;
         if (el.closest && el.closest('.pagefooter')) return;
         if (el.closest && el.closest('.topmenuitems')) return;
         if (el.closest && el.closest('.pageheader') && !el.closest('.breadcrumb.linkset6')) return;
         if (el.tagName === 'A') {
-            if (inlineStyleHasDarkFill(el, '#1a1a1a', 'rgb(26,26,26)')) return;
-        } else if (inlineStyleHasDarkFill(el, '#1a1a1a', 'rgb(26,26,26)')
-            && inlineStyleHasTextColor(el, '#e0e0e0', 'rgb(224,224,224)')) {
+            if (pageCases.inlineStyleHasDarkFill(el, '#1a1a1a', 'rgb(26,26,26)')) return;
+        } else if (pageCases.inlineStyleHasDarkFill(el, '#1a1a1a', 'rgb(26,26,26)')
+            && pageCases.inlineStyleHasTextColor(el, '#e0e0e0', 'rgb(224,224,224)')) {
             return;
         }
         el.style.setProperty('background', '#1a1a1a', 'important');
@@ -2097,7 +970,13 @@
 
     function applyLighterDarkStyle(el) {
         if (!el || !el.style) return;
-        if (isStudyplanModalBackgroundExemptElement(el)) return;
+        if (pageCases.isStudyplanModalBackgroundExemptElement(el)) return;
+        // The red header has one painter. Painting it grey here too made every style
+        // change re-trigger the observer (grey, then red, then grey), which froze the tab.
+        if (el.matches && el.matches('.dturedbackground')) {
+            forceDtuRedBackgroundDark2(el);
+            return;
+        }
         if (window.location.hostname === 'learn.inside.dtu.dk' && el.matches) {
             try {
                 var isQuizAttemptStructure = window.location.pathname.indexOf('/d2l/lms/quizzing/user/attempt/quiz_attempt_page') !== -1
@@ -2121,7 +1000,7 @@
                 var isSurveyAttemptAnswerRowStructure = window.location.pathname.indexOf('/d2l/lms/survey/user/attempt/') !== -1
                     && surveyAnswerRow
                     && surveyAnswerRow.querySelector('.d2l-qc-controls-container input.d2l-radio');
-                if (isSurveyAttemptAnswerRowStructure) forceSurveyAttemptAnswerRowDark1(surveyAnswerRow);
+                if (isSurveyAttemptAnswerRowStructure) pageCases.forceSurveyAttemptAnswerRowDark1(surveyAnswerRow);
                 var surveyRadioWrapper = el.closest && el.closest('.dco_c');
                 var isSurveyAttemptRadioStructure = window.location.pathname.indexOf('/d2l/lms/survey/user/attempt/') !== -1
                     && (el.matches('.d2l-radio')
@@ -2138,8 +1017,8 @@
                     && el.closest('tr')
                     && el.closest('tr').querySelector('.d2l-grades-score');
                 if (isQuizAttemptStructure || isQuizListRowStructure || isSurveyListRowStructure || isGradesMainStructuralCell || isGradesFeedbackStructure || isSurveyAttemptAnswerRowStructure || isSurveyAttemptRadioStructure || isQuizSubmissionScoreStructure || isQuizSubmissionAttemptStructure || isQuizSubmissionScoreRowStructure) {
-                    if (inlineStyleHasDarkFill(el, '#1a1a1a', 'rgb(26,26,26)')
-                        && inlineStyleHasTextColor(el, '#e0e0e0', 'rgb(224,224,224)')) return;
+                    if (pageCases.inlineStyleHasDarkFill(el, '#1a1a1a', 'rgb(26,26,26)')
+                        && pageCases.inlineStyleHasTextColor(el, '#e0e0e0', 'rgb(224,224,224)')) return;
                     el.style.setProperty('background', '#1a1a1a', 'important');
                     el.style.setProperty('background-color', '#1a1a1a', 'important');
                     el.style.setProperty('background-image', 'none', 'important');
@@ -2158,7 +1037,7 @@
                     el.style.setProperty('background-image', 'none', 'important');
                     return;
                 }
-                if (isWithinNotificationIconComponent(el)) {
+                if (pageCases.isWithinNotificationIconComponent(el)) {
                     el.style.setProperty('background', 'transparent', 'important');
                     el.style.setProperty('background-color', 'transparent', 'important');
                     el.style.setProperty('background-image', 'none', 'important');
@@ -2196,8 +1075,8 @@
         // retrigger the mutation observer and loop), mirroring the general guard.
         if (el.id === 'TitlePlaceholderId'
             || (el.closest && el.closest('#TitlePlaceholderId') && !el.closest('d2l-dropdown-content'))) {
-            if (inlineStyleHasDarkFill(el, '#1a1a1a', 'rgb(26,26,26)')
-                && (el.tagName === 'A' || inlineStyleHasTextColor(el, '#e0e0e0', 'rgb(224,224,224)'))) return;
+            if (pageCases.inlineStyleHasDarkFill(el, '#1a1a1a', 'rgb(26,26,26)')
+                && (el.tagName === 'A' || pageCases.inlineStyleHasTextColor(el, '#e0e0e0', 'rgb(224,224,224)'))) return;
             el.style.setProperty('background', '#1a1a1a', 'important');
             el.style.setProperty('background-color', '#1a1a1a', 'important');
             el.style.setProperty('background-image', 'none', 'important');
@@ -2219,13 +1098,13 @@
             && el.closest('.navigation-container .navigation-tree')
             && el.matches
             && el.matches('.co-content, .title-container, .title, .title > div, .title-text, .title-text span, .overflow-detector, .overflow-detector span, .text-wrapper, .date-container, .due-date-container')) {
-            forceLessonsTocDark1Element(el);
+            pageCases.forceLessonsTocDark1Element(el);
             return;
         }
         if (window.location.hostname === 'learn.inside.dtu.dk'
             && el.matches
             && el.matches('.d2l-action-buttons, .d2l-action-buttons-list, ul.d2l-action-buttons-list, .d2l-action-buttons-item')) {
-            forceLessonsTocDark1Element(el);
+            pageCases.forceLessonsTocDark1Element(el);
             return;
         }
         var tagName = ((el.tagName || '') + '').toLowerCase();
@@ -2234,10 +1113,10 @@
             // Transparent so the glyph sits on whatever its row shows (resting,
             // hovered or current pill) instead of drawing its own square.
             // Guarded: rewriting unchanged inline styles loops the observer.
-            var iconFill = normalizeInlineStyleValue(el.style.getPropertyValue('background-color'));
+            var iconFill = pageCases.normalizeInlineStyleValue(el.style.getPropertyValue('background-color'));
             if ((iconFill === 'transparent' || iconFill === 'rgba(0,0,0,0)')
                 && el.style.getPropertyPriority('background-color') === 'important'
-                && inlineStyleHasTextColor(el, '#e0e0e0', 'rgb(224,224,224)')) return;
+                && pageCases.inlineStyleHasTextColor(el, '#e0e0e0', 'rgb(224,224,224)')) return;
             el.style.setProperty('background', 'transparent', 'important');
             el.style.setProperty('background-color', 'transparent', 'important');
             el.style.setProperty('background-image', 'none', 'important');
@@ -2264,9 +1143,9 @@
             return;
         }
         if (el.tagName === 'A') {
-            if (inlineStyleHasDarkFill(el, '#2d2d2d', 'rgb(45,45,45)')) return;
-        } else if (inlineStyleHasDarkFill(el, '#2d2d2d', 'rgb(45,45,45)')
-            && inlineStyleHasTextColor(el, '#e0e0e0', 'rgb(224,224,224)')) {
+            if (pageCases.inlineStyleHasDarkFill(el, '#2d2d2d', 'rgb(45,45,45)')) return;
+        } else if (pageCases.inlineStyleHasDarkFill(el, '#2d2d2d', 'rgb(45,45,45)')
+            && pageCases.inlineStyleHasTextColor(el, '#e0e0e0', 'rgb(224,224,224)')) {
             return;
         }
         el.style.setProperty('background', '#2d2d2d', 'important');
@@ -2279,16 +1158,16 @@
         root.querySelectorAll(DARK_SELECTORS).forEach(applyDarkStyle);
         root.querySelectorAll(LIGHTER_DARK_SELECTORS).forEach(applyLighterDarkStyle);
         try {
-            forceLessonsTocDark1(document);
-            if (root !== document) forceLessonsTocDark1(root);
+            pageCases.forceLessonsTocDark1(document);
+            if (root !== document) pageCases.forceLessonsTocDark1(root);
         } catch (e18) { }
         try {
-            forceD2LActionButtonsDark1(document);
-            if (root !== document) forceD2LActionButtonsDark1(root);
+            pageCases.forceD2LActionButtonsDark1(document);
+            if (root !== document) pageCases.forceD2LActionButtonsDark1(root);
         } catch (e19) { }
         try {
-            disableLegacyLessonsSidebarGradient(document);
-            if (root !== document) disableLegacyLessonsSidebarGradient(root);
+            pageCases.disableLegacyLessonsSidebarGradient(document);
+            if (root !== document) pageCases.disableLegacyLessonsSidebarGradient(root);
         } catch (e20) { }
         root.querySelectorAll('.nav__dropdown, article.nav__dropdown').forEach(function (dropdown) {
             dropdown.querySelectorAll('a, span, h2, li, div, header').forEach(function (el) {
@@ -2338,10 +1217,10 @@
                 if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
                     const el = mutation.target;
                     try {
-                        if (el && el.closest && el.closest('.navigation-container .navigation-tree')) forceLessonsTocDark1(el);
+                        if (el && el.closest && el.closest('.navigation-container .navigation-tree')) pageCases.forceLessonsTocDark1(el);
                     } catch (e22) { }
-                    try { forceD2LActionButtonsDark1(el); } catch (e23) { }
-                    try { disableLegacyLessonsSidebarGradient(el); } catch (e24) { }
+                    try { pageCases.forceD2LActionButtonsDark1(el); } catch (e23) { }
+                    try { pageCases.disableLegacyLessonsSidebarGradient(el); } catch (e24) { }
                     if (el.matches && el.matches(LIGHTER_DARK_SELECTORS)) {
                         applyLighterDarkStyle(el);
                     } else if (el.matches && el.matches(DARK_SELECTORS)) {
@@ -2352,18 +1231,16 @@
                     mutation.addedNodes.forEach((node) => {
                         if (node.nodeType !== 1) return;
                         try {
-                            if (node.closest && node.closest('.navigation-container .navigation-tree')) forceLessonsTocDark1(node);
+                            if (node.closest && node.closest('.navigation-container .navigation-tree')) pageCases.forceLessonsTocDark1(node);
                         } catch (e25) { }
-                        try { forceD2LActionButtonsDark1(node); } catch (e26) { }
-                        try { disableLegacyLessonsSidebarGradient(node); } catch (e27) { }
+                        try { pageCases.forceD2LActionButtonsDark1(node); } catch (e26) { }
+                        try { pageCases.disableLegacyLessonsSidebarGradient(node); } catch (e27) { }
                         if (node.matches && node.matches(DARK_SELECTORS)) applyDarkStyle(node);
                         if (node.matches && node.matches(LIGHTER_DARK_SELECTORS)) applyLighterDarkStyle(node);
                         if (node.querySelectorAll) {
                             node.querySelectorAll(DARK_SELECTORS).forEach(applyDarkStyle);
                             node.querySelectorAll(LIGHTER_DARK_SELECTORS).forEach(applyLighterDarkStyle);
-                            forceLessonsTocDark1(node);
-                            forceD2LActionButtonsDark1(node);
-                            disableLegacyLessonsSidebarGradient(node);
+                            pageCases.forceLessonsTocDark1(node);
                         }
                     });
                 }
@@ -2371,7 +1248,8 @@
         });
         observer.observe(root, {
             attributes: true,
-            attributeFilter: ['style', 'class'],
+            // Only style changes are handled above; class changes would wake the observer for nothing.
+            attributeFilter: ['style'],
             childList: true,
             subtree: true
         });
@@ -2464,6 +1342,15 @@
         return true;
     }
 
+    // Shared by the late-shadow and iframe walks below. Only their tree walkers differ.
+    function processShadowCandidate(node) {
+        if (!node || node.nodeType !== 1 || !node.tagName) return;
+        if (!node.tagName.toLowerCase().startsWith('d2l-')) return;
+        if (shouldExcludeElement(node) || isInsideExcludedContainer(node)) return;
+        if (node.shadowRoot) injectStylesIntoShadowRoot(node.shadowRoot, node);
+        else handleShadowHostCandidate(node);
+    }
+
     function processElement(element) {
         if (!element || element.nodeType !== 1) return;
         if (!shouldUseBrightspaceShadowDomProcessing()) return;
@@ -2472,7 +1359,7 @@
             if (!node || node.nodeType !== 1) return;
             if (shouldExcludeElement(node) || isInsideExcludedContainer(node)) return;
             if (node.shadowRoot) injectStylesIntoShadowRoot(node.shadowRoot, node);
-            else scheduleShadowHostRetry(node);
+            else handleShadowHostCandidate(node);
         }
         processNode(element);
         const walker = document.createTreeWalker(element, NodeFilter.SHOW_ELEMENT, null);
@@ -2490,18 +1377,11 @@
         if (!shouldUseBrightspaceShadowDomProcessing()) return;
         var baseRoot = root && root.nodeType === 1 ? root : (document.body || document.documentElement);
         if (!baseRoot) return;
-        function processCandidate(node) {
-            if (!node || node.nodeType !== 1 || !node.tagName) return;
-            if (!node.tagName.toLowerCase().startsWith('d2l-')) return;
-            if (shouldExcludeElement(node) || isInsideExcludedContainer(node)) return;
-            if (node.shadowRoot) injectStylesIntoShadowRoot(node.shadowRoot, node);
-            else scheduleShadowHostRetry(node);
-        }
-        processCandidate(baseRoot);
+        processShadowCandidate(baseRoot);
         var walker = document.createTreeWalker(baseRoot, NodeFilter.SHOW_ELEMENT, null);
         var node = walker.nextNode();
         while (node) {
-            processCandidate(node);
+            processShadowCandidate(node);
             node = walker.nextNode();
         }
     }
@@ -2509,15 +1389,7 @@
     function processIframeShadowTree(doc, rootNode) {
         if (!doc || !rootNode || !shouldUseBrightspaceShadowDomProcessing()) return;
 
-        function processCandidate(node) {
-            if (!node || node.nodeType !== 1 || !node.tagName) return;
-            if (!node.tagName.toLowerCase().startsWith('d2l-')) return;
-            if (shouldExcludeElement(node) || isInsideExcludedContainer(node)) return;
-            if (node.shadowRoot) injectStylesIntoShadowRoot(node.shadowRoot, node);
-            else scheduleShadowHostRetry(node);
-        }
-
-        processCandidate(rootNode);
+        processShadowCandidate(rootNode);
         var view = doc.defaultView;
         var showElement = view && view.NodeFilter ? view.NodeFilter.SHOW_ELEMENT : 1;
         var walker;
@@ -2528,7 +1400,7 @@
         }
         var node = walker.nextNode();
         while (node) {
-            processCandidate(node);
+            processShadowCandidate(node);
             node = walker.nextNode();
         }
     }
@@ -2547,7 +1419,7 @@
                         var added = mutation.addedNodes[j];
                         if (added && added.nodeType === 1) {
                             processIframeShadowTree(doc, added);
-                            authoredTableChanged = true;
+                            if ((added.matches && added.matches('td, th')) || (added.querySelector && added.querySelector('td, th'))) authoredTableChanged = true;
                         }
                     }
                 }
@@ -2612,12 +1484,24 @@
         ]);
     }
 
+    // A legacy page (two-panel layout) shown inside the Lessons viewer sits on its #2d2d2d
+    // panel; its own #1a1a1a page base would draw a dark frame around the content.
+    function isLegacyPageInLessonsViewer() {
+        try {
+            if (window === window.top || !document.querySelector('.d2l-twopanelselector-main')) return false;
+            return /\/d2l\/ui\/apps\/smart-curriculum\//.test(window.parent.location.pathname);
+        } catch (eCross) { return false; }
+    }
+
     function enforcePageBackground() {
-        document.documentElement.style.setProperty('background-color', '#1a1a1a', 'important');
-        document.documentElement.style.setProperty('background', '#1a1a1a', 'important');
+        var inLessons = isLegacyPageInLessonsViewer();
+        var bg = inLessons ? '#2d2d2d' : '#1a1a1a';
+        document.documentElement.classList.toggle('dtu-in-lessons-viewer', inLessons);
+        document.documentElement.style.setProperty('background-color', bg, 'important');
+        document.documentElement.style.setProperty('background', bg, 'important');
         if (document.body) {
-            document.body.style.setProperty('background-color', '#1a1a1a', 'important');
-            document.body.style.setProperty('background', '#1a1a1a', 'important');
+            document.body.style.setProperty('background-color', bg, 'important');
+            document.body.style.setProperty('background', bg, 'important');
         }
     }
 
@@ -2640,7 +1524,6 @@
         markAuthoredLightTableCells(document, 'td, th');
         if (useBrightspaceShadowDom) {
             pollForHtmlBlocks();
-            pollForMultiselects();
             pollOverrideDynamicStyles();
             if (document.body) processElement(document.body);
             else sweepForLateShadowRoots();
@@ -2662,22 +1545,21 @@
         observeInjectedShadowRoot: observeInjectedShadowRoot,
         processHtmlBlocks: processHtmlBlocks,
         pollForHtmlBlocks: pollForHtmlBlocks,
-        pollForMultiselects: pollForMultiselects,
-        forceLessonsTocDark1: forceLessonsTocDark1,
-        forceD2LActionButtonsDark1: forceD2LActionButtonsDark1,
-        disableLegacyLessonsSidebarGradient: disableLegacyLessonsSidebarGradient,
+        forceLessonsTocDark1: pageCases.forceLessonsTocDark1,
+        forceD2LActionButtonsDark1: pageCases.forceD2LActionButtonsDark1,
+        disableLegacyLessonsSidebarGradient: pageCases.disableLegacyLessonsSidebarGradient,
         applyDarkStyle: applyDarkStyle,
         applyLighterDarkStyle: applyLighterDarkStyle,
         setupStyleObserver: setupStyleObserver,
         pollOverrideDynamicStyles: pollOverrideDynamicStyles,
         processElement: processElement,
-        sweepForLateShadowRoots: sweepForLateShadowRoots,
         processIframes: processIframes,
         waitForCustomElements: waitForCustomElements,
         runDarkModeChecks: runDarkModeChecks
     };
 
     if (isDarkModeEnabled()) {
+        registerShadowAttachedListener();
         enforcePageBackground();
         pollOverrideDynamicStyles();
         function initialize() {

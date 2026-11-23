@@ -262,10 +262,10 @@
                 refreshRuleList();
                 return;
             }
-            saveUrlPausePatterns(remaining);
+            var saved = saveUrlPausePatterns(remaining);
             if (wasMatchingCurrentPage) {
                 closePausedUrlRulesModal(false);
-                window.location.reload();
+                saved.then(function () { window.location.reload(); });
                 return;
             }
             setStatus('Removed paused URL rule.', theme.muted);
@@ -344,10 +344,10 @@
                 return;
             }
             patterns.push(normalized);
-            saveUrlPausePatterns(patterns);
+            var saved = saveUrlPausePatterns(patterns);
             if (getMatchingUrlPausePatterns(currentUrl).indexOf(normalized) !== -1) {
                 closePausedUrlRulesModal(false);
-                window.location.reload();
+                saved.then(function () { window.location.reload(); });
                 return;
             }
             setStatus('Saved paused URL rule.', 'var(--dtu-ad-accent)');
@@ -356,7 +356,7 @@
 
         saveRuleBtn.addEventListener('click', saveRule);
         ruleInput.addEventListener('keydown', function (e6) {
-            if (e6.key === 'Enter') {
+            if (e6.key === 'Enter' && !e6.isComposing && e6.keyCode !== 229) {
                 e6.preventDefault();
                 saveRule();
             }
@@ -365,7 +365,8 @@
         modal.appendChild(body);
         overlay.appendChild(modal);
 
-        overlay.addEventListener('click', function (e7) {
+        // mousedown, as in Settings: a text drag that ends on the backdrop must not close it.
+        overlay.addEventListener('mousedown', function (e7) {
             if (e7.target === overlay) closePausedUrlRulesModal(reopenSettingsOnClose);
         });
         var pausedKeyHandler = function (e8) {

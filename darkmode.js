@@ -1,8 +1,17 @@
 ﻿// Dark mode script to inject styles into Shadow DOM elements
 (function () {
     'use strict';
-    var markExt = globalThis.DTUAfterDarkDom.markExt;
-    var normalizeWhitespace = globalThis.DTUAfterDarkDom.normalizeWhitespace;
+    var __dom = globalThis.DTUAfterDarkDom;
+    if (!__dom) throw new Error('darkmode.js loaded before darkmode.dom.js');
+    var markExt = __dom.markExt;
+    var normalizeWhitespace = __dom.normalizeWhitespace;
+    var deepQueryAll = __dom.deepQueryAll;
+    var invalidateDeepRoots = __dom.invalidateDeepRoots;
+    var schedulePlacement = __dom.schedulePlacement;
+    if (typeof deepQueryAll !== 'function' || typeof invalidateDeepRoots !== 'function'
+        || typeof schedulePlacement !== 'function') {
+        throw new Error('darkmode.dom.js must expose deepQueryAll, invalidateDeepRoots and schedulePlacement');
+    }
 
     const __urlPause = globalThis.DTUAfterDarkUrlPause;
     if (!__urlPause) throw new Error('darkmode.js loaded before darkmode.url-pause.js');
@@ -12,10 +21,24 @@
     if (!__accentTheme) throw new Error('darkmode.js loaded before darkmode.accent-theme.js');
     const __participantIntelBridge = globalThis.DTUAfterDarkParticipantIntelBridge;
     if (!__participantIntelBridge) throw new Error('darkmode.js loaded before darkmode.participant-intel-bridge.js');
+    const __storage = globalThis.DTUAfterDarkStorage;
+    if (!__storage) throw new Error('darkmode.js loaded before darkmode.storage.js');
+    const __themeState = globalThis.DTUAfterDarkThemeState;
+    if (!__themeState) throw new Error('darkmode.js loaded before darkmode.theme-state.js');
 
-    // ===== DARK MODE TOGGLE =====
-    const DARK_MODE_KEY = 'dtuDarkModeEnabled';
-    const DARK_MODE_FOLLOW_KEY = 'dtuDarkModeFollowDevice';
+    const DARK_MODE_KEY = __themeState.DARK_MODE_KEY;
+    const DARK_MODE_FOLLOW_KEY = __themeState.DARK_MODE_FOLLOW_KEY;
+    const clearLegacyDarkModeCookie = __themeState.clearLegacyDarkModeCookie;
+    const isFollowingDeviceTheme = __themeState.isFollowingDeviceTheme;
+    const isDarkModeEnabled = __themeState.isDarkModeEnabled;
+    const saveDarkModePreference = __themeState.saveDarkModePreference;
+    const saveDarkModeFollowDevice = __themeState.saveDarkModeFollowDevice;
+    const applyStoredDarkModeValue = __themeState.applyStoredDarkModeValue;
+    const subscribeDarkModeStorageChanges = __themeState.subscribeDarkModeStorageChanges;
+    const startFollowingDeviceThemeChanges = __themeState.startFollowingDeviceThemeChanges;
+    const getExtensionStorageArea = __storage.getExtensionStorageArea;
+    const storageLocalGet = __storage.storageLocalGet;
+    const storageLocalSet = __storage.storageLocalSet;
     const IS_TOP_WINDOW = __urlPause.isTopWindow;
     const getCurrentUrlWithoutHash = __urlPause.getCurrentUrlWithoutHash;
     const normalizeUrlPausePattern = __urlPause.normalizeUrlPausePattern;
@@ -62,91 +85,7 @@
     // Keep false unless explicitly enabling in a private local dev build.
     const ENABLE_CONTEXT_CAPTURE_DEV_TOOL = false;
 
-    function clearLegacyDarkModeCookie() {
-        try {
-            if (!IS_TOP_WINDOW || !location.hostname.endsWith('.dtu.dk')) return;
-            var expiry = 'dtuDarkMode=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax; Secure';
-            document.cookie = expiry;
-            document.cookie = expiry + '; domain=.dtu.dk';
-        } catch (e) { /* cookie access blocked */ }
-    }
-
     clearLegacyDarkModeCookie();
-
-    // Check dark mode preference: localStorage -> default true
-    function deviceThemeQuery() {
-        try { return window.matchMedia('(prefers-color-scheme: dark)'); } catch (e) { return null; }
-    }
-
-    function isFollowingDeviceTheme() {
-        return localStorage.getItem(DARK_MODE_FOLLOW_KEY) === 'true';
-    }
-
-    // Effective theme: the device's setting while Auto is on, otherwise the manual choice.
-    function isDarkModeEnabled() {
-        if (isFollowingDeviceTheme()) {
-            var query = deviceThemeQuery();
-            if (query) return query.matches;
-        }
-        const stored = localStorage.getItem(DARK_MODE_KEY);
-        if (stored !== null) return stored === 'true';
-        return true;
-    }
-
-    function getExtensionStorageArea() {
-        try {
-            if (typeof browser !== 'undefined' && browser.storage && browser.storage.local) {
-                return { api: 'browser', area: browser.storage.local };
-            }
-        } catch (e) { }
-        try {
-            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local) {
-                return { api: 'chrome', area: chrome.storage.local };
-            }
-        } catch (e) { }
-        return null;
-    }
-
-    // Save preference to all available stores (localStorage + extension storage).
-    // Resolves once extension storage has the value, so callers can reload without
-    // losing the write (a lost write makes the next load flip the toggle back).
-    // A manual choice ends Auto (device theme).
-    function saveDarkModePreference(enabled) {
-        localStorage.setItem(DARK_MODE_KEY, String(enabled));
-        localStorage.removeItem(DARK_MODE_FOLLOW_KEY);
-        var storage = getExtensionStorageArea();
-        if (!storage) return Promise.resolve();
-        var values = { [DARK_MODE_KEY]: enabled, [DARK_MODE_FOLLOW_KEY]: false };
-        return new Promise(function (resolve) {
-            try {
-                if (storage.api === 'browser') {
-                    storage.area.set(values).then(resolve, resolve);
-                } else {
-                    storage.area.set(values, function () { resolve(); });
-                }
-            } catch (e) {
-                resolve();
-            }
-        });
-    }
-
-    // "Match device theme": while on, the device's light/dark setting decides, not the manual toggle.
-    function saveDarkModeFollowDevice(enabled) {
-        localStorage.setItem(DARK_MODE_FOLLOW_KEY, String(enabled));
-        var storage = getExtensionStorageArea();
-        if (!storage) return Promise.resolve();
-        return new Promise(function (resolve) {
-            try {
-                if (storage.api === 'browser') {
-                    storage.area.set({ [DARK_MODE_FOLLOW_KEY]: enabled }).then(resolve, resolve);
-                } else {
-                    storage.area.set({ [DARK_MODE_FOLLOW_KEY]: enabled }, function () { resolve(); });
-                }
-            } catch (e) {
-                resolve();
-            }
-        });
-    }
 
     function getExtensionUrl(path) {
         try {
@@ -160,6 +99,22 @@
             // Fall back to raw path below.
         }
         return path;
+    }
+
+    // kurser-widgets loads in its own content-script group after this file, so
+    // resolve its namespace when a consumer calls the dependency, not now.
+    function lazyCourseWidgetsFunction(name) {
+        return function () {
+            var layout = globalThis.DTUAfterDarkCourseWidgetsLayout;
+            if (!layout) {
+                throw new Error('darkmode.js needs darkmode.kurser-widgets.js before calling ' + name);
+            }
+            var fn = layout[name];
+            if (typeof fn !== 'function') {
+                throw new Error('DTUAfterDarkCourseWidgetsLayout.' + name + ' is missing');
+            }
+            return fn.apply(null, arguments);
+        };
     }
 
 
@@ -324,128 +279,30 @@
         document.addEventListener('DOMContentLoaded', injectDarkCSS, { once: true });
     }
 
-    function applyStoredDarkModeValue(storedEnabled, storedFollow) {
-        // Unset follow means off. Cache it before the effective value is recomputed.
-        if (typeof storedFollow === 'boolean') localStorage.setItem(DARK_MODE_FOLLOW_KEY, String(storedFollow));
-        else if (storedFollow === undefined) localStorage.removeItem(DARK_MODE_FOLLOW_KEY);
-        // Extension storage is the one copy every DTU site shares; each site's localStorage
-        // is only a fast-start cache of it. Unset there means the default (on): a site that
-        // cached "false" long ago (localStorage outlives an extension reinstall) otherwise
-        // stayed light while the Learn toggle showed on.
-        if (storedEnabled === undefined) storedEnabled = true;
-        // Only booleans are ever written; anything else would reload on every load.
-        if (typeof storedEnabled !== 'boolean') return;
-        localStorage.setItem(DARK_MODE_KEY, String(storedEnabled));
-        if (isDarkModeEnabled() !== darkModeEnabled && window === window.top) {
-            location.reload();
-        }
-    }
-
     // Async cross-origin check via extension storage (covers s.brightspace.com etc.)
     var extensionStorage = getExtensionStorageArea();
     if (extensionStorage) {
         if (extensionStorage.api === 'browser') {
             extensionStorage.area.get([DARK_MODE_KEY, DARK_MODE_FOLLOW_KEY]).then(function (result) {
-                applyStoredDarkModeValue(result[DARK_MODE_KEY], result[DARK_MODE_FOLLOW_KEY]);
+                applyStoredDarkModeValue(result[DARK_MODE_KEY], result[DARK_MODE_FOLLOW_KEY], darkModeEnabled);
             }).catch(function () { });
         } else {
             extensionStorage.area.get([DARK_MODE_KEY, DARK_MODE_FOLLOW_KEY], function (result) {
                 if (chrome && chrome.runtime && chrome.runtime.lastError) return;
-                applyStoredDarkModeValue(result ? result[DARK_MODE_KEY] : undefined, result ? result[DARK_MODE_FOLLOW_KEY] : undefined);
+                applyStoredDarkModeValue(result ? result[DARK_MODE_KEY] : undefined, result ? result[DARK_MODE_FOLLOW_KEY] : undefined, darkModeEnabled);
             });
         }
     }
 
-    function subscribeDarkModeStorageChanges() {
-        var onChanged = function (changes, areaName) {
-            if (!IS_TOP_WINDOW) return;
-            if (areaName && areaName !== 'local') return;
-            if (!changes || (!changes[DARK_MODE_KEY] && !changes[DARK_MODE_FOLLOW_KEY])) return;
-            if (changes[DARK_MODE_FOLLOW_KEY]) {
-                var follow = changes[DARK_MODE_FOLLOW_KEY].newValue;
-                if (follow === true) localStorage.setItem(DARK_MODE_FOLLOW_KEY, 'true');
-                else localStorage.removeItem(DARK_MODE_FOLLOW_KEY);
-            }
-            if (changes[DARK_MODE_KEY]) {
-                var next = changes[DARK_MODE_KEY].newValue;
-                if (typeof next !== 'boolean') return;
-                localStorage.setItem(DARK_MODE_KEY, String(next));
-            }
-            if (isDarkModeEnabled() !== darkModeEnabled) {
-                location.reload();
-            }
-        };
-
-        try {
-            if (typeof browser !== 'undefined' && browser.storage && browser.storage.onChanged) {
-                browser.storage.onChanged.addListener(onChanged);
-                return;
-            }
-        } catch (e) { }
-        try {
-            if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
-                chrome.storage.onChanged.addListener(onChanged);
-            }
-        } catch (e) { }
-    }
-    subscribeDarkModeStorageChanges();
+    subscribeDarkModeStorageChanges(darkModeEnabled);
 
     // Device switched light/dark while following it: reload into the new theme.
-    (function followDeviceThemeChanges() {
-        var query = deviceThemeQuery();
-        if (!query || !IS_TOP_WINDOW) return;
-        var onDeviceThemeChange = function () {
-            if (isFollowingDeviceTheme() && isDarkModeEnabled() !== darkModeEnabled) location.reload();
-        };
-        if (query.addEventListener) query.addEventListener('change', onDeviceThemeChange);
-        else if (query.addListener) query.addListener(onDeviceThemeChange);
-    })();
+    startFollowingDeviceThemeChanges(darkModeEnabled);
 
     // Dark mode toggle for light mode (re-enable): inserted via runFeatureChecks below
 
     // ===== FEATURE FLAGS (extension-wide) =====
     // These toggles live in extension storage so they apply across all DTU domains.
-
-    function storageLocalGet(defaults, cb) {
-        var storage = getExtensionStorageArea();
-        if (!storage) {
-            if (cb) cb(Object.assign({}, defaults));
-            return;
-        }
-        try {
-            if (storage.api === 'browser') {
-                storage.area.get(defaults).then(function (result) {
-                    cb(result || Object.assign({}, defaults));
-                }).catch(function () {
-                    cb(Object.assign({}, defaults));
-                });
-            } else {
-                storage.area.get(defaults, function (result) {
-                    if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.lastError) {
-                        cb(Object.assign({}, defaults));
-                        return;
-                    }
-                    cb(result || Object.assign({}, defaults));
-                });
-            }
-        } catch (e) {
-            cb(Object.assign({}, defaults));
-        }
-    }
-
-    function storageLocalSet(items) {
-        var storage = getExtensionStorageArea();
-        if (!storage) return;
-        try {
-            if (storage.api === 'browser') {
-                storage.area.set(items).catch(function () { });
-            } else {
-                storage.area.set(items, function () { });
-            }
-        } catch (e) {
-            // ignore
-        }
-    }
 
     // A feature whose DTU page element is gone (DTU changed the page) says so once in the
     // console instead of vanishing without a trace. DTU pages draw parts after load, so
@@ -597,7 +454,8 @@
     globalThis.DTUAfterDarkDarkEngineDeps = {
         // Bumped whenever a mutation flush begins, so per-element caches in the
         // dark engine can be dropped wholesale when the DOM has moved on.
-        domGeneration: function () { return _deepRootsGeneration; },
+        domGeneration: __dom.deepRootsGeneration,
+        invalidateDeepRoots: invalidateDeepRoots,
         isDarkModeEnabled: function () { return !!darkModeEnabled; },
         isLegacyHeavyPage: isDTULearnLegacyHeavyCourseToolPage,
         forceDTULearnAccentInRoot: forceDTULearnAccentInRoot,
@@ -650,12 +508,6 @@
         return api.runDarkModeChecks(rootNode);
     }
 
-    function sweepForLateShadowRoots(root) {
-        var api = getDarkEngineApi();
-        if (!api || typeof api.sweepForLateShadowRoots !== 'function') return;
-        return api.sweepForLateShadowRoots(root);
-    }
-
     function waitForCustomElements() {
         var api = getDarkEngineApi();
         if (!api || typeof api.waitForCustomElements !== 'function') return Promise.resolve();
@@ -705,8 +557,6 @@
     try {
         globalThis.DTUAfterDarkLearnNavDeps = {
             isTopWindow: function () { return IS_TOP_WINDOW; },
-            placeAfterDarkNavItemAt: placeAfterDarkNavItemAt,
-            placeAfterDarkNavItemBefore: placeAfterDarkNavItemBefore,
             isFeatureFlagEnabled: isFeatureFlagEnabled,
             isDarkModeEnabled: function () { return !!darkModeEnabled; },
             normalizeWhitespace: normalizeWhitespace,
@@ -778,8 +628,6 @@
     try {
         globalThis.DTUAfterDarkLibraryDeps = {
             isTopWindow: function () { return IS_TOP_WINDOW; },
-            placeAfterDarkNavItemAt: placeAfterDarkNavItemAt,
-            placeAfterDarkNavItemBefore: placeAfterDarkNavItemBefore,
             isLibraryEnabled: function () { return isFeatureFlagEnabled(FEATURE_LIBRARY_DROPDOWN_KEY); },
             isDTULearnHomepage: isDTULearnHomepage,
             deepQueryAll: deepQueryAll,
@@ -865,8 +713,9 @@
             getSettingKeys: function () {
                 return {
                     busEnabled: 'dtuDarkModeBusEnabled',
-                    deadlinesEnabled: 'dtuDarkModeDeadlinesEnabled',
-                    searchWidgetEnabled: 'dtuDarkModeSearchWidgetEnabled'
+                    deadlinesEnabled: DEADLINES_ENABLED_KEY,
+                    exchangeDeadlineEnabled: 'dtuDarkModeExchangeDeadlineEnabled',
+                    searchWidgetEnabled: SEARCH_WIDGET_ENABLED_KEY
                 };
             },
             saveDarkModePreference: saveDarkModePreference,
@@ -1132,124 +981,6 @@
     // ===== CONTENT SHORTCUT BUTTON =====
     // Adds a small "Content" button to each course card on the homepage
     // that links directly to /d2l/le/lessons/{courseId}
-
-    // Enumerating shadow roots means walking every element under every root, so it
-    // dominates deepQueryAll: on the Learn homepage four modules asked for nav
-    // elements several times per mutation batch and each call repeated the whole
-    // walk. The root list is memoized instead; the matching itself still runs
-    // fresh on every call, so newly added elements inside known roots are never
-    // missed. The cache is dropped whenever a mutation batch adds nodes, and in
-    // any case after DEEP_ROOTS_TTL_MS, because attaching a shadow root to an
-    // element already in the DOM produces no mutation record of its own.
-    const DEEP_ROOTS_TTL_MS = 400;
-    let _deepRootsCache = new WeakMap();
-    let _deepRootsGeneration = 0;
-
-    // Matches are memoized too. Feature checks ask the same few questions
-    // repeatedly -- the course-search poller alone runs every 400 ms and queries
-    // the nav twice per tick -- and re-running querySelectorAll across every
-    // shadow root each time is the remaining cost.
-    //
-    // Only non-empty results are cached, deliberately. A stale non-empty answer
-    // is harmless: the element is verified to still be connected before reuse.
-    // A stale *empty* answer is not, because "is my UI already there?" is exactly
-    // how the insert paths guard themselves, and answering no twice would insert
-    // twice. A miss for something that does not exist yet is cheap anyway.
-    const DEEP_RESULTS_TTL_MS = 400;
-    const DEEP_RESULTS_MAX_CACHED = 64;
-    let _deepResultsCache = new WeakMap();
-
-    function invalidateDeepRoots() {
-        _deepRootsGeneration++;
-    }
-
-    function collectDeepRoots(startRoot) {
-        const cached = _deepRootsCache.get(startRoot);
-        const now = Date.now();
-        if (cached && cached.generation === _deepRootsGeneration &&
-            (now - cached.at) < DEEP_ROOTS_TTL_MS) {
-            return cached.roots;
-        }
-
-        const roots = [];
-        const pending = [startRoot];
-        while (pending.length > 0) {
-            const searchRoot = pending.pop();
-            if (!searchRoot || !searchRoot.querySelectorAll) continue;
-            roots.push(searchRoot);
-
-            const walker = document.createTreeWalker(searchRoot, NodeFilter.SHOW_ELEMENT, null);
-            let el = walker.nextNode();
-            while (el) {
-                if (el.shadowRoot) pending.push(el.shadowRoot);
-                el = walker.nextNode();
-            }
-        }
-
-        try {
-            _deepRootsCache.set(startRoot, {
-                roots: roots,
-                generation: _deepRootsGeneration,
-                at: now
-            });
-        } catch (eCache) { }
-        return roots;
-    }
-
-    function cachedDeepResults(root, selector) {
-        const perRoot = _deepResultsCache.get(root);
-        if (!perRoot) return null;
-        const entry = perRoot.get(selector);
-        if (!entry) return null;
-        if (entry.generation !== _deepRootsGeneration) return null;
-        if ((Date.now() - entry.at) >= DEEP_RESULTS_TTL_MS) return null;
-        // A cached node that has since left the document would be handed back as
-        // a live match, so verify before reuse rather than trusting the clock.
-        for (let i = 0; i < entry.results.length; i++) {
-            const el = entry.results[i];
-            if (!el || el.isConnected === false) return null;
-        }
-        return entry.results;
-    }
-
-    function storeDeepResults(root, selector, results) {
-        if (!results.length) return;
-        if (results.length > DEEP_RESULTS_MAX_CACHED) return;
-        let perRoot = _deepResultsCache.get(root);
-        if (!perRoot) {
-            perRoot = new Map();
-            try { _deepResultsCache.set(root, perRoot); } catch (eStore) { return; }
-        }
-        perRoot.set(selector, {
-            // Callers get their own array and some mutate it, so keep a private copy.
-            results: results.slice(),
-            generation: _deepRootsGeneration,
-            at: Date.now()
-        });
-    }
-
-    // Recursively find all elements matching a selector, traversing shadow roots
-    function deepQueryAll(selector, root) {
-        if (!root) return [];
-
-        const cacheRoot = root.shadowRoot || root;
-        const cached = cachedDeepResults(cacheRoot, selector);
-        if (cached) return cached.slice();
-
-        const results = [];
-        if (root.matches && root.matches(selector)) {
-            results.push(root);
-        }
-
-        const roots = collectDeepRoots(cacheRoot);
-        for (const searchRoot of roots) {
-            if (!searchRoot.querySelectorAll) continue;
-            searchRoot.querySelectorAll(selector).forEach(match => results.push(match));
-        }
-
-        storeDeepResults(cacheRoot, selector, results);
-        return results;
-    }
 
     function getContentShortcutApi() {
         try { return globalThis.DTUAfterDarkContentShortcutUi || null; } catch (e0) { return null; }
@@ -1524,7 +1255,9 @@
             markExt: markExt,
             isTopWindow: function () { return IS_TOP_WINDOW; },
             isFeatureFlagEnabled: isFeatureFlagEnabled,
-            isKurserCoursePage: isKurserCoursePage,
+            isKurserCoursePage: lazyCourseWidgetsFunction('isKurserCoursePage'),
+            getKurserCourseCode: lazyCourseWidgetsFunction('getKurserCourseCode'),
+            getExtensionUrl: getExtensionUrl,
             isDTULearnCoursePage: isDTULearnCoursePage,
             isDarkModeEnabled: isDarkModeEnabled,
             normalizeISBN: normalizeISBN,
@@ -1549,46 +1282,6 @@
         }
     }
 
-    // ===== COURSE GRADE STATISTICS (kurser.dtu.dk) =====
-    function isKurserCoursePage() {
-        return window.location.hostname === 'kurser.dtu.dk'
-            && /\/course\/(?:\d{4}-\d{4}\/)?[A-Za-z0-9]+/i.test(window.location.pathname);
-    }
-
-    function getKurserCourseCode() {
-        var match = window.location.pathname.match(/\/course\/(?:\d{4}-\d{4}\/)?([A-Za-z0-9]+)/i);
-        if (!match || !match[1]) return null;
-        return match[1].toUpperCase();
-    }
-
-    function findKurserCourseTitleElement(courseCode) {
-        var headings = Array.prototype.slice.call(document.querySelectorAll('h1, h2'));
-        if (!headings.length) return null;
-        var normalizedCode = (courseCode || '').toUpperCase();
-
-        for (var i = 0; i < headings.length; i++) {
-            var txt = (headings[i].textContent || '').trim().toUpperCase();
-            if (normalizedCode && txt.indexOf(normalizedCode) === 0) return headings[i];
-        }
-
-        // DTU course pages commonly use an h2 title.
-        var styledH2 = document.querySelector('h2[style*="font-family:verdana"]');
-        if (styledH2) return styledH2;
-
-        return document.querySelector('h1') || document.querySelector('h2');
-    }
-
-    function findKurserGradeStatsInsertAnchor(titleEl) {
-        if (!titleEl) return null;
-        var titleCol = titleEl.closest('.col-sm-9, .col-md-9, .col-lg-9, [class*="col-"]');
-        if (titleCol && titleCol.parentElement) {
-            var row = titleCol.parentElement;
-            var cls = row.className || '';
-            if (/\brow\b/.test(cls)) return row;
-        }
-        return titleEl;
-    }
-
     function sendRuntimeMessage(msg, cb) {
         try {
             if (typeof browser !== 'undefined' && browser.runtime && browser.runtime.sendMessage) {
@@ -1611,77 +1304,6 @@
     }
 
 
-    // The extension's own DTU Learn nav items, in the order they must appear
-    // after the anchor item. Each module used to assert its own rule -- Settings
-    // wanted to sit right after Atomic Search, Library wanted to sit right after
-    // Settings -- so on a page where the anchor appears late, every feature pass
-    // moved one of them and the two visibly traded places until the passes
-    // stopped. Ranking them here makes the resting order the only stable one.
-    const AFTER_DARK_NAV_ORDER = ['dtu-settings-nav-item', 'dtu-library-nav-item'];
-
-    function afterDarkNavRank(el) {
-        if (!el || !el.classList) return -1;
-        for (var i = 0; i < AFTER_DARK_NAV_ORDER.length; i++) {
-            if (el.classList.contains(AFTER_DARK_NAV_ORDER[i])) return i;
-        }
-        return -1;
-    }
-
-    // Returns the node navItem should be inserted before to sit directly after
-    // anchorItem, behind any of our items that outrank it.
-    function afterDarkNavInsertRef(mainWrapper, anchorItem, navItem) {
-        var rank = afterDarkNavRank(navItem);
-        var ref = anchorItem ? anchorItem.nextSibling : (mainWrapper ? mainWrapper.firstChild : null);
-        while (ref) {
-            if (ref === navItem) {
-                ref = ref.nextSibling;
-                continue;
-            }
-            var otherRank = afterDarkNavRank(ref);
-            if (otherRank >= 0 && otherRank < rank) {
-                ref = ref.nextSibling;
-                continue;
-            }
-            break;
-        }
-        return ref;
-    }
-
-    function placeAfterDarkNavItemAt(mainWrapper, anchorItem, navItem) {
-        if (!mainWrapper || !navItem) return;
-        var ref = afterDarkNavInsertRef(mainWrapper, anchorItem, navItem);
-        // Re-inserting a node that is already in place still counts as a mutation,
-        // which would wake the observer and schedule the next pass. Leave it alone.
-        if (navItem.parentNode === mainWrapper && navItem.nextSibling === ref) return;
-        try { mainWrapper.insertBefore(navItem, ref); } catch (ePlace) { }
-    }
-
-    // Same ordering, for the no-anchor case: our items form a block ending just
-    // before beforeItem (D2L's overflow "more" entry), or at the end of the nav.
-    // The old fallback inserted straight before that item every pass, so whichever
-    // of our two ran last ended up in front -- the visible swapping on course and
-    // lessons pages, where no Atomic Search anchor exists.
-    function placeAfterDarkNavItemBefore(mainWrapper, beforeItem, navItem) {
-        if (!mainWrapper || !navItem) return;
-        var rank = afterDarkNavRank(navItem);
-        var ref = (beforeItem && beforeItem.parentNode === mainWrapper) ? beforeItem : null;
-        var probe = ref ? ref.previousSibling : mainWrapper.lastChild;
-        while (probe) {
-            if (probe === navItem) {
-                probe = probe.previousSibling;
-                continue;
-            }
-            if (afterDarkNavRank(probe) > rank) {
-                ref = probe;
-                probe = probe.previousSibling;
-                continue;
-            }
-            break;
-        }
-        if (navItem.parentNode === mainWrapper && navItem.nextSibling === ref) return;
-        try { mainWrapper.insertBefore(navItem, ref); } catch (ePlaceBefore) { }
-    }
-
     function getKurserWidgetsApi() {
         try { return globalThis.DTUAfterDarkKurserWidgetsUi || null; } catch (e0) { return null; }
     }
@@ -1692,46 +1314,30 @@
             markExt: markExt,
             isTopWindow: function () { return IS_TOP_WINDOW; },
             isDarkModeEnabled: isDarkModeEnabled,
+            getResolvedAccentDeep: getResolvedAccentDeep,
             isFeatureFlagEnabled: isFeatureFlagEnabled,
-            isKurserCoursePage: isKurserCoursePage,
-            getKurserCourseCode: getKurserCourseCode,
-            findKurserCourseTitleElement: findKurserCourseTitleElement,
-            findKurserGradeStatsInsertAnchor: findKurserGradeStatsInsertAnchor,
-            getKurserInsightTheme: getKurserInsightTheme,
-            getKurserInsightContainerStyle: getKurserInsightContainerStyle,
-            getKurserInsightSurfaceStyle: getKurserInsightSurfaceStyle,
+            isKurserCoursePage: lazyCourseWidgetsFunction('isKurserCoursePage'),
+            getKurserCourseCode: lazyCourseWidgetsFunction('getKurserCourseCode'),
+            findKurserCourseTitleElement: lazyCourseWidgetsFunction('findKurserCourseTitleElement'),
+            findKurserGradeStatsInsertAnchor: lazyCourseWidgetsFunction('findKurserGradeStatsInsertAnchor'),
+            getKurserInsightTheme: lazyCourseWidgetsFunction('getKurserInsightTheme'),
+            getKurserInsightContainerStyle: lazyCourseWidgetsFunction('getKurserInsightContainerStyle'),
+            getKurserInsightSurfaceStyle: lazyCourseWidgetsFunction('getKurserInsightSurfaceStyle'),
             featureKurserGradeStatsKey: FEATURE_KURSER_GRADE_STATS_KEY
         };
     } catch (eKurserWidgetsDeps) { }
 
-    function getKurserInsightTheme() {
-        var isDark = !!darkModeEnabled;
-        return {
-            containerBg: isDark ? 'rgba(255,255,255,0.026)' : 'rgba(248,250,252,0.96)',
-            containerBorder: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(148,163,184,0.24)',
-            text: isDark ? '#e6e9ee' : '#1f2937',
-            mutedText: isDark ? '#aeb6c2' : '#667385',
-            subtleText: isDark ? '#cdd3db' : '#334155',
-            surfaceBg: isDark ? 'rgba(255,255,255,0.04)' : '#ffffff',
-            surfaceInset: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.06)',
-            divider: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.10)',
-            quietTrack: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)',
-            linkColor: isDark ? 'var(--dtu-ad-accent-soft)' : 'var(--dtu-ad-accent-deep-text, ' + getResolvedAccentDeep() + ')',
-            accentText: isDark ? 'var(--dtu-ad-accent-soft)' : 'var(--dtu-ad-accent-deep-text, ' + getResolvedAccentDeep() + ')'
+    // Exam results row (darkmode.kurser-exam-stats.js) shares the Grade statistics toggle.
+    try {
+        globalThis.DTUAfterDarkExamStatsDeps = {
+            isTopWindow: function () { return IS_TOP_WINDOW; },
+            isFeatureFlagEnabled: isFeatureFlagEnabled,
+            isKurserCoursePage: lazyCourseWidgetsFunction('isKurserCoursePage'),
+            getKurserCourseCode: lazyCourseWidgetsFunction('getKurserCourseCode'),
+            getExtensionUrl: getExtensionUrl,
+            featureKurserGradeStatsKey: FEATURE_KURSER_GRADE_STATS_KEY
         };
-    }
-
-    function getKurserInsightContainerStyle(theme) {
-        return 'margin: 7px 0 9px 0; padding: 9px 11px 10px; border-radius: 7px; width: 100%; max-width: none; '
-            + 'box-sizing: border-box; background:' + theme.containerBg + '; border: 1px solid ' + theme.containerBorder + '; '
-            + 'color: ' + theme.text + '; font-family: inherit; font-size: 11px;';
-    }
-
-    function getKurserInsightSurfaceStyle(theme, extra) {
-        return 'padding: 7px 9px; border-radius: 6px; background: ' + theme.surfaceBg + '; '
-            + 'box-shadow: inset 0 0 0 1px ' + theme.surfaceInset + ';'
-            + (extra || '');
-    }
+    } catch (eExamStatsDeps) { }
 
     function insertKurserGradeStats() {
         var api = getKurserWidgetsApi();
@@ -1751,13 +1357,13 @@
             markExt: markExt,
             isTopWindow: function () { return IS_TOP_WINDOW; },
             isFeatureFlagEnabled: isFeatureFlagEnabled,
-            isKurserCoursePage: isKurserCoursePage,
-            getKurserCourseCode: getKurserCourseCode,
-            getKurserInsightTheme: getKurserInsightTheme,
-            getKurserInsightContainerStyle: getKurserInsightContainerStyle,
-            getKurserInsightSurfaceStyle: getKurserInsightSurfaceStyle,
-            findKurserCourseTitleElement: findKurserCourseTitleElement,
-            findKurserGradeStatsInsertAnchor: findKurserGradeStatsInsertAnchor,
+            isKurserCoursePage: lazyCourseWidgetsFunction('isKurserCoursePage'),
+            getKurserCourseCode: lazyCourseWidgetsFunction('getKurserCourseCode'),
+            getKurserInsightTheme: lazyCourseWidgetsFunction('getKurserInsightTheme'),
+            getKurserInsightContainerStyle: lazyCourseWidgetsFunction('getKurserInsightContainerStyle'),
+            getKurserInsightSurfaceStyle: lazyCourseWidgetsFunction('getKurserInsightSurfaceStyle'),
+            findKurserCourseTitleElement: lazyCourseWidgetsFunction('findKurserCourseTitleElement'),
+            findKurserGradeStatsInsertAnchor: lazyCourseWidgetsFunction('findKurserGradeStatsInsertAnchor'),
             isDarkModeEnabled: isDarkModeEnabled,
             featureKurserCourseEvalKey: FEATURE_KURSER_COURSE_EVAL_KEY
         };
@@ -1776,8 +1382,8 @@
             markExt: markExt,
             isTopWindow: function () { return IS_TOP_WINDOW; },
             isFeatureFlagEnabled: isFeatureFlagEnabled,
-            isKurserCoursePage: isKurserCoursePage,
-            getKurserCourseCode: getKurserCourseCode,
+            isKurserCoursePage: lazyCourseWidgetsFunction('isKurserCoursePage'),
+            getKurserCourseCode: lazyCourseWidgetsFunction('getKurserCourseCode'),
             getExtensionUrl: getExtensionUrl,
             featureKurserCourseMapKey: FEATURE_KURSER_COURSE_MAP_KEY
         };
@@ -1799,8 +1405,8 @@
             sendRuntimeMessage: sendRuntimeMessage,
             storageLocalGet: storageLocalGet,
             storageLocalSet: storageLocalSet,
-            isKurserCoursePage: isKurserCoursePage,
-            getKurserCourseCode: getKurserCourseCode,
+            isKurserCoursePage: lazyCourseWidgetsFunction('isKurserCoursePage'),
+            getKurserCourseCode: lazyCourseWidgetsFunction('getKurserCourseCode'),
             featureStudyplanExamScheduleKey: FEATURE_STUDYPLAN_EXAM_SCHEDULE_KEY
         };
     } catch (eExamScheduleDeps) { }
@@ -2099,7 +1705,7 @@
         return true;
     }
 
-    var _hostFeatureBootstrapTimer = null;
+    var _hostFeatureBootstrapWatch = null;
     var _campusnetLogoFastTimer = null;
 
     function startCampusnetLogoFastBootstrap() {
@@ -2126,7 +1732,6 @@
 
     function startHostFeatureBootstrap() {
         if (!IS_TOP_WINDOW) return;
-        if (_hostFeatureBootstrapTimer) return;
         var host = window.location.hostname;
         if (host === 'campusnet.dtu.dk') {
             startCampusnetLogoFastBootstrap();
@@ -2134,26 +1739,23 @@
         }
         if (host !== 'studieplan.dtu.dk' && host !== 'kurser.dtu.dk') return;
 
-        var attempts = 0;
-        _hostFeatureBootstrapTimer = setInterval(function () {
-            attempts++;
-            runTopWindowFeatureChecks(null, false);
-
-            var done = false;
-            if (host === 'studieplan.dtu.dk') {
-                done = !!document.querySelector('[data-dtu-exam-schedule]');
-            } else if (host === 'kurser.dtu.dk') {
-                done = !!document.querySelector('[data-dtu-grade-stats]')
+        if (_hostFeatureBootstrapWatch && _hostFeatureBootstrapWatch.active()) {
+            _hostFeatureBootstrapWatch.trigger();
+            return;
+        }
+        _hostFeatureBootstrapWatch = schedulePlacement({
+            capMs: 30000,
+            run: function () {
+                runTopWindowFeatureChecks(null, false);
+                if (host === 'studieplan.dtu.dk') {
+                    return !!document.querySelector('[data-dtu-exam-schedule]');
+                }
+                return !!document.querySelector('[data-dtu-grade-stats]')
                     || !!document.querySelector('[data-dtu-course-eval]')
                     || !!document.querySelector('[data-dtu-textbook-linker]')
                     || !!document.querySelector('[data-dtu-textbook-linker-bar-host]');
             }
-
-            if (done || attempts >= 35) {
-                clearInterval(_hostFeatureBootstrapTimer);
-                _hostFeatureBootstrapTimer = null;
-            }
-        }, 500);
+        });
     }
 
     var _hostLightObserver = null;
@@ -2358,7 +1960,6 @@
                             if (darkSelectors && node.matches && node.matches(darkSelectors)) applyDarkStyle(node);
                             if (lighterDarkSelectors && node.matches && node.matches(lighterDarkSelectors)) applyLighterDarkStyle(node);
                             forceLessonsTocDark1(node);
-                            forceD2LActionButtonsDark1(node);
                             if (node.matches && node.matches('.dturedbackground')) {
                                 forceDtuRedBackgroundDark2(node);
                             }
@@ -2526,17 +2127,4 @@
             }, 100);
         }
     });
-
-    // Lightweight safety-net for late-created Brightspace shadow roots.
-    // Runs in iframes as well: Lessons/Content SPAs render in same-origin
-    // frames whose shadow trees the top-window sweep cannot reach.
-    // NOTE: the engine loads after this script, so the shadow-processing gate
-    // must be evaluated inside the tick, not at registration time.
-    if (darkModeEnabled) {
-        setInterval(function () {
-            if (document.hidden) return;
-            if (!shouldUseBrightspaceShadowDomProcessing()) return;
-            sweepForLateShadowRoots();
-        }, 15000);
-    }
 })();

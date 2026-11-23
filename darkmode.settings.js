@@ -221,6 +221,15 @@
                     insertDeadlinesHomepageWidget();
                 }
             },
+            // The widget shows an "Allow access" button until the optional
+            // beyondborders.dtu.dk permission is granted on the extension page.
+            'exchange-deadline-toggle': {
+                getState: function () { return localStorage.getItem(settingKeys.exchangeDeadlineEnabled) === 'true'; },
+                onChange: function (checked) {
+                    localStorage.setItem(settingKeys.exchangeDeadlineEnabled, checked.toString());
+                    insertDeadlinesHomepageWidget();
+                }
+            },
             'search-widget-toggle': {
                 getState: function () { return isSearchWidgetEnabled(); },
                 onChange: function (checked) {
@@ -285,6 +294,7 @@
                 id: 'dashboard', label: 'Dashboard Widgets', desc: 'DTU Learn homepage widgets and dashboard cards', items: [
                     { tid: 'bus-departures-toggle', title: 'Bus Departures', desc: 'Show live bus departure times around campus' },
                     { tid: 'deadlines-toggle', title: 'Deadlines Widget', desc: 'Timeline of DTU course and exam registration deadlines' },
+                    { tid: 'exchange-deadline-toggle', title: 'Exchange Deadline', desc: 'Adds the exchange application deadline from DTU Beyond Borders to the Deadlines Widget. Asks for access to beyondborders.dtu.dk', subToggleOf: 'deadlines-toggle' },
                     { tid: 'search-widget-toggle', title: 'Course Search', desc: 'Native course search on the dashboard' },
                     { tid: 'feature-lessons-bulk-download-toggle', title: 'Course Content Download', desc: 'Download selected Lessons sections as a ZIP file' }
                 ]
@@ -305,7 +315,7 @@
             },
             {
                 id: 'course-catalog', label: 'Course Catalog', desc: 'Enhancements for kurser.dtu.dk and course resource pages', items: [
-                    { tid: 'feature-kurser-grade-stats-toggle', title: 'Grade Statistics', desc: 'Show pass rates and grade histograms' },
+                    { tid: 'feature-kurser-grade-stats-toggle', title: 'Grade Statistics', desc: 'Show pass rates, grade histograms and the Exam results row' },
                     { tid: 'feature-textbook-links-toggle', title: 'Textbook Links', desc: 'Textbook source links on DTU Learn and kurser.dtu.dk' },
                     { tid: 'feature-kurser-course-eval-toggle', title: 'Course Evaluation', desc: 'Show evaluation scores on course pages' },
                     { tid: 'feature-kurser-course-map-toggle', title: 'Course Map', desc: 'A row under Academic prerequisites that maps earlier and later courses' }

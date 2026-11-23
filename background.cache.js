@@ -35,12 +35,61 @@
             } catch (e) { resolve(null); }
         });
     }
-    function storageSet(key, value) {
+    // Every cache prefix and how long its entries stay good. Entries past it
+    // are only ever skipped on read, so pruneCache deletes them.
+    const CACHE_TTLS = [
+        [CACHE_PREFIX_GRADE, GRADE_STATS_CACHE_TTL_MS],
+        [CACHE_PREFIX_EVAL, COURSE_EVAL_CACHE_TTL_MS],
+        [CACHE_PREFIX_WORKLOAD, COURSE_WORKLOAD_CACHE_TTL_MS],
+        [CACHE_PREFIX_FINDIT, FINDIT_AVAIL_CACHE_TTL_MS],
+        [CACHE_PREFIX_EXAM_TABLE, EXAM_TABLE_CACHE_TTL_MS],
+        [CACHE_PREFIX_COURSE_PAGE, COURSE_PAGE_CACHE_TTL_MS],
+        [CACHE_PREFIX_LIB_EVENTS, LIB_CACHE_TTL_MS],
+        [CACHE_PREFIX_LIB_NEWS, LIB_CACHE_TTL_MS],
+        [CACHE_PREFIX_LIB_CROWD, LIB_CROWD_CACHE_TTL_MS]
+    ];
+
+    function cacheTtlFor(key) {
+        const hit = CACHE_TTLS.find(([prefix]) => key.indexOf(prefix) === 0);
+        return hit ? hit[1] : null;
+    }
+
+    // Deletes cache entries: the expired ones, or with all set every one
+    // (they are only copies of DTU pages). Settings are never touched.
+    // Chrome gives storage.local 10 MB, shared with the settings, so a cache
+    // that only grows ends in failed writes, the dark mode toggle's included.
+    function pruneCache(all) {
+        return new Promise(resolve => {
+            try {
+                runtime.storage.local.get(null, items => {
+                    const now = Date.now();
+                    const stale = Object.keys(items || {}).filter(key => {
+                        const ttl = cacheTtlFor(key);
+                        if (ttl === null) return false;
+                        const entry = items[key];
+                        return all || !entry || !entry.ts || (now - entry.ts) > ttl;
+                    });
+                    if (stale.length) storageRemove(stale);
+                    resolve(stale.length);
+                });
+            } catch (e) { resolve(0); }
+        });
+    }
+
+    function storageWrite(obj) {
         try {
-            const obj = {};
-            obj[key] = value;
-            runtime.storage.local.set(obj);
-        } catch (e) { /* best-effort */ }
+            return Promise.resolve(runtime.storage.local.set(obj));
+        } catch (e) { return Promise.reject(e); }
+    }
+
+    // A cache write that fails (storage full) clears the whole cache and
+    // tries once more; a second failure is logged, not hidden.
+    function storageSet(key, value) {
+        const obj = {};
+        obj[key] = value;
+        return storageWrite(obj)
+            .catch(() => pruneCache(true).then(() => storageWrite(obj)))
+            .catch(e => console.warn('DTU After Dark: cache write failed for ' + key, e));
     }
     function storageRemove(keys) {
         try {
@@ -88,6 +137,11 @@
         });
     }
 
+    if (runtime.runtime) {
+        if (runtime.runtime.onStartup) runtime.runtime.onStartup.addListener(() => pruneCache(false));
+        if (runtime.runtime.onInstalled) runtime.runtime.onInstalled.addListener(() => pruneCache(false));
+    }
+
     storageRemove([
         'worker_usage_install_id_v1',
         'worker_usage_last_day_v1',
@@ -103,6 +157,7 @@
         storageGet,
         storageSet,
         storageRemove,
+        pruneCache,
         storageCacheGet,
         storageCacheSet,
         serveCached,

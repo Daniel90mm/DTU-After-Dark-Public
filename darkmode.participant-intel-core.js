@@ -268,7 +268,6 @@
             if (idx === null || isNaN(idx)) idx = i;
 
             var infoBox = doc.getElementById('participantinformation' + idx);
-            if (!infoBox) infoBox = item.nextElementSibling;
             if (!infoBox) {
                 var sib = item.nextElementSibling;
                 while (sib && !sib.classList.contains('ui-participant')) {
@@ -276,6 +275,7 @@
                     sib = sib.nextElementSibling;
                 }
             }
+            if (!infoBox) infoBox = item.nextElementSibling;
             if (infoBox) {
                 var headers = infoBox.querySelectorAll('.info-header span');
                 for (var h = 0; h < headers.length; h++) {
@@ -296,8 +296,7 @@
 
     // The "Users" list as CampusNet would show it with every participant on one
     // page. When the visible page already holds them all, that is the page
-    // itself. Otherwise it is read from CampusNet's participant export, or, if
-    // that fails, from the one-page list fetched in the background and parsed
+    // itself. Otherwise it is read from the one-page list fetched in the background and parsed
     // as an inert document, so CampusNet's page size is left alone and no
     // profile pictures are requested (CampusNet serves each one slowly).
     // Falls back to the visible page when both fail.
@@ -345,55 +344,6 @@
             restorePictures();
             throw err;
         });
-    }
-
-    // CampusNet's own participant export (the list's More, Export), limited to
-    // the Users and the four columns the composition needs. On 12106 (786
-    // users) it answers in about 3 s with 160 KB, where the one-page list takes
-    // 13 to 25 s and 3 MB. The fields go in the export form's order, which is
-    // also the column order of the file.
-    var PARTICIPANT_EXPORT_FIELDS = ['FirstName', 'LastName', 'StudyNumber', 'Education'];
-
-    function fetchParticipantExport(path) {
-        var body = new URLSearchParams();
-        PARTICIPANT_EXPORT_FIELDS.forEach(function (f) { body.append('fields', f); });
-        body.append('Seperator', ';');
-        body.append('roleid', 'Everyone regardless of roles');
-        body.append('acl', '2');
-        body.append('includeClosed', 'True');
-        return fetch(window.location.origin + path + '/export', { method: 'POST', body: body, credentials: 'include' }).then(function (res) {
-            if (!res.ok) throw new Error('http_' + res.status);
-            if (!/attachment/i.test(res.headers.get('content-disposition') || '')) throw new Error('export_not_file');
-            return res.arrayBuffer();
-        }).then(decodeParticipantExport);
-    }
-
-    // The file is UTF-16LE (as Excel wants it); read UTF-8 too in case that changes.
-    function decodeParticipantExport(buf) {
-        var bytes = new Uint8Array(buf);
-        var utf16 = (bytes[0] === 0xff && bytes[1] === 0xfe) || (bytes.length > 1 && bytes[1] === 0);
-        return new TextDecoder(utf16 ? 'utf-16le' : 'utf-8').decode(bytes).replace(/^﻿/, '');
-    }
-
-    // Rows "First;Last;s123456;Education;" under a header row. Throws when the
-    // columns are not the ones asked for, so the caller falls back to the list.
-    function parseParticipantExport(text) {
-        var deps = getDeps();
-        var lines = String(text || '').split(/\r?\n/).filter(function (l) { return l.trim(); });
-        var header = lines.length ? lines[0].split(';') : [];
-        if (header.length < 4 || !/stud/i.test(header[2]) || !/educ|uddan/i.test(header[3])) throw new Error('export_columns');
-        var participants = [];
-        for (var i = 1; i < lines.length; i++) {
-            var cols = lines[i].split(';');
-            var sNumber = String(cols[2] || '').trim().toLowerCase();
-            if (!/^s\d{6}$/.test(sNumber)) continue;
-            participants.push({
-                name: deps.normalizeWhitespace((cols[0] || '') + ' ' + (cols[1] || '')),
-                sNumber: sNumber,
-                program: deps.readExportProgram(cols[3] || '')
-            });
-        }
-        return participants;
     }
 
     // The one-page list as a document, for the program filter, which copies
@@ -464,20 +414,17 @@
         }
 
         if (!fullParticipantListInFlight || fullParticipantListInFlight.key !== key) {
-            var promise = fetchParticipantExport(key).then(function (text) {
-                var exported = parseParticipantExport(text);
-                if (!exported.length) throw new Error('export_empty');
-                return { participants: exported, total: total || exported.length };
-            }).catch(function () {
-                return fetchFullParticipantsHtml(key).then(function (html) {
-                    var doc = new DOMParser().parseFromString(html, 'text/html');
-                    var parsed = parseParticipantList(doc);
-                    if (!parsed.length) throw new Error('parse_empty');
-                    fullListDocCache = { key: key, ts: Date.now(), doc: doc };
-                    return { participants: parsed, total: deps.getCampusnetUsersCountFromPage(doc) || parsed.length };
-                });
+            // Never CampusNet's participant export: it is a file download, and on
+            // 2026-11-23 an export.csv of every participant landed in Downloads
+            // after a CampusNet sign-in round trip.
+            var promise = fetchFullParticipantsHtml(key).then(function (html) {
+                var doc = new DOMParser().parseFromString(html, 'text/html');
+                var parsed = parseParticipantList(doc);
+                if (!parsed.length) throw new Error('parse_empty');
+                fullListDocCache = { key: key, ts: Date.now(), doc: doc };
+                return { participants: parsed, total: deps.getCampusnetUsersCountFromPage(doc) || parsed.length };
             }).then(function (list) {
-                // The export has no CampusNet user ids; take them from this page,
+                // Fill in CampusNet user ids from this page where missing,
                 // which is how the student's own entry is recognised.
                 var userIds = {};
                 visible.forEach(function (p) { if (p.sNumber && p.userId) userIds[p.sNumber] = p.userId; });
@@ -732,8 +679,6 @@
         getFullParticipantList: getFullParticipantList,
         getFullListUsersElements: getFullListUsersElements,
         loadFullListDoc: loadFullListDoc,
-        parseParticipantExport: parseParticipantExport,
-        decodeParticipantExport: decodeParticipantExport,
         collectParticipantData: collectParticipantData,
         detectAndStoreSelf: detectAndStoreSelf
     };

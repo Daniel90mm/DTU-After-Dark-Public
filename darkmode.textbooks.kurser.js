@@ -18,6 +18,38 @@
     var cleanKurserCitationQuery = _textbooksCore.cleanKurserCitationQuery;
     var buildKurserFinditUrl = _textbooksCore.buildKurserFinditUrl;
     var buildKurserGoogleBooksUrl = _textbooksCore.buildKurserGoogleBooksUrl;
+    var findKnownLiterature = _textbooksCore.findKnownLiterature;
+
+    // Books checked once per semester (scripts/build-literature-data.mjs). A course whose literature text
+    // still has the key in the file shows those books; any other course is parsed on the page.
+    var LITERATURE_DATA_FILE = 'literature-data.json';
+    var _literatureData; // undefined: not asked yet; null: loading; object: loaded (empty after a failure)
+
+    function loadLiteratureData(done) {
+        _literatureData = null;
+        var deps = _textbooksCore.getDeps();
+        if (!deps || typeof deps.getExtensionUrl !== 'function') throw new Error('DTUAfterDarkTextbooksDeps.getExtensionUrl is missing');
+        fetch(deps.getExtensionUrl(LITERATURE_DATA_FILE))
+            .then(function (res) {
+                if (!res.ok) throw new Error('http ' + res.status);
+                return res.json();
+            })
+            .then(function (data) {
+                if (!data || !data.courses) throw new Error('bad data');
+                _literatureData = data;
+            })
+            .catch(function (err) {
+                console.warn('[DTU After Dark] ' + LITERATURE_DATA_FILE + ' not loaded, parsing literature on the page:', err);
+                _literatureData = { courses: {} };
+            })
+            .then(done);
+    }
+
+    function currentCourseCode() {
+        var deps = _textbooksCore.getDeps();
+        if (!deps || typeof deps.getKurserCourseCode !== 'function') throw new Error('DTUAfterDarkTextbooksDeps.getKurserCourseCode is missing');
+        return deps.getKurserCourseCode();
+    }
 
     var _kurserTextbookLinkerTimer = null;
 
@@ -136,6 +168,10 @@
             if (node.nodeType === 1 && node.classList && node.classList.contains('bar')) {
                 insertBeforeNode = node;
                 break;
+            }
+            if (node.nodeType === 1 && node.hasAttribute && node.hasAttribute('data-dtu-textbook-linker-bar-host')) {
+                node = node.nextSibling;
+                continue;
             }
             if (node.nodeType === 3) {
                 var txtNodeText = node.textContent || '';
@@ -331,13 +367,15 @@
         return injected;
     }
 
+    // Returns how many literature bars the page has; the page-wide fallback scan runs only when it has none.
     function processKurserLiteratureBarSections() {
         var bars = document.querySelectorAll('.bar');
-        if (!bars.length) return;
+        var literatureBars = 0;
 
         bars.forEach(function (bar) {
             var label = (bar.textContent || '').replace(/\s+/g, ' ').trim();
             if (!isKurserLiteratureLabel(label)) return;
+            literatureBars++;
             if (bar.getAttribute('data-dtu-textbook-linker-scanned') === '1') return;
 
             var attempts = parseInt(bar.getAttribute('data-dtu-textbook-linker-attempts') || '0', 10);
@@ -346,81 +384,74 @@
 
             var section = getKurserBarSectionData(bar);
             if (!section || !section.lines.length) return;
-            if (isNotesOnlyLiterature((section.text || '').replace(/\s+/g, ' ').trim())) {
+            var known = findKnownLiterature(_literatureData, currentCourseCode(), section.text);
+            if (known && !known.length) {
+                bar.setAttribute('data-dtu-textbook-linker-scanned', '1');
+                return;
+            }
+            if (!known && isNotesOnlyLiterature((section.text || '').replace(/\s+/g, ' ').trim())) {
                 bar.setAttribute('data-dtu-textbook-linker-scanned', '1');
                 return;
             }
 
+            // Compared, not put in a selector: a label with a quote would make the selector throw.
             var existingHost = bar.parentElement
-                ? bar.parentElement.querySelector('[data-dtu-textbook-linker-bar-host-for="' + label.toLowerCase() + '"]')
+                ? Array.prototype.find.call(bar.parentElement.querySelectorAll('[data-dtu-textbook-linker-bar-host-for]'), function (h) {
+                    return h.getAttribute('data-dtu-textbook-linker-bar-host-for') === label.toLowerCase();
+                }) || null
                 : null;
             if (existingHost && existingHost.querySelector('[data-dtu-textbook-linker]')) {
                 bar.setAttribute('data-dtu-textbook-linker-scanned', '1');
                 return;
             }
 
-            var seenLines = Object.create(null);
-            var uniqueLines = [];
-            section.lines.forEach(function (line) {
-                var key = line.toLowerCase().replace(/\s+/g, ' ').trim();
-                if (seenLines[key]) return;
-                seenLines[key] = true;
-                uniqueLines.push(line);
-            });
-
-            var node = bar.nextSibling;
-            var toHide = [];
-            while (node) {
-                if (node.nodeType === 1 && node.classList && node.classList.contains('bar')) break;
-                if (node.nodeType === 1 && node.hasAttribute('data-dtu-textbook-linker-bar-host')) { node = node.nextSibling; continue; }
-                if (node.nodeType === 1 && node.hasAttribute('data-dtu-textbook-original')) { node = node.nextSibling; continue; }
-                toHide.push(node);
-                node = node.nextSibling;
+            var citations = known;
+            if (!citations) {
+                var seenLines = Object.create(null);
+                citations = [];
+                section.lines.forEach(function (line) {
+                    var key = line.toLowerCase().replace(/\s+/g, ' ').trim();
+                    if (seenLines[key]) return;
+                    seenLines[key] = true;
+                    var parsed = parseKurserCitationLine(line);
+                    if (parsed) citations.push(parsed);
+                });
             }
-            if (toHide.length) {
-                var originalWrap = document.createElement('div');
-                originalWrap.style.display = 'none';
-                originalWrap.setAttribute('data-dtu-textbook-original', '1');
-                markExt(originalWrap);
-                bar.insertAdjacentElement('afterend', originalWrap);
-                toHide.forEach(function (n) { originalWrap.appendChild(n); });
+            // Nothing to link: leave DTU's literature text as it is, never hide it under an empty bar.
+            citations = citations.filter(function (c) { return buildKurserFinditUrl(c) || buildKurserGoogleBooksUrl(c); });
+            if (!citations.length) {
+                if (attempts >= 4) bar.setAttribute('data-dtu-textbook-linker-scanned', '1');
+                return;
             }
 
-            var host = document.createElement('div');
-            markExt(host);
-            host.setAttribute('data-dtu-textbook-linker-bar-host', '1');
-            host.setAttribute('data-dtu-textbook-linker-bar-host-for', label.toLowerCase());
-            host.style.cssText = 'margin: 8px 0 12px; padding: 0 8px;';
-
-            var insertRef = bar.nextSibling;
-            while (insertRef && insertRef.nodeType === 1 && insertRef.hasAttribute('data-dtu-textbook-original')) {
-                insertRef = insertRef.nextSibling;
-            }
-            if (insertRef) {
-                bar.parentNode.insertBefore(host, insertRef);
-            } else if (bar.parentNode) {
-                bar.parentNode.appendChild(host);
-            }
-
+            // DTU's literature text stays as it is; the links go after it, at the end of the section.
             var isDark = isDarkModeEnabled();
             var accentColor = isDark ? 'var(--dtu-ad-accent-soft)' : 'var(--dtu-ad-accent-deep-text, var(--dtu-ad-accent-deep))';
             var textColor = isDark ? '#e0e0e0' : '#333';
             var mutedColor = isDark ? '#888' : '#777';
             var dividerColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
 
+            var host = document.createElement('div');
+            markExt(host);
+            host.setAttribute('data-dtu-textbook-linker-bar-host', '1');
+            host.setAttribute('data-dtu-textbook-linker-bar-host-for', label.toLowerCase());
+            host.style.cssText = 'margin: 8px 0 12px; padding: 6px 8px 0; border-top: 1px solid ' + dividerColor + ';';
+            if (section.insertBeforeNode) section.insertBeforeNode.parentNode.insertBefore(host, section.insertBeforeNode);
+            else if (bar.parentNode) bar.parentNode.appendChild(host);
+
             var injectedCount = 0;
             var seenKeys = Object.create(null);
 
-            uniqueLines.forEach(function (lineText) {
-                var parsed = parseKurserCitationLine(lineText);
-                if (!parsed) return;
+            citations.forEach(function (parsed) {
+                var lineText = parsed.raw;
                 var libraryUrl = buildKurserFinditUrl(parsed);
                 var googleBooksUrl = buildKurserGoogleBooksUrl(parsed);
                 if (!libraryUrl && !googleBooksUrl) return;
 
                 var key = (parsed.isbn || cleanKurserCitationQuery(parsed.queryText || parsed.title || '')).toLowerCase();
                 if (!key) key = libraryUrl || googleBooksUrl;
-                if (seenKeys[key]) return;
+                // The dataset lists each work once; two volumes may share a search.
+                if (!known && seenKeys[key]) return;
                 seenKeys[key] = true;
 
                 if (injectedCount > 0) {
@@ -438,7 +469,8 @@
                 var citationEl = document.createElement('span');
                 markExt(citationEl);
                 citationEl.style.cssText = 'font-size: 13px; color: ' + textColor + '; flex: 1 1 auto; min-width: 200px; line-height: 1.5;';
-                citationEl.textContent = lineText;
+                citationEl.textContent = parsed.display || lineText;
+                citationEl.title = lineText;
                 row.appendChild(citationEl);
 
                 var actions = document.createElement('span');
@@ -492,24 +524,13 @@
                 bar.setAttribute('data-dtu-textbook-linker-scanned', '1');
             }
         });
-    }
-
-    function restoreKurserLiteratureOriginals() {
-        document.querySelectorAll('[data-dtu-textbook-original]').forEach(function (wrapper) {
-            var parent = wrapper.parentNode;
-            if (!parent) { wrapper.remove(); return; }
-            while (wrapper.firstChild) {
-                parent.insertBefore(wrapper.firstChild, wrapper);
-            }
-            wrapper.remove();
-        });
+        return literatureBars;
     }
 
     function clearKurserTextbookUi() {
         document.querySelectorAll('[data-dtu-textbook-linker], [data-dtu-textbook-linker-bar-host], [data-dtu-textbook-linker-fallback]').forEach(function (el) {
             el.remove();
         });
-        restoreKurserLiteratureOriginals();
         document.querySelectorAll('[data-dtu-textbook-linker-scanned], [data-dtu-textbook-linker-attempts]').forEach(function (el) {
             el.removeAttribute('data-dtu-textbook-linker-scanned');
             el.removeAttribute('data-dtu-textbook-linker-attempts');
@@ -523,14 +544,22 @@
             return;
         }
         if (!isKurserCoursePage()) return;
+        if (_literatureData === undefined) {
+            loadLiteratureData(insertKurserTextbookLinks);
+            return;
+        }
+        if (_literatureData === null) return;
 
-        processKurserLiteratureBarSections();
+        // The bar owns its section; scanning the rest of the page only found junk such as "Last updated".
+        if (processKurserLiteratureBarSections()) return;
 
         var containers = findKurserLiteratureContainers();
         if (!containers.length) return;
 
         containers.forEach(function (container) {
             if (!container || container.getAttribute('data-dtu-textbook-linker-scanned') === '1') return;
+            // The bar pass already listed these books; its hidden copy of the text must not be scanned again.
+            if (container.closest('[data-dtu-textbook-linker-bar-host]')) return;
             var attempts = parseInt(container.getAttribute('data-dtu-textbook-linker-attempts') || '0', 10);
             if (attempts >= 5) return;
             container.setAttribute('data-dtu-textbook-linker-attempts', String(attempts + 1));

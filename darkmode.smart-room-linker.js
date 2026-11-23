@@ -58,7 +58,8 @@
     }
 
     function getFeatureSmartRoomLinkerKey() {
-        return getDepValue('featureSmartRoomLinkerKey', 'dtuAfterDarkFeatureSmartRoomLinker');
+        var deps = getDeps();
+        return (deps && deps.featureSmartRoomLinkerKey) || globalThis.DTUAfterDarkFeatureFlags.FEATURE_SMART_ROOM_LINKER_KEY;
     }
 
     // Announcements are where lecturers name rooms, so they stay linked even
@@ -399,7 +400,8 @@
             } else {
                 out = { ok: false, error: (resp && resp.error) ? resp.error : 'not_found', ts: Date.now() };
             }
-            mazemapResolveCache[key] = out;
+            // Only an answer is kept for 12 h; a failed request (http, fetch_error, no reply) is asked again next click.
+            if (out.ok || out.error === 'not_found' || /^invalid_/.test(out.error)) mazemapResolveCache[key] = out;
             if (cb) cb(out);
         });
     }

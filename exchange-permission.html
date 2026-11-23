@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DTU After Dark: exchange deadline</title>
+<style>
+/* Component: permission page. Colours follow DTU After Dark's dark/light defaults. */
+:root {
+    --paper: #ffffff; --ink: #1f2937; --muted: #6b7280; --accent: #990000; --accent-ink: #ffffff; --hair: #e5e7eb;
+    color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+    :root { --paper: #1a1a1a; --ink: #e0e0e0; --muted: #b0b0b0; --accent: #c0392b; --accent-ink: #ffffff; --hair: #333333; }
+}
+html, body { margin: 0; background: var(--paper); color: var(--ink); overflow-x: clip; }
+body { font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+main { max-width: 34rem; margin: 12vh auto 0; padding: 0 16px; }
+h1 { font-size: 20px; font-weight: 700; margin: 0 0 12px; }
+p { margin: 0 0 20px; }
+button { font: inherit; font-weight: 600; padding: 8px 18px; border-radius: 6px; border: 1px solid var(--accent);
+    background: var(--accent); color: var(--accent-ink); cursor: pointer; }
+button:hover { filter: brightness(1.1); }
+button:active { transform: translateY(1px); }
+button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+button:disabled { opacity: 0.5; cursor: default; }
+#status { margin-top: 16px; color: var(--muted); min-height: 1.5em; }
+#status[data-state="error"] { color: var(--accent); }
+</style>
+</head>
+<body>
+<main>
+    <h1>Exchange deadline</h1>
+    <p>To show DTU's exchange application deadline in the Deadlines widget, DTU After Dark reads the list of
+    partner universities from beyondborders.dtu.dk, at most once a day. It sends nothing about you to the site.</p>
+    <button id="allow" type="button">Allow access</button>
+    <div id="status" role="status"></div>
+</main>
+<script src="exchange-permission.js"></script>
+</body>
+</html>

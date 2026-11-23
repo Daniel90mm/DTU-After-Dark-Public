@@ -7,10 +7,22 @@
     }
 
 
+    // DTU course codes: two digits, then three digits or capitals (02105, 41B02;
+    // 158 codes in course-map-data.json have letters), and KU courses (KU123). Letters
+    // must be capitals, so "10min" or "24hrs" in a title is not read as a course.
+    var COURSE_CODE_SOURCE = '\\d{2}[0-9A-Z]{3}|[Kk][Uu]\\d{3}';
+    var COURSE_CODE_IN_TEXT_RE = new RegExp('\\b(' + COURSE_CODE_SOURCE + ')\\b');
+
+    // The first course code in a text, in capitals, or ''.
+    function findIntelCourseCode(text) {
+        var m = String(text || '').match(COURSE_CODE_IN_TEXT_RE);
+        return m ? String(m[1]).toUpperCase() : '';
+    }
+
     function normalizeIntelCourseCode(code) {
         var rawText = String(code || '');
-        var m = rawText.match(/\b(\d{5}|KU\d{3})\b/i);
-        if (m) return String(m[1]).toUpperCase();
+        var found = findIntelCourseCode(rawText);
+        if (found) return found;
 
         var raw = rawText.toUpperCase();
         raw = raw.replace(/[\u200B-\u200D\uFEFF]/g, '');
@@ -142,7 +154,7 @@
 
     function getCampusnetCourseCodeFromPage(rootDoc) {
         var doc = rootDoc || document;
-        var codeRe = /\b(\d{5}|KU\d{3})\b/i;
+        var codeRe = COURSE_CODE_IN_TEXT_RE;
         var breadcrumb = doc.querySelector('#breadcrumb, .breadcrumb, nav[aria-label="breadcrumb"]');
         if (breadcrumb) {
             var links = breadcrumb.querySelectorAll('a');
@@ -180,7 +192,7 @@
         if (!breadcrumb) return '';
         var links = breadcrumb.querySelectorAll('a[href]');
         for (var i = 0; i < links.length; i++) {
-            if (!/\b(?:\d{5}|KU\d{3})\b/i.test(links[i].textContent || '')) continue;
+            if (!findIntelCourseCode(links[i].textContent)) continue;
             var href = links[i].getAttribute('href') || '';
             var m = href.match(/elementid=(\d+)/i) || href.match(/\/cnnet\/element\/(\d+)/i);
             if (!m) return '';
@@ -200,9 +212,9 @@
     }
 
     function isCampusnetNonCourseTitle(text) {
-        var t = normalizeWhitespace(text || '').toLowerCase();
+        var t = normalizeWhitespace(text || '');
         if (!t) return false;
-        t = t.replace(/\b(?:\d{5}|ku\d{3})\b/gi, ' ');
+        t = t.replace(new RegExp('\\b(?:' + COURSE_CODE_SOURCE + ')\\b', 'g'), ' ').toLowerCase();
         t = t.replace(/\b[fe]\s*[-_/]?\s*(?:20)?\d{2}\b/gi, ' ');
         t = t.replace(/\(archived\)/gi, ' ');
         t = normalizeWhitespace(t);
@@ -221,7 +233,7 @@
 
     function isCampusnetLikelyAcademicCourse(courseCode, courseName, opts) {
         var code = normalizeIntelCourseCode(courseCode);
-        if (!/^(?:\d{5}|KU\d{3})$/.test(code)) return false;
+        if (!new RegExp('^(?:' + COURSE_CODE_SOURCE + ')$').test(code)) return false;
         var texts = [];
         if (courseName) texts.push(String(courseName));
         if (opts && opts.title) texts.push(String(opts.title));
@@ -349,22 +361,6 @@
         return best;
     }
 
-    // CampusNet's participant export joins a student's programs with ", ". A
-    // degree abbreviation after a comma ("Process and Innovation, B. Eng.")
-    // belongs to the label before it.
-    function splitExportEducation(text) {
-        var out = [];
-        String(text || '').split(/,\s+/).forEach(function (part) {
-            if (out.length && /^[bm]\.\s?(?:eng|sc)\.?$/i.test(part.trim())) out[out.length - 1] += ', ' + part;
-            else out.push(part);
-        });
-        return out;
-    }
-
-    function readExportProgram(text) {
-        return pickParticipantProgram(splitExportEducation(text));
-    }
-
     // The education infobox lists one <p> per program. Older markup puts the
     // label straight in a child div.
     function readParticipantProgram(infoDiv) {
@@ -389,7 +385,7 @@
             var txt = normalizeWhitespace(headings[i].textContent);
             if (!labelRegex.test(txt)) continue;
             // "Users (1 234)": thousands may be grouped with a space, nbsp, dot or comma.
-            var m = txt.match(/\((\d{1,3}(?:[\s .,]\d{3})*)\)/);
+            var m = txt.match(/\((\d{1,3}(?:[\s .,]\d{3})+|\d+)\)/);
             var count = m ? parseInt(m[1].replace(/\D/g, ''), 10) : null;
             return {
                 headingEl: headings[i],
@@ -495,6 +491,13 @@
         var mailLink = item.querySelector('a[href^="mailto:"]');
         if (mailLink) candidates.push(mailLink.getAttribute('href') || '');
 
+        // Some entries show no e-mail on the row; the s-number is then only in
+        // the entry's detail box (one of 128 on 876717, 2026-11-23).
+        var info = item.nextElementSibling;
+        if (info && info.classList && info.classList.contains('ui-participant-informationbox')) {
+            candidates.push(info.textContent || '');
+        }
+
         for (var i = 0; i < candidates.length; i++) {
             var match = String(candidates[i] || '').match(/\b(s\d{6})\b/i);
             if (match) return String(match[1]).toLowerCase();
@@ -504,6 +507,7 @@
 
     try {
         globalThis.DTUAfterDarkParticipantIntelHost = {
+            findIntelCourseCode: findIntelCourseCode,
             normalizeIntelCourseCode: normalizeIntelCourseCode,
             normalizeIntelCourseSemester: normalizeIntelCourseSemester,
             detectCampusnetSelfSNumberFromHeader: detectCampusnetSelfSNumberFromHeader,
@@ -524,7 +528,6 @@
             normalizeProgramLabel: normalizeProgramLabel,
             pickParticipantProgram: pickParticipantProgram,
             readParticipantProgram: readParticipantProgram,
-            readExportProgram: readExportProgram,
             getCampusnetParticipantCategoryMeta: getCampusnetParticipantCategoryMeta,
             getCampusnetUsersCategoryMeta: getCampusnetUsersCategoryMeta,
             getCampusnetUsersCountFromPage: getCampusnetUsersCountFromPage,

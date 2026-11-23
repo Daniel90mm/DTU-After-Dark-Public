@@ -3,6 +3,10 @@
     var markExt = globalThis.DTUAfterDarkDom.markExt;
     var isTopWindow = globalThis.DTUAfterDarkDom.isTopWindow;
     var normalizeWhitespace = globalThis.DTUAfterDarkDom.normalizeWhitespace;
+    var schedulePlacement = globalThis.DTUAfterDarkDom.schedulePlacement;
+    if (typeof schedulePlacement !== 'function') {
+        throw new Error('darkmode.learn-nav.js requires DTUAfterDarkDom.schedulePlacement');
+    }
 
     function getDeps() {
         try { return globalThis.DTUAfterDarkLearnNavDeps || null; } catch (e0) { return null; }
@@ -32,6 +36,77 @@
     function queryFirstDeep(selector, root) {
         var hits = deepQueryAll(selector, root);
         return hits && hits.length ? hits[0] : null;
+    }
+
+    // The extension's own DTU Learn nav items, in the order they must appear
+    // after the anchor item. Each module used to assert its own rule -- Settings
+    // wanted to sit right after Atomic Search, Library wanted to sit right after
+    // Settings -- so on a page where the anchor appears late, every feature pass
+    // moved one of them and the two visibly traded places until the passes
+    // stopped. Ranking them here makes the resting order the only stable one.
+    const AFTER_DARK_NAV_ORDER = ['dtu-settings-nav-item', 'dtu-library-nav-item'];
+
+    function afterDarkNavRank(el) {
+        if (!el || !el.classList) return -1;
+        for (var i = 0; i < AFTER_DARK_NAV_ORDER.length; i++) {
+            if (el.classList.contains(AFTER_DARK_NAV_ORDER[i])) return i;
+        }
+        return -1;
+    }
+
+    // Returns the node navItem should be inserted before to sit directly after
+    // anchorItem, behind any of our items that outrank it.
+    function afterDarkNavInsertRef(mainWrapper, anchorItem, navItem) {
+        var rank = afterDarkNavRank(navItem);
+        var ref = anchorItem ? anchorItem.nextSibling : (mainWrapper ? mainWrapper.firstChild : null);
+        while (ref) {
+            if (ref === navItem) {
+                ref = ref.nextSibling;
+                continue;
+            }
+            var otherRank = afterDarkNavRank(ref);
+            if (otherRank >= 0 && otherRank < rank) {
+                ref = ref.nextSibling;
+                continue;
+            }
+            break;
+        }
+        return ref;
+    }
+
+    function placeAfterDarkNavItemAt(mainWrapper, anchorItem, navItem) {
+        if (!mainWrapper || !navItem) return;
+        var ref = afterDarkNavInsertRef(mainWrapper, anchorItem, navItem);
+        // Re-inserting a node that is already in place still counts as a mutation,
+        // which would wake the observer and schedule the next pass. Leave it alone.
+        if (navItem.parentNode === mainWrapper && navItem.nextSibling === ref) return;
+        try { mainWrapper.insertBefore(navItem, ref); } catch (ePlace) { }
+    }
+
+    // Same ordering, for the no-anchor case: our items form a block ending just
+    // before beforeItem (D2L's overflow "more" entry), or at the end of the nav.
+    // The old fallback inserted straight before that item every pass, so whichever
+    // of our two ran last ended up in front -- the visible swapping on course and
+    // lessons pages, where no Atomic Search anchor exists.
+    function placeAfterDarkNavItemBefore(mainWrapper, beforeItem, navItem) {
+        if (!mainWrapper || !navItem) return;
+        var rank = afterDarkNavRank(navItem);
+        var ref = (beforeItem && beforeItem.parentNode === mainWrapper) ? beforeItem : null;
+        var probe = ref ? ref.previousSibling : mainWrapper.lastChild;
+        while (probe) {
+            if (probe === navItem) {
+                probe = probe.previousSibling;
+                continue;
+            }
+            if (afterDarkNavRank(probe) > rank) {
+                ref = probe;
+                probe = probe.previousSibling;
+                continue;
+            }
+            break;
+        }
+        if (navItem.parentNode === mainWrapper && navItem.nextSibling === ref) return;
+        try { mainWrapper.insertBefore(navItem, ref); } catch (ePlaceBefore) { }
     }
 
     function findLearnMainNavWrappers() {
@@ -650,34 +725,15 @@
         if (anchor) {
             // Shared placement keeps our items in one fixed order behind the
             // anchor, so this item and the Library item cannot displace each other.
-            var deps = getDeps();
-            if (deps && typeof deps.placeAfterDarkNavItemAt === 'function') {
-                deps.placeAfterDarkNavItemAt(mainWrapper, anchor, navItem);
-                return;
-            }
-            if (anchor.nextSibling !== navItem) {
-                mainWrapper.insertBefore(navItem, anchor.nextSibling);
-            }
+            placeAfterDarkNavItemAt(mainWrapper, anchor, navItem);
             return;
         }
 
         var moreItem = mainWrapper.querySelector('.d2l-navigation-s-more') || queryFirstDeep('.d2l-navigation-s-more', mainWrapper);
-        var navDeps = getDeps();
-        if (navDeps && typeof navDeps.placeAfterDarkNavItemBefore === 'function') {
-            navDeps.placeAfterDarkNavItemBefore(mainWrapper, moreItem, navItem);
-            return;
-        }
-        if (moreItem && moreItem.parentNode === mainWrapper) {
-            if (navItem.nextSibling !== moreItem) {
-                mainWrapper.insertBefore(navItem, moreItem);
-            }
-        } else if (navItem.parentNode !== mainWrapper || navItem.nextSibling) {
-            mainWrapper.appendChild(navItem);
-        }
+        placeAfterDarkNavItemBefore(mainWrapper, moreItem, navItem);
     }
 
-    var _learnNavBootstrapTimer = null;
-    var _learnNavBootstrapAttempts = 0;
+    var _learnNavBootstrapWatch = null;
     function runLearnNavBootstrapPass() {
         if (!isTopWindow()) return false;
         if (window.location.hostname !== 'learn.inside.dtu.dk') return false;
@@ -697,18 +753,16 @@
     function scheduleLearnNavBootstrap() {
         if (!isTopWindow()) return;
         if (window.location.hostname !== 'learn.inside.dtu.dk') return;
-        if (_learnNavBootstrapTimer) return;
-
-        _learnNavBootstrapAttempts = 0;
-        _learnNavBootstrapTimer = setInterval(function () {
-            _learnNavBootstrapAttempts++;
-            var done = false;
-            try { done = runLearnNavBootstrapPass(); } catch (e0) { done = false; }
-            if ((done && _learnNavBootstrapAttempts >= 10) || _learnNavBootstrapAttempts >= 60) {
-                clearInterval(_learnNavBootstrapTimer);
-                _learnNavBootstrapTimer = null;
+        if (_learnNavBootstrapWatch && _learnNavBootstrapWatch.active()) {
+            _learnNavBootstrapWatch.trigger();
+            return;
+        }
+        _learnNavBootstrapWatch = schedulePlacement({
+            capMs: 30000,
+            run: function () {
+                return runLearnNavBootstrapPass();
             }
-        }, 400);
+        });
     }
 
     try {
@@ -717,7 +771,11 @@
             removeDTULearnNavResourceLinks: removeDTULearnNavResourceLinks,
             removeDTULearnHelpDropdown: removeDTULearnHelpDropdown,
             insertSettingsNavItem: insertSettingsNavItem,
-            insertLibraryNavItem: insertLibraryNavItem
+            insertLibraryNavItem: insertLibraryNavItem,
+            afterDarkNavRank: afterDarkNavRank,
+            afterDarkNavInsertRef: afterDarkNavInsertRef,
+            placeAfterDarkNavItemAt: placeAfterDarkNavItemAt,
+            placeAfterDarkNavItemBefore: placeAfterDarkNavItemBefore
         };
     } catch (eExpose) { }
 

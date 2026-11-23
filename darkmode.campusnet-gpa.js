@@ -4,28 +4,34 @@
 
     var GPA_SIM_STORAGE_KEY = 'gpaSimEntries';
     var GPA_EXCLUDED_ACTUAL_STORAGE_KEY = 'gpaExcludedActualRows';
+    // The grade rows seen on the last visit, so a grade that arrived since gets a "New" mark once.
+    var GRADES_SEEN_STORAGE_KEY = 'dtuCampusnetGradesSeenV1';
+    var NEW_GRADES_MAX = 8;
+    var _newGradeKeys = null;
     var DANISH_GRADES = [12, 10, 7, 4, 2, 0, -3];
 
     function getDeps() {
-        try { return globalThis.DTUAfterDarkCampusnetGpaDeps || null; } catch (e0) { return null; }
+        var deps = globalThis.DTUAfterDarkCampusnetGpaDeps;
+        if (!deps) throw new Error('CampusNet GPA dependencies are missing');
+        return deps;
     }
 
+    function getDep(name) {
+        var dep = getDeps()[name];
+        if (typeof dep !== 'function') throw new Error('CampusNet GPA dependency ' + name + ' is missing');
+        return dep;
+    }
 
     function isFeatureEnabled() {
-        var deps = getDeps();
-        return !!(deps && typeof deps.isFeatureEnabled === 'function' && deps.isFeatureEnabled());
+        return !!getDep('isFeatureEnabled')();
     }
 
     function isDarkMode() {
-        var deps = getDeps();
-        return !!(deps && typeof deps.isDarkMode === 'function' && deps.isDarkMode());
+        return !!getDep('isDarkMode')();
     }
 
     function setSuppressHeavyWork(value) {
-        var deps = getDeps();
-        if (deps && typeof deps.setSuppressHeavyWork === 'function') {
-            deps.setSuppressHeavyWork(!!value);
-        }
+        getDep('setSuppressHeavyWork')(!!value);
     }
 
     function isCampusnetGradesPage() {
@@ -41,51 +47,31 @@
         return String(text || '').replace(/\s+/g, ' ').trim();
     }
 
-    function getCampusnetActualGradeTitleText(cell) {
+    function getCampusnetActualGradeCellText(cell) {
         if (!cell) return '';
         try {
             var clone = cell.cloneNode(true);
-            clone.querySelectorAll('.gpa-actual-toggle-btn').forEach(function (btn) {
+            clone.querySelectorAll('.gpa-actual-toggle-btn, .gpa-new-grade').forEach(function (btn) {
                 btn.remove();
             });
             return normalizeCampusnetGradeCellText(clone.textContent);
         } catch (e) {
             return normalizeCampusnetGradeCellText(cell.textContent);
         }
-    }
-
-    function getCampusnetActualGradeCodeText(cell) {
-        if (!cell) return '';
-        try {
-            var clone = cell.cloneNode(true);
-            clone.querySelectorAll('.gpa-actual-toggle-btn').forEach(function (btn) {
-                btn.remove();
-            });
-            return normalizeCampusnetGradeCellText(clone.textContent);
-        } catch (e) {
-            return normalizeCampusnetGradeCellText(cell.textContent);
-        }
-    }
-
-    function isCampusnetActualGradeDataRow(row) {
-        if (!row || row.classList.contains('gradesListHeader')) return false;
-        if (row.classList.contains('gpa-row')
-            || row.classList.contains('gpa-projected-row')
-            || row.classList.contains('gpa-sim-row')
-            || row.classList.contains('gpa-sim-add-row')
-            || row.classList.contains('gpa-sim-disclaimer-row')) {
-            return false;
-        }
-        return true;
     }
 
     function parseCampusnetActualGradeRow(row) {
-        if (!isCampusnetActualGradeDataRow(row)) return null;
+        if (!row || row.classList.contains('gradesListHeader')
+            || row.classList.contains('gpa-row')
+            || row.classList.contains('gpa-projected-row')
+            || row.classList.contains('gpa-sim-row')
+            || row.classList.contains('gpa-sim-add-row')
+            || row.classList.contains('gpa-sim-disclaimer-row')) return null;
         var cells = row.querySelectorAll('td');
         if (cells.length < 4) return null;
 
-        var code = getCampusnetActualGradeCodeText(cells[0]);
-        var title = getCampusnetActualGradeTitleText(cells[1]);
+        var code = getCampusnetActualGradeCellText(cells[0]);
+        var title = getCampusnetActualGradeCellText(cells[1]);
         var gradeSpan = cells[2].querySelector('span');
         var gradeText = normalizeCampusnetGradeCellText(gradeSpan ? gradeSpan.textContent : cells[2].textContent);
         var numericMatch = gradeText.replace(/^[\u2212\u2013]/, '-').match(/^(-?\d+)/);
@@ -98,14 +84,9 @@
         return {
             row: row,
             cells: cells,
-            code: code,
-            title: title,
-            gradeText: gradeText,
             numericGrade: numericGrade,
             ects: safeEcts,
-            term: term,
             baseSignature: baseSignature,
-            signature: baseSignature,
             countsForGpa: numericGrade !== null && safeEcts > 0
         };
     }
@@ -121,7 +102,6 @@
             if (!entry) return;
             var occurrence = (seen.get(entry.baseSignature) || 0) + 1;
             seen.set(entry.baseSignature, occurrence);
-            entry.occurrenceIndex = occurrence;
             entry.signature = entry.baseSignature + '|occ:' + occurrence;
             entries.push(entry);
         });
@@ -145,14 +125,10 @@
     }
 
     function writeCampusnetExcludedActualGradeSignatures(signatures) {
-        var unique = [];
-        var seen = new Set();
-        (Array.isArray(signatures) ? signatures : []).forEach(function (item) {
-            if (typeof item !== 'string' || !item.trim()) return;
-            if (seen.has(item)) return;
-            seen.add(item);
-            unique.push(item);
-        });
+        var unique = Array.from(new Set(
+            (Array.isArray(signatures) ? signatures : []).filter(function (item) {
+                return typeof item === 'string' && item.trim();
+            })));
         localStorage.setItem(GPA_EXCLUDED_ACTUAL_STORAGE_KEY, JSON.stringify(unique));
     }
 
@@ -167,10 +143,12 @@
             totalECTS += entry.ects;
         });
 
+        var average = totalECTS > 0 ? totalWeighted / totalECTS : null;
         return {
             totalWeighted: totalWeighted,
             totalECTS: totalECTS,
-            gpa: totalECTS > 0 ? Number((totalWeighted / totalECTS).toFixed(2)) : null
+            average: average,
+            gpa: average === null ? null : Number(average.toFixed(2))
         };
     }
 
@@ -182,10 +160,7 @@
 
         entries.forEach(function (entry) {
             entry.excluded = excludedSet.has(entry.signature);
-            if (entry.excluded) {
-                excludedCount++;
-                return;
-            }
+            if (entry.excluded) excludedCount++;
         });
 
         var weightedGpa = calculateCampusnetWeightedGpa(entries.filter(function (entry) {
@@ -194,9 +169,9 @@
 
         return {
             entries: entries,
-            excludedSet: excludedSet,
             totalWeighted: weightedGpa.totalWeighted,
             totalECTS: weightedGpa.totalECTS,
+            averageGpa: weightedGpa.average,
             gpa: excludedList ? weightedGpa.gpa : null,
             exclusionsUnreadable: !excludedList,
             excludedCount: excludedCount
@@ -206,21 +181,15 @@
     function clearCampusnetActualGradeExclusionUi(table) {
         var scope = table || getCampusnetGradesTable();
         if (!scope) return;
-        scope.querySelectorAll('.gpa-actual-toggle-btn').forEach(function (btn) {
+        scope.querySelectorAll('.gpa-actual-toggle-btn, .gpa-new-grade').forEach(function (btn) {
             btn.remove();
         });
         scope.querySelectorAll('.gpa-actual-excluded').forEach(function (row) {
             row.classList.remove('gpa-actual-excluded');
             row.removeAttribute('data-gpa-actual-excluded');
         });
-        scope.querySelectorAll('[data-gpa-actual-inline-muted="1"]').forEach(function (el) {
-            if (!el || !el.style) return;
-            el.removeAttribute('data-gpa-actual-inline-muted');
-            el.style.removeProperty('background');
-            el.style.removeProperty('background-color');
-            el.style.removeProperty('color');
-            el.style.removeProperty('text-decoration');
-        });
+        scope.querySelectorAll('[data-gpa-actual-inline-muted="1"]')
+            .forEach(clearCampusnetGpaMutedInlineStyles);
     }
 
     function setCampusnetGpaAttribute(el, name, value) {
@@ -247,6 +216,55 @@
         saved[name] = { value: value, priority: expectedPriority, actual: el.style.getPropertyValue(name) };
     }
 
+    function setCampusnetGpaStyles(el, styles, priority) {
+        styles.forEach(function (pair) {
+            setCampusnetGpaStyle(el, pair[0], pair[1], priority);
+        });
+    }
+
+    function clearCampusnetGpaMutedInlineStyles(el) {
+        if (!el || !el.style) return;
+        el.removeAttribute('data-gpa-actual-inline-muted');
+        ['background', 'background-color', 'color', 'text-decoration'].forEach(function (name) {
+            el.style.removeProperty(name);
+        });
+    }
+
+    function createCampusnetGpaCell(cssText, text) {
+        var cell = document.createElement('td');
+        cell.setAttribute('data-dtu-ext', '1');
+        if (cssText) cell.style.cssText = cssText;
+        cell.textContent = text;
+        return cell;
+    }
+
+    function createCampusnetGpaCells(labelText, gradeText, ectsText, noteText, noteCss) {
+        var label = createCampusnetGpaCell('text-align: left; font-weight: bold; padding: 8px 0;', labelText);
+        label.colSpan = 2;
+        label.style.setProperty('padding-left', '5px', 'important');
+        label.style.setProperty('padding-right', '0', 'important');
+        return {
+            label: label,
+            grade: createCampusnetGpaCell(
+                'text-align: right; padding-right: 5px; font-weight: bold; white-space: nowrap;', gradeText),
+            ects: createCampusnetGpaCell(
+                'text-align: right; padding-right: 5px; font-weight: bold;', ectsText),
+            note: createCampusnetGpaCell(
+                noteCss || 'text-align: right; padding-right: 5px; font-size: 11px;', noteText)
+        };
+    }
+
+    function createCampusnetGpaMessageRow(className, text, cssText, color) {
+        var row = document.createElement('tr');
+        row.className = className;
+        row.setAttribute('data-dtu-ext', '1');
+        var cell = createCampusnetGpaCell(cssText, text);
+        cell.colSpan = 5;
+        cell.style.setProperty('color', color, 'important');
+        row.appendChild(cell);
+        return row;
+    }
+
     function applyCampusnetActualGradeToggleButtonState(btn, excluded) {
         if (!btn || !btn.style) return;
         if (btn.classList.contains('is-excluded') !== !!excluded) btn.classList.toggle('is-excluded', !!excluded);
@@ -263,43 +281,24 @@
         var fg = isDarkMode()
             ? (excluded ? '#c9ced6' : 'var(--dtu-ad-accent-soft)')
             : (excluded ? 'rgba(var(--dtu-ad-accent-deep-rgb), 0.78)' : 'rgba(var(--dtu-ad-accent-deep-rgb), 0.92)');
-        setCampusnetGpaStyle(btn, 'background', 'transparent', 'important');
-        setCampusnetGpaStyle(btn, 'background-color', 'transparent', 'important');
-        setCampusnetGpaStyle(btn, 'color', fg, 'important');
-        setCampusnetGpaStyle(btn, 'border', '0', 'important');
-        setCampusnetGpaStyle(btn, 'border-radius', '0', 'important');
-        setCampusnetGpaStyle(btn, 'box-shadow', 'none', 'important');
-        setCampusnetGpaStyle(btn, 'appearance', 'none', 'important');
-        setCampusnetGpaStyle(btn, '-webkit-appearance', 'none', 'important');
         // Padding lifts the click target from 24x13 to at least 24px tall.
-        setCampusnetGpaStyle(btn, 'padding', '5px 6px', 'important');
-        setCampusnetGpaStyle(btn, 'min-height', '24px', 'important');
-        setCampusnetGpaStyle(btn, 'display', 'inline-flex', 'important');
-        setCampusnetGpaStyle(btn, 'align-items', 'center', 'important');
-        setCampusnetGpaStyle(btn, 'justify-content', 'center', 'important');
-        setCampusnetGpaStyle(btn, 'float', 'right', 'important');
-        setCampusnetGpaStyle(btn, 'clear', 'none', 'important');
-        setCampusnetGpaStyle(btn, 'margin-top', '0', 'important');
-        setCampusnetGpaStyle(btn, 'margin-left', '0', 'important');
-        setCampusnetGpaStyle(btn, 'margin-right', '6px', 'important');
-        setCampusnetGpaStyle(btn, 'line-height', '1.2', 'important');
-        setCampusnetGpaStyle(btn, 'white-space', 'nowrap', 'important');
-        setCampusnetGpaStyle(btn, 'vertical-align', 'middle', 'important');
+        setCampusnetGpaStyles(btn, [
+            ['background', 'transparent'], ['background-color', 'transparent'], ['color', fg],
+            ['border', '0'], ['border-radius', '0'], ['box-shadow', 'none'],
+            ['appearance', 'none'], ['-webkit-appearance', 'none'],
+            ['padding', '5px 6px'], ['min-height', '24px'], ['display', 'inline-flex'],
+            ['align-items', 'center'], ['justify-content', 'center'], ['float', 'right'],
+            ['clear', 'none'], ['margin-top', '0'], ['margin-left', '0'], ['margin-right', '6px'],
+            ['line-height', '1.2'], ['white-space', 'nowrap'], ['vertical-align', 'middle']
+        ], 'important');
     }
 
     function applyCampusnetActualGradeExcludedRowInlineStyles(entry, excluded) {
         if (!entry || !entry.row || !entry.row.querySelectorAll) return;
 
-        if (!excluded) entry.row.querySelectorAll('[data-gpa-actual-inline-muted="1"]').forEach(function (el) {
-            if (!el || !el.style) return;
-            el.removeAttribute('data-gpa-actual-inline-muted');
-            el.style.removeProperty('background');
-            el.style.removeProperty('background-color');
-            el.style.removeProperty('color');
-            el.style.removeProperty('text-decoration');
-        });
-
         if (!excluded) {
+            entry.row.querySelectorAll('[data-gpa-actual-inline-muted="1"]')
+                .forEach(clearCampusnetGpaMutedInlineStyles);
             var courseNumberCell = entry.cells && entry.cells[0];
             if (courseNumberCell && courseNumberCell.querySelectorAll) {
                 // Course numbers link to their grade distribution, so they read as links
@@ -322,18 +321,17 @@
         entry.row.querySelectorAll('td').forEach(function (cell) {
             if (!cell || !cell.style) return;
             setCampusnetGpaAttribute(cell, 'data-gpa-actual-inline-muted', '1');
-            setCampusnetGpaStyle(cell, 'background', rowBg, 'important');
-            setCampusnetGpaStyle(cell, 'background-color', rowBg, 'important');
-            setCampusnetGpaStyle(cell, 'color', mutedText, 'important');
-            setCampusnetGpaStyle(cell, 'text-decoration', 'line-through', 'important');
+            setCampusnetGpaStyles(cell, [
+                ['background', rowBg], ['background-color', rowBg],
+                ['color', mutedText], ['text-decoration', 'line-through']
+            ], 'important');
         });
 
         entry.row.querySelectorAll('td span, td a').forEach(function (el) {
             if (!el || !el.style) return;
             if (el.closest && el.closest('.gpa-actual-toggle-btn')) return;
             setCampusnetGpaAttribute(el, 'data-gpa-actual-inline-muted', '1');
-            setCampusnetGpaStyle(el, 'color', mutedText, 'important');
-            setCampusnetGpaStyle(el, 'text-decoration', 'line-through', 'important');
+            setCampusnetGpaStyles(el, [['color', mutedText], ['text-decoration', 'line-through']], 'important');
         });
     }
 
@@ -346,9 +344,8 @@
         if (!scope) return;
         scope.querySelectorAll('tr.gradesListHeader td:first-child, tr.context_direct td:first-child, tr.context_alternating td:first-child').forEach(function (cell) {
             if (!cell || !cell.style) return;
-            setCampusnetGpaStyle(cell, 'width', '220px', 'important');
-            setCampusnetGpaStyle(cell, 'min-width', '220px', 'important');
-            setCampusnetGpaStyle(cell, 'white-space', 'nowrap', 'important');
+            setCampusnetGpaStyles(cell,
+                [['width', '220px'], ['min-width', '220px'], ['white-space', 'nowrap']], 'important');
         });
         // Fixed layout takes column widths from the header row, so hiding a grade (which
         // adds "1 ignored" under Date) or adding a planned grade (inputs under Grade
@@ -356,8 +353,7 @@
         var header = scope.querySelector && scope.querySelector('tr.gradesListHeader');
         if (!header || !header.children || header.children.length !== CAMPUSNET_GRADE_COLUMN_WIDTHS.length) return;
         setCampusnetGpaAttribute(scope, 'data-gpa-fixed-columns', '1');
-        setCampusnetGpaStyle(scope, 'table-layout', 'fixed', 'important');
-        setCampusnetGpaStyle(scope, 'width', '100%', 'important');
+        setCampusnetGpaStyles(scope, [['table-layout', 'fixed'], ['width', '100%']], 'important');
         CAMPUSNET_GRADE_COLUMN_WIDTHS.forEach(function (width, index) {
             var cell = header.children[index];
             if (!width || !cell || !cell.style) return;
@@ -403,6 +399,62 @@
         updateProjectedGPA();
     }
 
+    // Language-proof key for a grade row: course code, grade and ECTS, never the title or term,
+    // which CampusNet writes in Danish or English.
+    function campusnetGradeSeenKeys(entries) {
+        var seen = Object.create(null);
+        return entries.map(function (entry) {
+            var code = getCampusnetActualGradeCellText(entry.cells[0]).toLowerCase();
+            var grade = normalizeCampusnetGradeCellText(entry.cells[2] ? entry.cells[2].textContent : '').toLowerCase();
+            if (/^(ikke bestået|not passed|ib)$/.test(grade)) grade = 'fail';
+            else if (/^(bestået|passed|be)$/.test(grade)) grade = 'pass';
+            else if (/^(ikke godkendt|not approved)$/.test(grade)) grade = 'not-approved';
+            else if (/^(godkendt|approved)$/.test(grade)) grade = 'approved';
+            var base = code + '|' + grade + '|' + entry.ects;
+            seen[base] = (seen[base] || 0) + 1;
+            return base + '|' + seen[base];
+        });
+    }
+
+    // Marks rows that were not on the page last visit with a small "New", once: the rows are
+    // saved as seen on the same visit. The first visit only saves. More than NEW_GRADES_MAX new
+    // rows, or every row new, means CampusNet changed how it writes rows, not that grades arrived.
+    function markNewCampusnetGrades(entries) {
+        if (document.readyState === 'loading' || !entries.length) return;
+        var keys = campusnetGradeSeenKeys(entries);
+        if (_newGradeKeys === null) {
+            _newGradeKeys = new Set();
+            var stored = null;
+            try { stored = JSON.parse(localStorage.getItem(GRADES_SEEN_STORAGE_KEY) || 'null'); } catch (eRead) { stored = null; }
+            if (Array.isArray(stored)) {
+                var old = new Set(stored);
+                var fresh = keys.filter(function (k) { return !old.has(k); });
+                if (fresh.length && fresh.length <= NEW_GRADES_MAX && fresh.length < keys.length) {
+                    fresh.forEach(function (k) { _newGradeKeys.add(k); });
+                } else if (fresh.length) {
+                    console.warn('[DTU After Dark] ' + fresh.length + ' of ' + keys.length + ' grade rows look new; no New marks shown');
+                }
+            }
+            try { localStorage.setItem(GRADES_SEEN_STORAGE_KEY, JSON.stringify(keys)); } catch (eWrite) { }
+        }
+        var color = isDarkMode() ? 'var(--dtu-ad-accent-mark-dark, #ff6b6b)' : 'var(--dtu-ad-accent-mark-light, #990000)';
+        entries.forEach(function (entry, i) {
+            var titleCell = entry.cells[1];
+            if (!titleCell || !_newGradeKeys.has(keys[i]) || titleCell.querySelector('.gpa-new-grade')) return;
+            var chip = document.createElement('span');
+            chip.className = 'gpa-new-grade';
+            chip.setAttribute('data-dtu-ext', '1');
+            chip.textContent = 'New';
+            chip.title = 'Not on this page when you last opened it';
+            [['margin-left', '6px'], ['padding', '0 5px'], ['border', '1px solid ' + color], ['border-radius', '3px'],
+                ['color', color], ['background', 'transparent'], ['font-size', '10px'], ['font-weight', '600'],
+                ['line-height', '15px'], ['vertical-align', '1px'], ['white-space', 'nowrap']].forEach(function (p) {
+                chip.style.setProperty(p[0], p[1], 'important');
+            });
+            titleCell.appendChild(chip);
+        });
+    }
+
     function syncCampusnetActualGradeExclusionControls() {
         if (!isTopWindow()) return;
         if (!isCampusnetGradesPage()) return;
@@ -443,7 +495,116 @@
             }
 
             setCampusnetGpaAttribute(btn, 'data-gpa-signature', entry.signature);
-            applyCampusnetActualGradeExclusionState(entry, btn, summary.excludedSet.has(entry.signature));
+            applyCampusnetActualGradeExclusionState(entry, btn, entry.excluded);
+        });
+        markNewCampusnetGrades(summary.entries.filter(function (entry) { return entry && entry.cells && entry.cells.length >= 4; }));
+    }
+
+    // ===== Grades past DTU's grading deadline =====
+    // The Study Planner exam schedule saves the student's exams with DTU's grading deadline
+    // (dtuExamGradingWatchV1, extension storage). Here, an exam whose deadline has passed
+    // and that has no grade row for its term is listed under the table.
+    var GRADING_WATCH_KEY = 'dtuExamGradingWatchV1';
+    var _gradingWatchPending = false;
+    var _gradingWatchReadAt = 0;
+
+    function isoDayNumber(iso) {
+        var p = String(iso).split('-');
+        return Math.round(Date.UTC(+p[0], +p[1] - 1, +p[2]) / 86400000);
+    }
+
+    // CampusNet's term for an exam day: "v25" for the winter exams (December 2025 and the
+    // January after), "s26" for summer (May to August 2026). Null when the day fits neither.
+    function campusnetTermForExam(iso) {
+        var year = +String(iso).slice(0, 4);
+        var month = +String(iso).slice(5, 7);
+        var yy = function (y) { return String(y % 100).padStart(2, '0'); };
+        if (month === 12) return 'v' + yy(year);
+        if (month === 1 || month === 2) return 'v' + yy(year - 1);
+        if (month >= 5 && month <= 8) return 's' + yy(year);
+        return null;
+    }
+
+    // grades: [{code, term}] from the page. An exam counts as graded when a row has its
+    // course code and its term (any term when the exam day maps to none).
+    function findMissingGrades(watch, grades, todayIso) {
+        return (Array.isArray(watch) ? watch : []).filter(function (e) {
+            if (!e || !e.code || !e.grading || !(e.grading < todayIso)) return false;
+            var term = campusnetTermForExam(e.exam);
+            return !grades.some(function (g) {
+                return g.code.toLowerCase() === String(e.code).toLowerCase() && (!term || g.term.toLowerCase() === term);
+            });
+        }).map(function (e) {
+            return { code: e.code, name: e.name || '', exam: e.exam, grading: e.grading, daysAgo: isoDayNumber(todayIso) - isoDayNumber(e.grading) };
+        });
+    }
+
+    function formatGradingDay(iso) {
+        var p = String(iso).split('-');
+        try {
+            return new Date(Date.UTC(+p[0], +p[1] - 1, +p[2])).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+        } catch (e0) { return iso; }
+    }
+
+    function removeGradingWatchNote() {
+        document.querySelectorAll('.gpa-grading-watch').forEach(function (n) { n.remove(); });
+    }
+
+    function renderGradingWatchNote(table, missing) {
+        removeGradingWatchNote();
+        if (!missing.length) return;
+        var dark = isDarkMode();
+        var box = document.createElement('div');
+        box.className = 'gpa-grading-watch';
+        box.setAttribute('data-dtu-ext', '1');
+        [['margin', '12px 0 0'], ['padding', '8px 10px'], ['border', '1px solid ' + (dark ? '#3a3f47' : '#d1d5db')],
+            ['border-radius', '4px'], ['font-size', '12px'], ['line-height', '1.5'], ['background', 'transparent'],
+            ['color', dark ? '#e0e0e0' : '#1f2937'], ['max-width', table.offsetWidth ? table.offsetWidth + 'px' : 'none']].forEach(function (p) {
+            box.style.setProperty(p[0], p[1], 'important');
+        });
+        var title = document.createElement('div');
+        title.textContent = missing.length === 1 ? 'Grade not on this page yet' : 'Grades not on this page yet';
+        title.style.setProperty('font-weight', '600', 'important');
+        box.appendChild(title);
+        missing.forEach(function (m) {
+            var line = document.createElement('div');
+            line.textContent = m.code + (m.name ? ' ' + m.name : '') + ': exam ' + formatGradingDay(m.exam)
+                + ', DTU\'s grading deadline ' + formatGradingDay(m.grading)
+                + ' (' + m.daysAgo + (m.daysAgo === 1 ? ' day' : ' days') + ' ago)';
+            box.appendChild(line);
+        });
+        var foot = document.createElement('div');
+        foot.textContent = 'Exams from your Study Planner exam schedule; deadlines from DTU\'s exam table.';
+        foot.style.setProperty('color', dark ? '#9aa1aa' : '#6b7280', 'important');
+        box.appendChild(foot);
+        table.parentNode.insertBefore(box, table.nextSibling);
+    }
+
+    function syncGradingWatchNote(table) {
+        // insertGPARow runs on every page mutation: read storage at most every 3 s.
+        if (_gradingWatchPending || Date.now() - _gradingWatchReadAt < 3000) return;
+        _gradingWatchReadAt = Date.now();
+        var storage = globalThis.DTUAfterDarkStorage;
+        if (!storage || typeof storage.storageLocalGet !== 'function') return;
+        _gradingWatchPending = true;
+        var defaults = {};
+        defaults[GRADING_WATCH_KEY] = [];
+        storage.storageLocalGet(defaults, function (result) {
+            _gradingWatchPending = false;
+            if (!table.isConnected || !isFeatureEnabled()) return;
+            var grades = getCampusnetActualGradeEntries(table).map(function (entry) {
+                return {
+                    code: getCampusnetActualGradeCellText(entry.cells[0]),
+                    term: normalizeCampusnetGradeCellText(entry.cells[4] ? entry.cells[4].textContent : '')
+                };
+            });
+            var missing = findMissingGrades(result && result[GRADING_WATCH_KEY], grades, globalThis.DTUAfterDarkDom.copenhagenDateIso());
+            var key = JSON.stringify(missing);
+            var existing = document.querySelector('.gpa-grading-watch');
+            if (existing && existing.getAttribute('data-gpa-grading-key') === key) return;
+            renderGradingWatchNote(table, missing);
+            var box = document.querySelector('.gpa-grading-watch');
+            if (box) box.setAttribute('data-gpa-grading-key', key);
         });
     }
 
@@ -459,6 +620,7 @@
                 var projected = disabledTable.querySelector('.gpa-projected-row');
                 if (projected) projected.remove();
             }
+            removeGradingWatchNote();
             return;
         }
         // The extension starts while CampusNet still parses the grades table; a
@@ -467,6 +629,7 @@
         var table = getCampusnetGradesTable();
         syncCampusnetActualGradeExclusionControls();
         if (!table) globalThis.DTUAfterDarkWarnMissingAnchor && globalThis.DTUAfterDarkWarnMissingAnchor('CampusNet GPA', 'table.gradesList', function () { return !getCampusnetGradesTable(); });
+        if (table) syncGradingWatchNote(table);
         if (!table || table.querySelector('.gpa-row')) return;
 
         var summary = getCampusnetActualGradeSummary(table);
@@ -482,27 +645,12 @@
         gpaRow.className = 'gpa-row';
         gpaRow.setAttribute('data-dtu-ext', '1');
 
-        var tdLabel = document.createElement('td');
-        tdLabel.setAttribute('data-dtu-ext', '1');
-        tdLabel.colSpan = 2;
-        tdLabel.style.cssText = 'text-align: left; font-weight: bold; padding: 8px 0;';
-        tdLabel.style.setProperty('padding-left', '5px', 'important');
-        tdLabel.style.setProperty('padding-right', '0', 'important');
-        tdLabel.textContent = 'Weighted GPA';
-
-        var tdGrade = document.createElement('td');
-        tdGrade.setAttribute('data-dtu-ext', '1');
-        tdGrade.style.cssText = 'text-align: right; padding-right: 5px; font-weight: bold; white-space: nowrap;';
-        tdGrade.textContent = summary.gpa !== null ? summary.gpa.toFixed(2) : '';
-
-        var tdECTS = document.createElement('td');
-        tdECTS.setAttribute('data-dtu-ext', '1');
-        tdECTS.style.cssText = 'text-align: right; padding-right: 5px; font-weight: bold;';
-        tdECTS.textContent = summary.totalECTS;
-
-        var tdDate = document.createElement('td');
-        tdDate.setAttribute('data-dtu-ext', '1');
-        tdDate.style.cssText = 'text-align: right; padding-right: 5px; font-size: 11px;';
+        var cells = createCampusnetGpaCells(
+            'Weighted GPA',
+            summary.gpa !== null ? summary.gpa.toFixed(2) : '',
+            summary.totalECTS,
+            '');
+        var tdDate = cells.note;
         tdDate.style.setProperty('color', isDarkMode() ? '#9aa1aa' : '#6b7280', 'important');
         if (summary.exclusionsUnreadable) {
             tdDate.textContent = 'Ignored courses could not be read';
@@ -511,15 +659,15 @@
             tdDate.textContent = summary.excludedCount + ' ignored';
         }
 
-        gpaRow.appendChild(tdLabel);
+        gpaRow.appendChild(cells.label);
         if (summary.exclusionsUnreadable) {
             // No GPA to show: the note takes the grade, ECTS and note columns.
             tdDate.colSpan = 3;
             tdDate.style.setProperty('white-space', 'nowrap');
             gpaRow.appendChild(tdDate);
         } else {
-            gpaRow.appendChild(tdGrade);
-            gpaRow.appendChild(tdECTS);
+            gpaRow.appendChild(cells.grade);
+            gpaRow.appendChild(cells.ects);
             gpaRow.appendChild(tdDate);
         }
 
@@ -539,17 +687,11 @@
             return;
         }
         if (!disclaimerRow) {
-            disclaimerRow = document.createElement('tr');
-            disclaimerRow.className = 'gpa-sim-disclaimer-row';
-            disclaimerRow.setAttribute('data-dtu-ext', '1');
-
-            var td = document.createElement('td');
-            td.colSpan = 5;
-            td.setAttribute('data-dtu-ext', '1');
-            td.style.cssText = 'text-align:right;padding:4px 6px 2px;font-size:10px;';
-            td.style.setProperty('color', isDarkMode() ? '#9aa1aa' : '#6b7280', 'important');
-            td.textContent = 'Projected GPA is an estimate. Always verify official grades/GPA in DTU systems.';
-            disclaimerRow.appendChild(td);
+            disclaimerRow = createCampusnetGpaMessageRow(
+                'gpa-sim-disclaimer-row',
+                'Projected GPA is an estimate. Always verify official grades/GPA in DTU systems.',
+                'text-align:right;padding:4px 6px 2px;font-size:10px;',
+                isDarkMode() ? '#9aa1aa' : '#6b7280');
         }
 
         var anchor = table.querySelector('.gpa-projected-row') || table.querySelector('.gpa-row') || simRows[simRows.length - 1];
@@ -580,18 +722,9 @@
         localStorage.setItem(GPA_SIM_STORAGE_KEY, JSON.stringify(entries));
     }
 
-    function updateProjectedGPA() {
-        var table = getCampusnetGradesTable();
-        if (!table) return;
-
-        var actualSummary = getCampusnetActualGradeSummary(table);
-        var actualWeighted = actualSummary.totalWeighted;
-        var actualECTS = actualSummary.totalECTS;
-
-        var simWeighted = 0;
-        var simECTS = 0;
-        var simRows = table.querySelectorAll('.gpa-sim-row');
-        simRows.forEach(function (row) {
+    function getCampusnetSimGradeEntries(table) {
+        var entries = [];
+        table.querySelectorAll('.gpa-sim-row').forEach(function (row) {
             var cells = row.querySelectorAll('td');
             if (cells.length < 4) return;
             var gradeSelect = cells[2].querySelector('select');
@@ -600,9 +733,41 @@
             var grade = parseInt(gradeSelect.value, 10);
             var ects = parseFloat(ectsInput.value);
             if (isNaN(ects) || ects <= 0) return;
-            simWeighted += grade * ects;
-            simECTS += ects;
+            entries.push({ numericGrade: grade, ects: ects, countsForGpa: true });
         });
+        return entries;
+    }
+
+    // A saved plan that cannot be read is reported, not quietly dropped: the next
+    // save overwrites it, so the student should know it was there.
+    function readCampusnetSimEntries() {
+        var saved = [];
+        var unreadable = false;
+        try {
+            var stored = localStorage.getItem(GPA_SIM_STORAGE_KEY);
+            if (stored) saved = JSON.parse(stored);
+        } catch (e) {
+            unreadable = true;
+        }
+        if (!Array.isArray(saved)) {
+            saved = [];
+            unreadable = true;
+        }
+        var entries = saved.filter(function (entry) {
+            return entry && typeof entry === 'object' && !Array.isArray(entry)
+                && DANISH_GRADES.indexOf(entry.grade) >= 0
+                && (entry.ects === null || (Number.isFinite(entry.ects) && entry.ects > 0));
+        });
+        return { entries: entries, unreadable: unreadable, lostCount: saved.length - entries.length };
+    }
+
+    function updateProjectedGPA() {
+        var table = getCampusnetGradesTable();
+        if (!table) return;
+
+        var actualSummary = getCampusnetActualGradeSummary(table);
+        var simEntries = getCampusnetSimGradeEntries(table);
+        var simECTS = calculateCampusnetWeightedGpa(simEntries).totalECTS;
 
         var existingProjected = table.querySelector('.gpa-projected-row');
         if (existingProjected) existingProjected.remove();
@@ -612,9 +777,10 @@
         // Same totals as the GPA row: without a readable ignore list there is no honest projection.
         if (actualSummary.exclusionsUnreadable) return;
 
-        var currentGPA = actualECTS > 0 ? actualWeighted / actualECTS : 0;
-        var projectedGPA = (actualECTS + simECTS) > 0
-            ? (actualWeighted + simWeighted) / (actualECTS + simECTS) : 0;
+        var projectedGpa = calculateCampusnetWeightedGpa(
+            actualSummary.entries.filter(function (entry) { return !entry.excluded; }).concat(simEntries));
+        var currentGPA = actualSummary.averageGpa || 0;
+        var projectedGPA = projectedGpa.average || 0;
         var delta = projectedGPA - currentGPA;
         var projectedNeutralTextColor = isDarkMode() ? '#e0e0e0' : '#1f2937';
         var projectedRowBg = isDarkMode() ? 'rgba(var(--dtu-ad-accent-rgb), 0.12)' : 'rgba(var(--dtu-ad-accent-rgb), 0.08)';
@@ -624,59 +790,46 @@
         var projRow = document.createElement('tr');
         projRow.className = 'gpa-projected-row';
         projRow.setAttribute('data-dtu-ext', '1');
-        projRow.style.setProperty('background', projectedRowBg, 'important');
-        projRow.style.setProperty('background-color', projectedRowBg, 'important');
-        projRow.style.setProperty('border-top', '1px dashed rgba(var(--dtu-ad-accent-rgb), 0.7)', 'important');
+        setCampusnetGpaStyles(projRow, [
+            ['background', projectedRowBg], ['background-color', projectedRowBg],
+            ['border-top', '1px dashed rgba(var(--dtu-ad-accent-rgb), 0.7)']
+        ], 'important');
+        var projectedCellStyles = [
+            ['background', projectedRowBg], ['background-color', projectedRowBg],
+            ['color', projectedNeutralTextColor]
+        ];
 
-        var tdLabel = document.createElement('td');
-        tdLabel.setAttribute('data-dtu-ext', '1');
-        tdLabel.colSpan = 2;
-        tdLabel.style.cssText = 'text-align: left; font-weight: bold; padding: 8px 0;';
-        tdLabel.style.setProperty('padding-left', '5px', 'important');
-        tdLabel.style.setProperty('padding-right', '0', 'important');
-        tdLabel.style.setProperty('background', projectedRowBg, 'important');
-        tdLabel.style.setProperty('background-color', projectedRowBg, 'important');
-        tdLabel.style.setProperty('color', projectedNeutralTextColor, 'important');
-        tdLabel.textContent = 'Projected GPA';
-
-        var tdGrade = document.createElement('td');
-        tdGrade.setAttribute('data-dtu-ext', '1');
-        tdGrade.style.cssText = 'text-align: right; padding-right: 5px; font-weight: bold; white-space: nowrap;';
-        tdGrade.style.setProperty('background', projectedRowBg, 'important');
-        tdGrade.style.setProperty('background-color', projectedRowBg, 'important');
-        tdGrade.style.setProperty('color', projectedNeutralTextColor, 'important');
-        tdGrade.textContent = projectedGPA.toFixed(2);
-
-        var tdECTS = document.createElement('td');
-        tdECTS.setAttribute('data-dtu-ext', '1');
-        tdECTS.style.cssText = 'text-align: right; padding-right: 5px; font-weight: bold;';
-        tdECTS.style.setProperty('background', projectedRowBg, 'important');
-        tdECTS.style.setProperty('background-color', projectedRowBg, 'important');
-        tdECTS.style.setProperty('color', projectedNeutralTextColor, 'important');
-        tdECTS.textContent = actualECTS + simECTS;
-
-        var tdDelta = document.createElement('td');
-        tdDelta.setAttribute('data-dtu-ext', '1');
-        tdDelta.style.cssText = 'text-align: right; padding-right: 5px; font-weight: bold; font-size: 12px;';
-        tdDelta.style.setProperty('background', projectedRowBg, 'important');
-        tdDelta.style.setProperty('background-color', projectedRowBg, 'important');
+        var deltaText;
+        var deltaColor;
         if (delta > 0) {
-            tdDelta.style.setProperty('color', positiveDeltaColor, 'important');
-            tdDelta.textContent = '+' + delta.toFixed(2);
+            deltaColor = positiveDeltaColor;
+            deltaText = '+' + delta.toFixed(2);
         } else if (delta < 0) {
-            tdDelta.style.setProperty('color', negativeDeltaColor, 'important');
-            tdDelta.textContent = delta.toFixed(2);
+            deltaColor = negativeDeltaColor;
+            deltaText = delta.toFixed(2);
         } else {
-            tdDelta.style.setProperty('color', projectedNeutralTextColor, 'important');
-            tdDelta.textContent = actualSummary.excludedCount > 0
+            deltaColor = projectedNeutralTextColor;
+            deltaText = actualSummary.excludedCount > 0
                 ? (actualSummary.excludedCount + ' ignored')
                 : '0.00';
         }
 
-        projRow.appendChild(tdLabel);
-        projRow.appendChild(tdGrade);
-        projRow.appendChild(tdECTS);
-        projRow.appendChild(tdDelta);
+        var cells = createCampusnetGpaCells(
+            'Projected GPA',
+            projectedGPA.toFixed(2),
+            projectedGpa.totalECTS,
+            deltaText,
+            'text-align: right; padding-right: 5px; font-weight: bold; font-size: 12px;');
+        [cells.label, cells.grade, cells.ects].forEach(function (cell) {
+            setCampusnetGpaStyles(cell, projectedCellStyles, 'important');
+        });
+        setCampusnetGpaStyles(cells.note, projectedCellStyles.slice(0, 2), 'important');
+        cells.note.style.setProperty('color', deltaColor, 'important');
+
+        projRow.appendChild(cells.label);
+        projRow.appendChild(cells.grade);
+        projRow.appendChild(cells.ects);
+        projRow.appendChild(cells.note);
 
         var gpaRow = table.querySelector('.gpa-row');
         if (gpaRow) gpaRow.after(projRow);
@@ -692,8 +845,7 @@
         tr.className = 'gpa-sim-row';
         tr.setAttribute('data-dtu-ext', '1');
 
-        var tdCode = document.createElement('td');
-        tdCode.setAttribute('data-dtu-ext', '1');
+        var tdCode = createCampusnetGpaCell('', '');
         var codeInput = document.createElement('input');
         codeInput.type = 'text';
         codeInput.className = 'gpa-sim-input';
@@ -704,8 +856,7 @@
         codeInput.addEventListener('input', function () { saveSimEntries(); });
         tdCode.appendChild(codeInput);
 
-        var tdName = document.createElement('td');
-        tdName.setAttribute('data-dtu-ext', '1');
+        var tdName = createCampusnetGpaCell('', '');
         var nameInput = document.createElement('input');
         nameInput.type = 'text';
         nameInput.className = 'gpa-sim-input';
@@ -716,9 +867,7 @@
         nameInput.addEventListener('input', function () { saveSimEntries(); });
         tdName.appendChild(nameInput);
 
-        var tdGrade = document.createElement('td');
-        tdGrade.setAttribute('data-dtu-ext', '1');
-        tdGrade.style.cssText = 'text-align: right; padding-right: 5px;';
+        var tdGrade = createCampusnetGpaCell('text-align: right; padding-right: 5px;', '');
         var gradeSelect = document.createElement('select');
         gradeSelect.className = 'gpa-sim-select';
         gradeSelect.setAttribute('data-dtu-ext', '1');
@@ -734,9 +883,7 @@
         gradeSelect.addEventListener('change', function () { saveSimEntries(); updateProjectedGPA(); });
         tdGrade.appendChild(gradeSelect);
 
-        var tdECTS = document.createElement('td');
-        tdECTS.setAttribute('data-dtu-ext', '1');
-        tdECTS.style.cssText = 'text-align: right; padding-right: 8px;';
+        var tdECTS = createCampusnetGpaCell('text-align: right; padding-right: 8px;', '');
         var ectsInput = document.createElement('input');
         ectsInput.type = 'number';
         ectsInput.className = 'gpa-sim-input';
@@ -748,9 +895,7 @@
         ectsInput.addEventListener('input', function () { saveSimEntries(); updateProjectedGPA(); });
         tdECTS.appendChild(ectsInput);
 
-        var tdAction = document.createElement('td');
-        tdAction.setAttribute('data-dtu-ext', '1');
-        tdAction.style.cssText = 'text-align: right; width: 56px;';
+        var tdAction = createCampusnetGpaCell('text-align: right; width: 56px;', '');
         tdAction.style.setProperty('padding-left', '8px', 'important');
         tdAction.style.setProperty('padding-right', '14px', 'important');
         var delBtn = document.createElement('button');
@@ -797,27 +942,10 @@
         var headerRow = table.querySelector('tr.gradesListHeader');
         if (!headerRow) return;
 
-        // A saved plan that cannot be read is reported, not quietly dropped: the next
-        // save overwrites it, so the student should know it was there.
-        var savedEntries = [];
-        var savedUnreadable = false;
-        try {
-            var stored = localStorage.getItem(GPA_SIM_STORAGE_KEY);
-            if (stored) savedEntries = JSON.parse(stored);
-        } catch (e) {
-            savedUnreadable = true;
-        }
-        if (!Array.isArray(savedEntries)) {
-            savedEntries = [];
-            savedUnreadable = true;
-        }
-        var savedCount = savedEntries.length;
-        savedEntries = savedEntries.filter(function (entry) {
-            return entry && typeof entry === 'object' && !Array.isArray(entry)
-                && DANISH_GRADES.indexOf(entry.grade) >= 0
-                && (entry.ects === null || (Number.isFinite(entry.ects) && entry.ects > 0));
-        });
-        var lostCount = savedCount - savedEntries.length;
+        var saved = readCampusnetSimEntries();
+        var savedEntries = saved.entries;
+        var savedUnreadable = saved.unreadable;
+        var lostCount = saved.lostCount;
 
         // The row stays as the anchor planned rows are inserted after (right under the
         // header). The button itself sits with the page's own controls, next to "Only
@@ -842,17 +970,19 @@
         var dark = isDarkMode();
         var restingBorder = dark ? '#505050' : '#b8b8b8';
         var accentMark = dark ? 'var(--dtu-ad-accent-mark-dark, #ff6b6b)' : 'var(--dtu-ad-accent-mark-light, #990000)';
-        [
+        setCampusnetGpaStyles(addBtn, [
             ['display', 'inline-flex'], ['align-items', 'center'], ['gap', '6px'],
             ['height', '30px'], ['margin', '0 0 0 16px'], ['padding', '0 12px'],
             ['border', '1px solid ' + restingBorder], ['border-radius', '4px'],
             ['background', 'transparent'], ['background-color', 'transparent'],
             ['color', dark ? '#e0e0e0' : '#1a1a1a'], ['font-size', '13px'], ['font-weight', '400'],
             ['line-height', '1'], ['vertical-align', 'middle'], ['cursor', 'pointer'], ['box-shadow', 'none']
-        ].forEach(function (pair) { addBtn.style.setProperty(pair[0], pair[1], 'important'); });
-        plus.style.setProperty('font-size', '16px', 'important');
-        plus.style.setProperty('line-height', '1', 'important');
-        plus.style.setProperty('color', accentMark, 'important');
+        ], 'important');
+        setCampusnetGpaStyles(plus, [
+            ['font-size', '16px'],
+            ['line-height', '1'],
+            ['color', accentMark]
+        ], 'important');
         ['mouseenter', 'focus'].forEach(function (type) {
             addBtn.addEventListener(type, function () { addBtn.style.setProperty('border-color', accentMark, 'important'); });
         });
@@ -861,17 +991,25 @@
         });
         addBtn.addEventListener('click', function (e) {
             e.preventDefault();
+            // Always switched back on: left off, the page observer ignores every later change
+            // and new CampusNet content stays light until reload.
             setSuppressHeavyWork(true);
-            var unreadRow = table.querySelector('.gpa-sim-unread-row');
-            if (unreadRow) unreadRow.remove();
-            var newEntry = { code: '', name: '', grade: 7, ects: 5 };
-            var newRow = createSimRow(newEntry);
-            var lastSimRow = table.querySelector('.gpa-sim-row:last-of-type');
-            if (lastSimRow) lastSimRow.after(newRow);
-            else addRow.after(newRow);
-            saveSimEntries();
-            updateProjectedGPA();
-            setSuppressHeavyWork(false);
+            var newRow;
+            try {
+                var unreadRow = table.querySelector('.gpa-sim-unread-row');
+                if (unreadRow) unreadRow.remove();
+                var newEntry = { code: '', name: '', grade: 7, ects: 5 };
+                newRow = createSimRow(newEntry);
+                // :last-of-type matches by tag, not class, so take the last row of the list.
+                var simRows = table.querySelectorAll('.gpa-sim-row');
+                var lastSimRow = simRows.length ? simRows[simRows.length - 1] : null;
+                if (lastSimRow) lastSimRow.after(newRow);
+                else addRow.after(newRow);
+                saveSimEntries();
+                updateProjectedGPA();
+            } finally {
+                setSuppressHeavyWork(false);
+            }
             var firstInput = newRow.querySelector('input');
             if (firstInput && firstInput.focus) firstInput.focus();
         });
@@ -888,10 +1026,8 @@
             controlsHost.appendChild(addBtn);
         } else {
             // CampusNet changed its controls: keep the button in its own row instead.
-            var addTd = document.createElement('td');
-            addTd.setAttribute('data-dtu-ext', '1');
+            var addTd = createCampusnetGpaCell('text-align: left; padding: 6px 0;', '');
             addTd.colSpan = 5;
-            addTd.style.cssText = 'text-align: left; padding: 6px 0;';
             addBtn.style.setProperty('margin', '0', 'important');
             addTd.appendChild(addBtn);
             addRow.appendChild(addTd);
@@ -901,18 +1037,13 @@
 
         var insertAfter = addRow;
         if (savedUnreadable || lostCount > 0) {
-            var unreadRow = document.createElement('tr');
-            unreadRow.className = 'gpa-sim-unread-row';
-            unreadRow.setAttribute('data-dtu-ext', '1');
-            var unreadTd = document.createElement('td');
-            unreadTd.colSpan = 5;
-            unreadTd.setAttribute('data-dtu-ext', '1');
-            unreadTd.style.cssText = 'text-align:left;padding:4px 6px;font-size:12px;';
-            unreadTd.style.setProperty('color', isDarkMode() ? '#e0e0e0' : '#1f2937', 'important');
-            unreadTd.textContent = savedUnreadable
-                ? 'Saved planned grades could not be read.'
-                : lostCount + ' saved planned grade' + (lostCount === 1 ? '' : 's') + ' could not be read.';
-            unreadRow.appendChild(unreadTd);
+            var unreadRow = createCampusnetGpaMessageRow(
+                'gpa-sim-unread-row',
+                savedUnreadable
+                    ? 'Saved planned grades could not be read.'
+                    : lostCount + ' saved planned grade' + (lostCount === 1 ? '' : 's') + ' could not be read.',
+                'text-align:left;padding:4px 6px;font-size:12px;',
+                isDarkMode() ? '#e0e0e0' : '#1f2937');
             insertAfter.after(unreadRow);
             insertAfter = unreadRow;
         }
@@ -937,6 +1068,8 @@
     } catch (eExpose) { }
 
     function startCampusnetGradesPage() {
+        // darkmode.js stops before it sets the deps on a paused URL: the extension is off there by choice.
+        if (!globalThis.DTUAfterDarkCampusnetGpaDeps) return;
         insertGPARow();
         insertGPASimulator();
         syncCampusnetActualGradeExclusionControls();

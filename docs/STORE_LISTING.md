@@ -10,23 +10,24 @@ DTU After Dark
 
 Dark mode and practical student tools for DTU Learn, CampusNet, Study Planner, and related DTU services.
 
+## Summary (Firefox Add-ons, 250 characters at most)
+
+Dark mode and student tools for DTU Learn, CampusNet, Study Planner and kurser.dtu.dk: deadlines, bus times, library occupancy, exam schedule, grade statistics, course evaluations, a course map and GPA tools.
+
 ## Full description
 
-DTU After Dark is an unofficial browser extension that gives DTU's student-facing services a consistent two-tone dark theme and adds optional workflow tools.
+DTU After Dark is an unofficial browser extension that gives DTU's student sites one consistent dark theme and adds tools students use every week.
 
-Highlights:
+What it adds:
 
-- Customizable dark mode with DTU-inspired accent presets and custom colors.
-- DTU Learn dashboard tools for deadlines, live bus departures, Library occupancy/events/news, course search, and course Content shortcuts.
-- Course-content download tools for supported DTU Learn Lessons pages.
-- CampusNet GPA tools with weighted GPA, projected-grade simulation, and grade-row controls.
-- CampusNet Participant Intelligence: course composition, Retention (enrolment changes between visits), and optional shared course history.
-- Study Planner exam schedule: your exams per exam period from DTU's exam table, with workload ratings and calendar export.
-- Course Catalog insights for grade statistics, course evaluations, exam dates, a prerequisite course map, and textbook links.
-- Smart Room Links that turn room mentions already shown on supported DTU pages into MazeMap links.
-- Per-feature settings and paused-URL controls.
-
-Supported services include DTU Learn, CampusNet, Study Planner, kurser.dtu.dk, grades, course evaluations, and selected related DTU pages.
+- Dark mode on DTU Learn, CampusNet, Study Planner, kurser.dtu.dk, grades and course evaluations. Choose Light, Dark or Auto (follows your device), with DTU colour accents or your own colour.
+- DTU Learn homepage: a deadlines timeline for course and exam registration and withdrawal (add them to your calendar), live bus and Letbane departures from Rejseplanen, and a Library panel with live occupancy, today's visitors against a usual day, events and news.
+- Study Planner: an exam schedule for each exam period from DTU's exam table, with the student workload rating of each course and "Add to calendar".
+- kurser.dtu.dk course pages: grade statistics for the last four exams, the latest course evaluation, the exam date, a map of the courses before and after a course, and textbook links to DTU FindIt.
+- CampusNet: weighted GPA with planned grades, and course composition and Retention on participant lists.
+- DTU Learn Lessons: download a course as a ZIP: its content and videos, and if you choose, announcements, assignments with feedback, quizzes and discussions.
+- Room links: room names on DTU pages open the room in MazeMap.
+- Every feature can be switched off in Settings, and any page can be paused.
 
 Privacy:
 
@@ -35,7 +36,34 @@ Privacy:
 - DTU After Dark does not include advertising, analytics, heartbeat telemetry, or remote code.
 - Live features contact the DTU and third-party services documented in the public privacy policy.
 
+Write to daniel-yttesen@hotmail.com with bugs, ideas or questions.
+
 DTU After Dark is unofficial and is not affiliated with or endorsed by DTU or any service provider. Information shown by the extension may be delayed, incomplete, or inaccurate; always verify critical information through official DTU channels.
+
+## Screenshots
+
+1280x800, dark mode, taken with `.dtu-dev/shot-store.mjs` (local-only; it hides the signed-in name). Chrome takes the first five.
+
+1. Deadlines timeline and live bus departures on the DTU Learn homepage.
+2. Exam schedule in the Study Planner, with workload ratings from course evaluations.
+3. Grade statistics and the latest course evaluation on a kurser.dtu.dk course page.
+4. Course map: the courses that lead to a course and the courses it leads to.
+5. Library panel: live occupancy, today against a usual day, and events.
+6. Settings: Light, Dark or Auto, accent colours, and one switch per feature.
+
+## Version 9.2.0 release notes
+
+- Download course: the Lessons download now saves a whole course. Under the content sections, "Also save" adds Announcements (with attachments), Assignments (your submissions and the teacher's feedback, including pen marks written into your PDFs and the rubric), finished Quizzes, Discussions (with attached files) and Grades, each as a page that opens without DTU Learn; an "i" next to each says what it saves. Each section shows its videos and their size, and videos are saved as separate downloads.
+- Deadlines: "Add to calendar" downloads the next 12 months of course and exam deadlines as calendar events. An optional Exchange Deadline row (Settings, off by default) shows the exchange application deadline from DTU Beyond Borders, and once it has passed, says when the next one is or that none is listed yet. When a DTU page fails, the widget keeps the last good copy and says how old it is.
+- CampusNet Grades: "Grade not on this page yet" lists each planned exam whose grading deadline has passed with no grade showing, and a new grade is marked "New".
+- kurser.dtu.dk: the Exam date row shows the date and period, with the exam table slot and DTU's grading deadline behind a small info button. Courses agreed with the teacher say so. The Grades widget now says how many registered students sat the exam, and the book bar uses a shipped list of each course's books for cleaner titles and authors.
+- Study Planner: the exam schedule gives each exam DTU's grading deadline. The Register/Withdraw dialog no longer covers the page in grey, and DTU's loading spinner is visible in dark mode.
+- Slow widgets show grey placeholder bars shaped like their content while they load.
+- Paused pages: a pause rule saved on one DTU site now works on every DTU site.
+- Dark mode reaches DTU Learn components as soon as they appear, without retries, and the older DTU Learn tools (Announcements, Classlist, Assignments) get dark dropdowns and tooltips.
+- Dates follow Danish time on every widget, so a computer set to another time zone no longer sees deadlines a day off around midnight.
+- A DTU server that does not answer now ends in an error message after 20 seconds (60 for library news and events) instead of loading forever.
+- Fixes: the Library panel is fully opaque in Firefox, DTU's evaluation reminder is no longer drawn under the deadlines timeline, course codes with letters count on CampusNet, old cached pages are cleared so storage cannot fill up, a red DTU header can no longer freeze the tab, and clicking a study line in Course composition shows every student in it.
 
 ## Version 9.1.0 release notes
 

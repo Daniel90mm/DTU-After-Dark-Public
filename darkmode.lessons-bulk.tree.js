@@ -4,12 +4,12 @@
     var _lessonsBulkCore = globalThis.DTUAfterDarkLessonsBulkCore;
     var normalizeWhitespace = _lessonsBulkCore.normalizeWhitespace;
     var deepQueryAll = _lessonsBulkCore.deepQueryAll;
+    var getDocHref = _lessonsBulkCore.getDocHref;
     var markExt = _lessonsBulkCore.markExt;
     var logLessonsBulkDebug = _lessonsBulkCore.logLessonsBulkDebug;
     var _lessonsBulkState = globalThis.DTUAfterDarkLessonsBulkState;
     var _lessonsBulkUiState = _lessonsBulkState.uiState;
     var _lessonsLegacyApiSectionsCache = _lessonsBulkState.legacyApiSectionsCache;
-    var _lessonsLegacyBackgroundResolveState = _lessonsBulkState.legacyBackgroundResolveState;
 
     // Glue for fetch, core and control functions that live in other files.
     function getLessonsBulkTreeDeps() {
@@ -96,7 +96,7 @@
         try { if (doc.querySelector('.navigation-tree .navigation-item[data-objectid]')) score += 110; } catch (e3) { }
         try { if (doc.querySelector('.navigation-menu')) score += 25; } catch (e4) { }
         try {
-            var href = String(doc.location && doc.location.href ? doc.location.href : '');
+            var href = getDocHref(doc);
             if (/\/d2l\/ui\/apps\/smart-curriculum\//i.test(href)) score += 40;
             if (/\/d2l\/le\/(?:lessons|content)\//i.test(href)) score += 25;
         } catch (e5) { }
@@ -153,12 +153,14 @@
     function getCurrentLessonsOrgUnitId(scopeDoc) {
         var doc = scopeDoc || getLessonsRuntimeDocument(document);
         var hrefs = [];
-        try { if (doc && doc.location && doc.location.href) hrefs.push(String(doc.location.href)); } catch (e0) { }
-        try { if (window && window.location && window.location.href) hrefs.push(String(window.location.href)); } catch (e1) { }
+        var docHref = getDocHref(doc);
+        if (docHref) hrefs.push(docHref);
+        var windowHref = getDocHref(window);
+        if (windowHref) hrefs.push(windowHref);
         for (var i = 0; i < hrefs.length; i++) {
             try {
                 var u = new URL(hrefs[i], window.location.href);
-                var m = (u.pathname || '').match(/\/d2l\/le\/lessons\/(\d+)\//i);
+                var m = (u.pathname || '').match(/\/d2l\/le\/lessons\/(\d+)(?:\/|$)/i);
                 if (m && m[1]) return m[1];
                 var c = (u.pathname || '').match(/\/d2l\/le\/content\/(\d+)(?:\/|$)/i);
                 if (c && c[1]) return c[1];
@@ -249,9 +251,7 @@
             var objectId = '';
             try { objectId = String(itemEl.getAttribute('data-objectid') || '').trim(); } catch (e3) { objectId = ''; }
             if (!objectId || !/^\d+$/.test(objectId)) return;
-            var isUnit = false;
-            try { isUnit = !!itemEl.querySelector('.unit-box[aria-expanded], .lesson-box[aria-expanded], [role="treeitem"][aria-expanded]'); } catch (e4) { isUnit = false; }
-            if (!isUnit) return;
+            if (!isLegacyUnitItem(itemEl)) return;
             seeds.push({
                 id: objectId,
                 label: getLegacyLessonsTreeLabel(itemEl),
@@ -285,12 +285,7 @@
     }
 
     function isLegacyUnitItem(itemEl) {
-        if (!itemEl || !itemEl.querySelector) return false;
-        try {
-            return !!itemEl.querySelector('.unit-box[aria-expanded], .lesson-box[aria-expanded], [role="treeitem"][aria-expanded]');
-        } catch (e0) {
-            return false;
-        }
+        return !!getLegacyItemTreeBox(itemEl);
     }
 
     function getLegacyItemTreeBox(itemEl) {
@@ -358,7 +353,7 @@
             logLessonsBulkDebug('legacy_dom_expand_root_missing', {
                 sectionKey: section && section.key ? section.key : '',
                 sectionObjectId: sectionObjectId,
-                docUrl: (function () { try { return String(doc.location && doc.location.href ? doc.location.href : ''); } catch (eMiss1) { return ''; } })(),
+                docUrl: getDocHref(doc),
                 sampleObjectIds: sampleIds
             });
             return [];
@@ -635,7 +630,7 @@
             var urls = await resolveLegacySectionUnitUrlsViaDomExpansion(section, treeDoc);
             logLessonsBulkDebug('legacy_hidden_tree_doc', {
                 sectionKey: sectionKey,
-                treeDocUrl: (function () { try { return String(treeDoc.location && treeDoc.location.href ? treeDoc.location.href : ''); } catch (eTD0) { return ''; } })(),
+                treeDocUrl: getDocHref(treeDoc),
                 scannerUrl: scannerUrl,
                 sectionObjectId: sectionObjectId
             });
@@ -876,8 +871,7 @@
         var orgUnitId = getCurrentLessonsOrgUnitId(hostDoc);
         if (!orgUnitId) return [];
 
-        var hostHref = '';
-        try { hostHref = String(hostDoc.location && hostDoc.location.href ? hostDoc.location.href : ''); } catch (eH0) { hostHref = ''; }
+        var hostHref = getDocHref(hostDoc);
         var scannerUrls = [];
         if (hostHref && /\/d2l\/ui\/apps\/smart-curriculum\//i.test(hostHref)) scannerUrls.push(hostHref);
         var lessonsRootUrl = toAbsoluteSamePageUrl('/d2l/le/lessons/' + orgUnitId + '/', window.location.origin);
@@ -914,10 +908,6 @@
             _lessonsLegacyApiSectionsCache.ts = 0;
             _lessonsLegacyApiSectionsCache.lastAttemptTs = 0;
             _lessonsLegacyApiSectionsCache.source = '';
-            _lessonsLegacyBackgroundResolveState.orgUnitId = orgUnitId;
-            _lessonsLegacyBackgroundResolveState.running = false;
-            _lessonsLegacyBackgroundResolveState.token = 0;
-            _lessonsLegacyBackgroundResolveState.resolvedKeys = new Set();
         }
 
         var allowHiddenBuild = !!(rootEl && rootEl.classList && rootEl.classList.contains('dtu-open'));
@@ -935,6 +925,13 @@
 
         _lessonsLegacyApiSectionsCache.lastAttemptTs = now;
         _lessonsLegacyApiSectionsCache.loading = true;
+        // A course change or reset starts a new load; an older one still running must
+        // then neither write its course's sections nor end the new load's "loading".
+        var runId = (_lessonsLegacyApiSectionsCache.runId || 0) + 1;
+        _lessonsLegacyApiSectionsCache.runId = runId;
+        function isCurrentLoad() {
+            return _lessonsLegacyApiSectionsCache.runId === runId && _lessonsLegacyApiSectionsCache.orgUnitId === orgUnitId;
+        }
         _lessonsLegacyApiSectionsCache.promise = (async function () {
             try {
                 var sections = [];
@@ -955,7 +952,7 @@
                     }
                 }
                 sections = normalizeLessonsBulkSections(sections);
-                if (Array.isArray(sections) && sections.length) {
+                if (isCurrentLoad() && Array.isArray(sections) && sections.length) {
                     _lessonsLegacyApiSectionsCache.sections = sections;
                     _lessonsLegacyApiSectionsCache.ts = Date.now();
                     _lessonsLegacyApiSectionsCache.source = resolvedSource || _lessonsLegacyApiSectionsCache.source || 'api';
@@ -963,6 +960,7 @@
             } catch (e0) {
                 logLessonsBulkDebug('legacy_api_sections_error', { error: String(e0 && e0.message ? e0.message : e0) });
             } finally {
+                if (!isCurrentLoad()) return;
                 _lessonsLegacyApiSectionsCache.loading = false;
                 _lessonsLegacyApiSectionsCache.promise = null;
                 if (!_lessonsLegacyApiSectionsCache.ts) _lessonsLegacyApiSectionsCache.ts = Date.now();
@@ -991,8 +989,7 @@
             var objectId = '';
             try { objectId = String(itemEl.getAttribute('data-objectid') || '').trim(); } catch (e2) { objectId = ''; }
             var label = getLegacyLessonsTreeLabel(itemEl);
-            var isUnit = false;
-            try { isUnit = !!itemEl.querySelector('.unit-box[aria-expanded], .lesson-box[aria-expanded], [role="treeitem"][aria-expanded]'); } catch (e3) { isUnit = false; }
+            var isUnit = isLegacyUnitItem(itemEl);
             if (!isUnit) {
                 try { isUnit = !!itemEl.querySelector('.module-triangle'); } catch (e4) { isUnit = false; }
             }
@@ -1038,10 +1035,7 @@
         });
 
         function isLegacySectionNode(n) {
-            if (!n || !n.isUnit) return false;
-            if (/\/units\//i.test(String(n.href || ''))) return true;
-            // Fallback for cases where href is not populated yet.
-            return true;
+            return !!(n && n.isUnit);
         }
         var candidateSections = nodes.filter(isLegacySectionNode);
         if (!candidateSections.length) return [];

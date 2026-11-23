@@ -51,6 +51,7 @@ function makeSandbox(globals) {
         Map,
         Set,
         Promise,
+        AbortSignal,
         JSON,
         Math,
         Date,
@@ -59,6 +60,13 @@ function makeSandbox(globals) {
         clearTimeout: () => {},
         setInterval: () => 0,
         clearInterval: () => {},
+        // Placement watches are not driven unless a test supplies its own schedulers.
+        MutationObserver: class {
+            observe() {}
+            disconnect() {}
+        },
+        requestAnimationFrame: () => 0,
+        cancelAnimationFrame: () => {},
         ...globals
     };
     sandbox.globalThis = sandbox;
@@ -70,6 +78,7 @@ function makeSandbox(globals) {
 }
 
 const DOM_SOURCE = readSource('darkmode.dom.js');
+const SKELETON_SOURCE = readSource('darkmode.skeleton.js');
 
 // For tests that build their own sandbox object: load the shared DOM helpers into it first.
 export function loadDom(sandbox) {
@@ -78,6 +87,8 @@ export function loadDom(sandbox) {
     const win = sandbox.window || sandbox;
     if (win && typeof win === 'object' && !('top' in win)) win.top = win;
     vm.runInContext(DOM_SOURCE, sandbox, { filename: 'darkmode.dom.js' });
+    // Every host that draws widgets loads the shared loading placeholders first.
+    vm.runInContext(SKELETON_SOURCE, sandbox, { filename: 'darkmode.skeleton.js' });
     return sandbox;
 }
 

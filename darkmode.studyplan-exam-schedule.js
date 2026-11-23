@@ -8,14 +8,22 @@
 // darkmode.studyplan-exam-schedule-core.js.
 (function () {
     'use strict';
-    var markExt = globalThis.DTUAfterDarkDom.markExt;
+    var DOM = globalThis.DTUAfterDarkDom;
+    var markExt = DOM.markExt;
+    var el = DOM.el;
+    var ensureStyles = DOM.ensureStyles;
+    var makeButton = DOM.makeButton;
+    var formatReadDate = DOM.formatReadDate;
 
     var STORAGE_KEY = 'dtuAfterDarkExamScheduleV1';
+    // Read by CampusNet Grades (darkmode.campusnet-gpa.js) to name exams past DTU's grading deadline with no grade yet.
+    var GRADING_WATCH_KEY = 'dtuExamGradingWatchV1';
+    var _lastGradingWatch = null;
     var EXAM_TABLE_URL = 'https://student.dtu.dk/en/exam/exam-dates';
     var STYLE_ID = 'dtu-exam-schedule-style';
     var CODE_RE = /^[0-9]{2}[0-9A-Z]{3}$/;
     var CUSTOM_PREFIX = 'custom:';
-    var normalizeWhitespace = globalThis.DTUAfterDarkDom.normalizeWhitespace;
+    var normalizeWhitespace = DOM.normalizeWhitespace;
     var FORMAT_LABELS = { written: 'Written', oral: 'Oral', 'hand-in': 'Hand-in', none: 'No exam', unknown: 'Format not read' };
     var EDIT_FORMATS = ['written', 'oral', 'hand-in', 'none'];
 
@@ -24,8 +32,7 @@
     }
 
     function dep(name) {
-        var deps = getDeps();
-        return deps && typeof deps[name] === 'function' ? deps[name] : null;
+        return DOM.dep(getDeps(), name);
     }
 
     function skeleton() {
@@ -38,13 +45,25 @@
         try { return globalThis.DTUAfterDarkExamScheduleCore || null; } catch (e0) { return null; }
     }
 
-
-    function el(tag, className, text) {
-        var node = markExt(document.createElement(tag));
-        if (className) node.className = className;
-        if (text != null) node.textContent = text;
-        return node;
+    function getStyles() {
+        var styles = globalThis.DTUAfterDarkExamScheduleStyles;
+        if (!styles || typeof styles.applyTheme !== 'function' || typeof styles.CSS !== 'string') {
+            throw new Error('darkmode.studyplan-exam-schedule.js requires darkmode.studyplan-exam-schedule.styles.js loaded first');
+        }
+        return styles;
     }
+
+    function getEditor() {
+        var editor = globalThis.DTUAfterDarkExamScheduleEditor;
+        if (!editor || typeof editor.renderEditor !== 'function') {
+            throw new Error('darkmode.studyplan-exam-schedule.js requires darkmode.studyplan-exam-schedule.editor.js loaded first');
+        }
+        return editor;
+    }
+
+    var scheduleStyles = getStyles();
+    var scheduleEditor = getEditor();
+
 
     function sendMessage(msg) {
         return new Promise(function (resolve) {
@@ -102,9 +121,9 @@
         });
     }
 
+    // Today in Denmark: DTU's exam dates are Danish dates.
     function todayIso() {
-        var d = new Date();
-        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        return DOM.copenhagenDateIso();
     }
 
     // ===== Planner DOM =====
@@ -198,146 +217,6 @@
         return out;
     }
 
-    // ===== Styles and theme =====
-
-    // The dialog's own rules lead with div.dtu-es-pop[data-dtu-ext]: darkmode.css paints every
-    // "body > div:not(.typebox)" solid, and a plain class selector loses to it.
-    var POP = 'div.dtu-es-pop[data-dtu-ext]';
-    var CSS = [
-        // A filled accent button, so the one entry point to the panel is easy to spot.
-        '.dtu-es-btn{appearance:none;-webkit-appearance:none;display:inline-flex;align-items:center;gap:5px;margin:0 0 0 8px;padding:5px 11px 5px 9px;border:0!important;border-radius:999px;background:var(--dtu-es-accent)!important;color:var(--dtu-es-on-accent)!important;font:inherit;font-size:13px;font-weight:600;line-height:18px!important;cursor:pointer;white-space:nowrap;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:filter .15s ease,transform .15s ease,box-shadow .15s ease}',
-        // The button overhangs its line by 3px above and below, so the name stays level with
-        // "120 ECTS planned" in the next column; 8px under the row keeps it off the plan box.
-        // In the planner's tab row, left of "Course search": the same shape, size and font
-        // as the two native tabs, told apart by the icon, bold text, the brighter accent and a gap.
-        '.mofoclass ul.nav-tabs > li.dtu-es-tab{float:left;margin:0 8px 0 0!important;padding:0!important;border:0!important;background:transparent!important;box-shadow:none!important;list-style:none}',
-        '.dtu-es-btn.dtu-es-btn-tab{gap:7px;margin:0;padding:10px 15px;border-radius:4px 4px 0 0;font:inherit;font-weight:700;line-height:16px!important;background:var(--dtu-ad-accent-hover,#b30000)!important;color:var(--dtu-ad-accent-on,#ffffff)!important;box-shadow:none}',
-        '.dtu-es-btn.dtu-es-btn-tab:hover,.dtu-es-btn.dtu-es-btn-tab[aria-expanded="true"]{transform:none;box-shadow:none;filter:brightness(1.12)}',
-        '.dtu-es-btn svg{width:14px;height:14px;flex:none;fill:none!important;stroke:currentColor!important}',
-        '.dtu-es-btn:hover,.dtu-es-btn[aria-expanded="true"]{filter:brightness(1.08);transform:translateY(-1px);box-shadow:0 3px 8px rgba(0,0,0,.3)}',
-        '.dtu-es-btn:active{transform:none;box-shadow:0 1px 2px rgba(0,0,0,.25)}',
-        '@media (prefers-reduced-motion:reduce){.dtu-es-btn{transition:none}.dtu-es-btn:hover,.dtu-es-btn[aria-expanded="true"]{transform:none}}',
-        '.dtu-es-btn:focus-visible,.dtu-es-pop :focus-visible{outline:2px solid var(--dtu-es-accent)!important;outline-offset:2px}',
-        // Same blurred, see-through backdrop as Settings, Library and the course map.
-        'div.dtu-es-backdrop[data-dtu-ext]{position:fixed;inset:0;z-index:2147482999;background:transparent!important;background-color:transparent!important;backdrop-filter:blur(4px)!important;-webkit-backdrop-filter:blur(4px)!important}',
-        POP + '{position:fixed;inset:0;margin:auto;z-index:2147483000;box-sizing:border-box;display:flex;flex-direction:column;width:min(760px,calc(100vw - 32px));height:min(660px,calc(100vh - 48px));padding:0;border:1px solid var(--dtu-es-faint)!important;border-radius:12px;background:var(--dtu-es-bg)!important;color:var(--dtu-es-ink)!important;font:13px/1.45 Arial,Helvetica,sans-serif;box-shadow:0 24px 64px rgba(0,0,0,.45);text-align:left;overflow:hidden}',
-        POP + ' *{box-sizing:border-box}',
-        POP + ' div{background:transparent!important;border-color:var(--dtu-es-line)!important}',
-        '.dtu-es-head{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 16px 0 24px}',
-        '.dtu-es-title{font-size:17px;font-weight:700;line-height:1.25;color:var(--dtu-es-ink)!important}',
-        POP + ' button{appearance:none;-webkit-appearance:none;margin:0;padding:3px 10px;border:1px solid var(--dtu-es-faint)!important;border-radius:6px;background:transparent!important;color:var(--dtu-es-ink)!important;font:inherit;font-size:12px;line-height:18px;cursor:pointer;white-space:nowrap}',
-        POP + ' button:hover{border-color:var(--dtu-es-accent)!important}',
-        POP + ' button.dtu-es-close{width:30px;height:30px;padding:0;border-color:transparent!important;border-radius:8px;font-size:20px;line-height:28px;color:var(--dtu-es-muted)!important}',
-        POP + ' button.dtu-es-close:hover{background:var(--dtu-es-tint)!important;color:var(--dtu-es-ink)!important}',
-        POP + ' a{color:var(--dtu-es-ink)!important;text-decoration:underline;text-underline-offset:2px}',
-        // One tab per exam period; the open one is a filled pill.
-        '.dtu-es-tabs{display:flex;flex-wrap:wrap;gap:4px;padding:12px 20px 0}',
-        POP + ' button.dtu-es-ptab{padding:6px 12px;border-color:transparent!important;border-radius:16px;font-size:13px;color:var(--dtu-es-muted)!important}',
-        POP + ' button.dtu-es-ptab:hover{color:var(--dtu-es-ink)!important}',
-        POP + ' button.dtu-es-ptab[aria-selected="true"]{background:var(--dtu-es-cell)!important;color:var(--dtu-es-ink)!important;font-weight:700}',
-        '.dtu-es-body{flex:1 1 auto;min-height:0;overflow:auto;padding:22px 24px 10px;scrollbar-width:thin}',
-        '.dtu-es-sum{font-size:20px;line-height:26px;font-weight:700;color:var(--dtu-es-ink)!important;overflow-wrap:anywhere}',
-        '.dtu-es-sumnote{margin-top:4px;font-size:13.5px;line-height:19px;color:var(--dtu-es-muted)!important}',
-        '.dtu-es-sumnote.near{color:var(--dtu-es-accent)!important}',
-        // One cell per day: filled for a planned exam, dashed for a basket course.
-        '.dtu-es-strip{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);gap:3px;margin:20px 0 4px}',
-        POP + ' div.dtu-es-sday{display:grid;justify-items:center;align-content:start;gap:5px;height:34px;min-width:0;font-size:10.5px;color:var(--dtu-es-muted)!important}',
-        '.dtu-es-sday i{display:block;width:100%;height:14px;border-radius:3px;background:var(--dtu-es-cell)!important}',
-        '.dtu-es-sday.plan i{background:var(--dtu-es-accent)!important;opacity:1}',
-        '.dtu-es-sday.bask i{background:transparent!important;border:1.5px dashed var(--dtu-es-accent)!important;opacity:1}',
-        '.dtu-es-sday.plan.bask i{background:var(--dtu-es-accent)!important;border:0!important;outline:1.5px dashed var(--dtu-es-accent);outline-offset:2px}',
-        POP + ' div.dtu-es-sday.plan,' + POP + ' div.dtu-es-sday.bask{color:var(--dtu-es-ink)!important;font-weight:700}',
-        '.dtu-es-cols{display:grid;grid-template-columns:104px minmax(0,1fr) 80px 150px;column-gap:16px;margin-top:14px;padding-bottom:6px;font-size:11px;color:var(--dtu-es-muted)!important}',
-        '.dtu-es-cols span{grid-column:3/-1;cursor:help}',
-        '.dtu-es-sec{margin:22px 0 8px;font-size:12px;font-weight:700;color:var(--dtu-es-muted)!important}',
-        // One line per exam, split by hairlines; a click opens where the date comes from and the editor.
-        POP + ' div.dtu-es-row{display:grid;grid-template-columns:104px minmax(0,1fr) 80px 150px;column-gap:16px;align-items:baseline;margin:0 -10px;padding:12px 10px;border-top:1px solid var(--dtu-es-line)!important;font-size:14px;line-height:19px;cursor:pointer}',
-        POP + ' div.dtu-es-row:not(.open):hover{background:var(--dtu-es-tint)!important}',
-        '.dtu-es-when{font-weight:700;white-space:nowrap;color:var(--dtu-es-ink)!important}',
-        '.dtu-es-course{min-width:0;overflow-wrap:anywhere;color:var(--dtu-es-ink)!important}',
-        '.dtu-es-code{margin-left:7px;font-size:12px;color:var(--dtu-es-muted)!important}',
-        '.dtu-es-row.quiet .dtu-es-when,.dtu-es-row.basket .dtu-es-when{font-weight:400;color:var(--dtu-es-muted)!important}',
-        '.dtu-es-row.basket .dtu-es-course{color:var(--dtu-es-muted)!important}',
-        '.dtu-es-load{display:flex;align-items:center;gap:7px;min-height:19px;font-size:12px;color:var(--dtu-es-muted)!important;white-space:nowrap}',
-        '.dtu-es-load[title]{cursor:help}',
-        '.dtu-es-load i{display:flex;gap:2px}',
-        '.dtu-es-load u{display:block;width:7px;height:9px;border-radius:1.5px;background:var(--dtu-es-cell)!important;text-decoration:none}',
-        '.dtu-es-load u.on{background:var(--dtu-es-muted)!important}',
-        '.dtu-es-kind{font-size:13px;text-align:right;color:var(--dtu-es-muted)!important}',
-        '.dtu-es-kind.near{font-weight:700;color:var(--dtu-es-accent)!important}',
-        POP + ' div.dtu-es-detail{grid-column:2/-1;margin-top:8px;padding:10px 12px;border-radius:8px;background:var(--dtu-es-tint)!important;font-size:12.5px;line-height:18px;color:var(--dtu-es-muted)!important;cursor:default}',
-        '.dtu-es-row.changed .dtu-es-detail{color:var(--dtu-es-ink)!important}',
-        '.dtu-es-detail-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-top:8px}',
-        POP + ' button.dtu-es-change{padding:4px 12px;border-color:var(--dtu-es-accent)!important;color:var(--dtu-es-accent)!important;font-weight:700}',
-        '.dtu-es-note{grid-column:2/-1;font-size:12px;color:var(--dtu-es-muted)!important}',
-        // The editor: a label column and a field column, so the last day's
-        // lists sit exactly under the first day's.
-        POP + ' div.dtu-es-edit{grid-column:2/-1;display:grid;grid-template-columns:max-content minmax(0,1fr);gap:10px 12px;align-items:center;margin-top:12px;padding-top:14px;border-top:1px solid var(--dtu-es-line)!important;cursor:default}',
-        '.dtu-es-flabel{grid-column:1;font-size:12px;color:var(--dtu-es-muted)!important}',
-        '.dtu-es-field{grid-column:2;justify-self:start}',
-        POP + ' select.dtu-es-format{width:278px}',
-        '.dtu-es-edit [hidden]{display:none!important}',
-        POP + ' .dtu-es-edit select{height:30px;padding:0 6px;border:1px solid var(--dtu-es-faint)!important;border-radius:7px;background:var(--dtu-es-bg)!important;color:var(--dtu-es-ink)!important;font:inherit;font-size:13px;color-scheme:var(--dtu-es-scheme);cursor:pointer}',
-        POP + ' .dtu-es-edit select:hover{border-color:var(--dtu-es-muted)!important}',
-        '.dtu-es-datefield{display:inline-flex;gap:6px}',
-        POP + ' .dtu-es-datefield select.dtu-es-d{width:64px}',
-        POP + ' .dtu-es-datefield select.dtu-es-m{width:124px}',
-        POP + ' .dtu-es-datefield select.dtu-es-y{width:78px}',
-        POP + ' label.dtu-es-several{grid-column:2;justify-self:start;display:inline-flex;align-items:center;gap:7px;margin:-2px 0 0;font-size:13px;font-weight:400!important;white-space:nowrap;color:var(--dtu-es-ink)!important;cursor:pointer;user-select:none}',
-        '.dtu-es-several input{width:15px;height:15px;margin:0;accent-color:var(--dtu-es-accent);cursor:pointer}',
-        '.dtu-es-edit-buttons{grid-column:2/-1;display:flex;align-items:center;gap:8px;margin-top:2px}',
-        POP + ' .dtu-es-edit-buttons button{height:30px;padding:0 14px;border-radius:7px;font-size:13px}',
-        POP + ' .dtu-es-edit-buttons button.dtu-es-save{border-color:var(--dtu-es-accent)!important;background:var(--dtu-es-accent)!important;color:var(--dtu-es-on-accent)!important;font-weight:700}',
-        POP + ' .dtu-es-edit-buttons button.dtu-es-save:hover{filter:brightness(1.08)}',
-        POP + ' .dtu-es-edit-buttons button.dtu-es-reset{margin-left:auto}',
-        '.dtu-es-err{grid-column:2/-1;font-size:12px;color:var(--dtu-es-accent)!important}',
-        '.dtu-es-empty{padding:12px 0;color:var(--dtu-es-muted)!important}',
-        // The notice stays in sight at the foot; "Why" opens its full wording above the line.
-        '.dtu-es-foot{padding:14px 24px 16px;border-top:1px solid var(--dtu-es-line)!important}',
-        '.dtu-es-notice-text{margin:0 0 12px;font-size:12px;line-height:1.5;color:var(--dtu-es-ink)!important;opacity:.86}',
-        '.dtu-es-notice-text[hidden]{display:none}',
-        '.dtu-es-export{margin:0 0 14px}',
-        '.dtu-es-export[hidden]{display:none}',
-        '.dtu-es-read{margin:0 0 6px;font-size:12px;color:var(--dtu-es-muted)!important}',
-        '.dtu-es-picks{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:2px 16px;margin-bottom:10px}',
-        POP + ' label.dtu-es-pick{display:flex;align-items:center;gap:8px;margin:0 -6px;padding:6px;border-radius:7px;font-size:13px;font-weight:400!important;color:var(--dtu-es-ink)!important;cursor:pointer;user-select:none}',
-        POP + ' label.dtu-es-pick:hover{background:var(--dtu-es-tint)!important}',
-        '.dtu-es-pick input{width:15px;height:15px;margin:0;flex:none;accent-color:var(--dtu-es-accent);cursor:pointer}',
-        '.dtu-es-pick span{flex:1 1 auto;min-width:0}',
-        '.dtu-es-pick i{font-style:normal;font-size:12px;color:var(--dtu-es-muted)!important;white-space:nowrap}',
-        '.dtu-es-footline{display:flex;justify-content:space-between;align-items:center;gap:12px 16px;flex-wrap:wrap;font-size:12px;color:var(--dtu-es-muted)!important}',
-        POP + ' button.dtu-es-why{padding:0;border:0!important;border-radius:2px;font-size:12px;text-decoration:underline;text-underline-offset:2px}',
-        POP + ' button.dtu-es-primary{padding:7px 14px;border-color:var(--dtu-es-accent)!important;border-radius:7px;background:var(--dtu-es-accent)!important;color:var(--dtu-es-on-accent)!important;font-size:13px;font-weight:700}',
-        POP + ' button.dtu-es-primary:hover{filter:brightness(1.08)}',
-        POP + ' button.dtu-es-primary:disabled{filter:none;cursor:default;border-color:var(--dtu-es-faint)!important;background:transparent!important;color:var(--dtu-es-muted)!important;font-weight:400}',
-        '@media (max-width:560px){.dtu-es-cols{display:none}'
-            + POP + ' div.dtu-es-row{grid-template-columns:minmax(0,1fr) auto;row-gap:2px}'
-            + '.dtu-es-when,.dtu-es-kind{grid-column:1/-1;text-align:left}'
-            + POP + ' div.dtu-es-detail,' + POP + ' div.dtu-es-edit{grid-column:1/-1}'
-            + '.dtu-es-body{padding:18px 16px 8px}.dtu-es-foot{padding:12px 16px 14px}.dtu-es-tabs{padding:12px 12px 0}.dtu-es-head{padding:14px 10px 0 16px}}'
-    ].join('\n');
-
-    function ensureStyles() {
-        if (document.getElementById(STYLE_ID)) return;
-        var style = markExt(document.createElement('style'));
-        style.id = STYLE_ID;
-        style.textContent = CSS;
-        (document.head || document.documentElement).appendChild(style);
-    }
-
-    function applyTheme(node) {
-        var isDark = dep('isDarkModeEnabled');
-        var dark = !isDark || isDark();
-        var tokens = dark ? {
-            ink: '#f0eee8', muted: 'rgba(240,238,232,.62)', faint: 'rgba(240,238,232,.22)', bg: '#202020', line: 'rgba(240,238,232,.12)', tint: 'rgba(240,238,232,.06)', tile: '#2a2a2a', cell: '#303030', 'skel': 'rgba(240,238,232,.16)', 'on-accent': '#1a1a1a', scheme: 'dark'
-        } : {
-            ink: '#1a1a1a', muted: 'rgba(26,26,26,.62)', faint: 'rgba(26,26,26,.20)', bg: '#ffffff', line: 'rgba(26,26,26,.10)', tint: 'rgba(26,26,26,.04)', tile: '#f7f7f5', cell: '#e8e8e4', 'skel': 'rgba(26,26,26,.12)', 'on-accent': '#ffffff', scheme: 'light'
-        };
-        Object.keys(tokens).forEach(function (k) { node.style.setProperty('--dtu-es-' + k, tokens[k]); });
-        node.style.setProperty('--dtu-skel-fill', tokens.skel);
-        node.style.setProperty('--dtu-es-accent', dark ? 'var(--dtu-ad-accent-soft, #ff6b6b)' : 'var(--dtu-ad-accent-deep, #990000)');
-    }
-
     // ===== Formatting =====
 
     function formatDay(iso) {
@@ -345,12 +224,6 @@
         var p = iso.split('-');
         var d = new Date(Date.UTC(+p[0], +p[1] - 1, +p[2]));
         try { return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }); } catch (e0) { return iso; }
-    }
-
-    function formatReadDate(ms) {
-        var d = new Date(ms);
-        if (isNaN(d.getTime())) return 'an unknown date';
-        try { return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e0) { return d.toISOString().slice(0, 10); }
     }
 
     var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -386,9 +259,16 @@
     }
 
     function detailText(row) {
+        var info = getCore().gradingForRow(row, _state && _state.sections);
+        var grading = info ? getCore().gradingText(info.grading, todayIso(), formatDay, info.day) + '.' : '';
+        if (info && row.status === 'suggested' && row.range) grading += ' A later exam day has a later deadline: set your day to see it.';
+        return mainDetailText(row) + (grading ? ' ' + grading : '');
+    }
+
+    function mainDetailText(row) {
         if (row.status === 'suggested') {
             if (row.format === 'hand-in') return 'Assessed on coursework (exercises, reports or a project), per the course page. The day is ' + getCore().evidenceText(row.evidence) + '.';
-            return sourceLine(row).replace(' from this day', '') + '.' + (row.range ? ' This is the first day: oral exams may run over several days.' : '');
+            return sourceLine(row).replace(' from this day', '') + '.' + (row.range ? ' This is the first day: oral exams may run over several days.' : row.pageDays ? ' ' + getCore().severalDaysNote(row) : '');
         }
         if (row.status === 'yours') return sourceLine(row) + '.';
         return sourceText(row).replace(/\.$/, '') + '.';
@@ -434,6 +314,21 @@
         }
     }
 
+    // The panel's outline (headline, day strip, then exam rows: date, course,
+    // workload, form) while DTU's table and the course pages are read;
+    // renderRows fades the real rows in.
+    function showSkeleton(state, label, rows) {
+        var body = state.body;
+        while (body.firstChild) body.removeChild(body.firstChild);
+        var row = [['84px', '12px'], ['', '12px', 'dtu-skel-grow'], ['64px', '9px'], ['48px', '12px']];
+        var lines = [[['240px', '22px']], [['', '14px', 'dtu-skel-grow']]];
+        for (var i = 0; i < Math.max(3, Math.min(rows || 0, 6)); i++) lines.push(row);
+        var box = skeleton().block(label, lines, markExt);
+        box.style.cssText = 'gap:26px;padding:16px 0';
+        body.appendChild(box);
+        state.skeleton = true;
+    }
+
     function showMessage(state, text, withLink) {
         var list = state.body;
         while (list.firstChild) list.removeChild(list.firstChild);
@@ -469,143 +364,8 @@
         return row.dtuDate ? { date: row.dtuDate, evidence: row.evidence } : null;
     }
 
-    function makeButton(text, onClick) {
-        var b = el('button', null, text);
-        b.type = 'button';
-        b.addEventListener('click', onClick);
-        return b;
-    }
-
     var MONTH_LONG = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-    function option(select, value, text) {
-        var o = el('option', null, text);
-        o.value = value;
-        select.appendChild(o);
-    }
-
-    // Day, month and year as three lists, in Danish order, so the date never
-    // depends on the browser's locale. value() is an ISO date, '' when left
-    // empty, 'incomplete' when only some are picked, 'invalid' for a day that
-    // does not exist (31 November).
-    function dateField(iso, label, years) {
-        var parts = iso ? iso.split('-') : ['', '', ''];
-        var box = el('span', 'dtu-es-datefield dtu-es-field');
-        var day = el('select', 'dtu-es-d');
-        var month = el('select', 'dtu-es-m');
-        var year = el('select', 'dtu-es-y');
-        day.setAttribute('aria-label', label + ', day');
-        month.setAttribute('aria-label', label + ', month');
-        year.setAttribute('aria-label', label + ', year');
-        option(day, '', 'Day');
-        for (var d = 1; d <= 31; d++) option(day, String(d), String(d));
-        option(month, '', 'Month');
-        MONTH_LONG.forEach(function (name, i) { option(month, String(i + 1), name); });
-        option(year, '', 'Year');
-        years.forEach(function (y) { option(year, String(y), String(y)); });
-        day.value = parts[2] ? String(+parts[2]) : '';
-        month.value = parts[1] ? String(+parts[1]) : '';
-        year.value = parts[0] || '';
-        box.appendChild(day);
-        box.appendChild(month);
-        box.appendChild(year);
-        return {
-            node: box,
-            focus: function () { day.focus(); },
-            value: function () {
-                if (!day.value && !month.value && !year.value) return '';
-                if (!day.value || !month.value || !year.value) return 'incomplete';
-                var dt = new Date(Date.UTC(+year.value, +month.value - 1, +day.value));
-                if (dt.getUTCDate() !== +day.value) return 'invalid';
-                return year.value + '-' + String(month.value).padStart(2, '0') + '-' + String(day.value).padStart(2, '0');
-            }
-        };
-    }
-
-    function editorYears(row) {
-        var now = new Date().getFullYear();
-        var years = [now, now + 1, now + 2];
-        // The period's own year and the next, so a project in a far period can be dated.
-        var py = parseInt(String(row.periodKey || ''), 10);
-        if (py) [py, py + 1].forEach(function (y) { if (years.indexOf(y) < 0) years.push(y); });
-        [row.date, row.endDate, row.dtuDate].forEach(function (iso) {
-            var y = iso ? +iso.slice(0, 4) : 0;
-            if (y && years.indexOf(y) < 0) years.push(y);
-        });
-        return years.sort();
-    }
-
-    // One date by default; "Several days" adds a last day for an exam that
-    // runs over more than one day, such as a big oral exam.
-    function renderEditor(state, row) {
-        var box = el('div', 'dtu-es-edit');
-        var years = editorYears(row);
-        box.appendChild(el('span', 'dtu-es-flabel', 'Format'));
-        var format = el('select', 'dtu-es-format dtu-es-field');
-        format.setAttribute('aria-label', 'Exam format for ' + courseTitle(state, row));
-        EDIT_FORMATS.forEach(function (f) { option(format, f, FORMAT_LABELS[f]); });
-        format.value = EDIT_FORMATS.indexOf(row.format) >= 0 ? row.format : isCustom(row.code) ? 'hand-in' : 'written';
-        box.appendChild(format);
-
-        var dateLabel = el('span', 'dtu-es-flabel', 'Date');
-        box.appendChild(dateLabel);
-        var start = dateField(row.date, 'Exam date for ' + courseTitle(state, row), years);
-        box.appendChild(start.node);
-        var severalLabel = el('label', 'dtu-es-several');
-        var several = el('input');
-        several.type = 'checkbox';
-        several.checked = !!row.endDate;
-        severalLabel.appendChild(several);
-        severalLabel.appendChild(document.createTextNode('Several days'));
-        box.appendChild(severalLabel);
-        var endLabel = el('span', 'dtu-es-flabel', 'Last day');
-        box.appendChild(endLabel);
-        var end = dateField(row.endDate, 'Last exam day for ' + courseTitle(state, row), years);
-        box.appendChild(end.node);
-        var err = el('div', 'dtu-es-err');
-        err.hidden = true;
-
-        function sync() {
-            var none = format.value === 'none';
-            dateLabel.hidden = none;
-            start.node.hidden = none;
-            severalLabel.hidden = none;
-            endLabel.hidden = none || !several.checked;
-            end.node.hidden = endLabel.hidden;
-        }
-        format.addEventListener('change', sync);
-        several.addEventListener('change', function () { sync(); if (several.checked) end.focus(); });
-        sync();
-
-        var buttons = el('div', 'dtu-es-edit-buttons');
-        var save = makeButton('Save', function () {
-            var f = format.value;
-            var a = f === 'none' ? '' : start.value();
-            var b = f === 'none' || !several.checked ? '' : end.value();
-            var problem = [a, b].filter(function (v) { return v === 'incomplete' || v === 'invalid'; })[0];
-            if (problem) {
-                err.textContent = problem === 'invalid' ? 'That day does not exist in that month.' : 'Pick a day, a month and a year, or leave all three empty.';
-                err.hidden = false;
-                return;
-            }
-            if (!a && b) { a = b; b = ''; }
-            if (a && b && b < a) { var t = a; a = b; b = t; }
-            if (a === b) b = '';
-            saveEntry(state, row.periodKey, row.code, { format: f, date: a || null, endDate: b || null, basis: basisOf(row) });
-        });
-        save.classList.add('dtu-es-save');
-        buttons.appendChild(save);
-        buttons.appendChild(makeButton('Cancel', function () { state.editing = null; state.open = row.id; renderRows(state); }));
-        if (Object.prototype.hasOwnProperty.call(periodEntries(state, row.periodKey), row.code) && row.status === 'yours') {
-            var reset = makeButton(row.dtuDate ? 'Use DTU\'s date' : 'Clear', function () { saveEntry(state, row.periodKey, row.code, null); });
-            reset.classList.add('dtu-es-reset');
-            buttons.appendChild(reset);
-        }
-        box.appendChild(buttons);
-        box.appendChild(err);
-        if (isCustom(row.code)) box.appendChild(el('div', 'dtu-es-note', 'Saved under this course\'s name. Renaming it in the planner starts it again with no date.'));
-        return box;
-    }
     // ===== Workload =====
 
     // The latest course evaluation's workload question, read by the background
@@ -697,7 +457,7 @@
             custom ? state.names[row.code] : (state.names[row.code] || row.code), custom ? '' : row.code, row.code, kindText(row), false);
         node.setAttribute('aria-label', 'Exam for ' + courseTitle(state, row) + ', ' + whenText(row) + '. Open to change the date or format.');
         if (state.editing === row.id) {
-            node.appendChild(renderEditor(state, row));
+            node.appendChild(scheduleEditor.renderEditor(state, row, EDITOR_HELPERS));
             return node;
         }
         if (state.open !== row.id && row.status !== 'changed') return node;
@@ -786,17 +546,8 @@
     function downloadCalendar(state) {
         var events = calendarEvents(state);
         if (!events.length) return;
-        var stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
-        var blob = new Blob([getCore().buildExamCalendar(events, stamp)], { type: 'text/calendar;charset=utf-8' });
-        var url = URL.createObjectURL(blob);
-        var a = el('a');
-        a.href = url;
-        a.download = 'dtu-exams.ics';
-        a.hidden = true;
-        document.body.appendChild(a);
-        a.click();
-        a.parentNode.removeChild(a);
-        setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+        var ics = globalThis.DTUAfterDarkIcs;
+        ics.downloadCalendar(getCore().buildExamCalendar(events, ics.stampNow()), 'dtu-exams.ics');
     }
 
     // "Add to calendar" opens one tick box per period with dated exams. The
@@ -953,8 +704,38 @@
         return (upcoming || tabs[0]).key;
     }
 
+    // Saves the planned exams that have a grading deadline, so CampusNet Grades can say
+    // which grades are not out after DTU's deadline. Written only when the list changes.
+    function saveGradingWatch(state, groups) {
+        var core = getCore();
+        var current = [];
+        groups.forEach(function (g) {
+            g.rows.forEach(function (row) {
+                if (isCustom(row.code)) return;
+                var info = core.gradingForRow(row, state.sections);
+                if (!info) return;
+                current.push({ code: row.code, name: state.names[row.code] || '', exam: info.day || row.date, grading: info.grading });
+            });
+        });
+        var get = dep('storageLocalGet');
+        var set = dep('storageLocalSet');
+        if (!get || !set) return;
+        var defaults = {};
+        defaults[GRADING_WATCH_KEY] = [];
+        get(defaults, function (result) {
+            var merged = core.mergeGradingWatch(result && result[GRADING_WATCH_KEY], current, todayIso());
+            var text = JSON.stringify(merged);
+            if (text === _lastGradingWatch || text === JSON.stringify((result && result[GRADING_WATCH_KEY]) || [])) { _lastGradingWatch = text; return; }
+            _lastGradingWatch = text;
+            var items = {};
+            items[GRADING_WATCH_KEY] = merged;
+            set(items);
+        });
+    }
+
     function renderRows(state) {
         var groups = currentGroups(state);
+        if (state.sections) saveGradingWatch(state, groups);
         var tabs = scheduleTabs(state, groups);
         var body = state.body;
         while (body.firstChild) body.removeChild(body.firstChild);
@@ -1013,6 +794,10 @@
             body.appendChild(el('div', 'dtu-es-empty', 'Reading the course pages for your basket...'));
         }
         renderExportPicker(state);
+        if (state.skeleton) {
+            state.skeleton = false;
+            skeleton().reveal(body, markExt);
+        }
     }
 
     // Basket dates arrive one course at a time. An open editor is left alone;
@@ -1093,7 +878,7 @@
     function renderDisclaimer(state, fetchedAt) {
         var note = state.noticeText;
         while (note.firstChild) note.removeChild(note.firstChild);
-        note.appendChild(document.createTextNode("These exam dates are read from DTU's exam table on " + formatReadDate(fetchedAt)
+        note.appendChild(document.createTextNode("These exam dates are read from DTU's exam table on " + formatReadDate(fetchedAt, { month: 'long', invalid: 'an unknown date' })
             + ", DTU's own exam dates page, and from each course page. They are not your official schedule: DTU can move an exam "
             + "or change its format, and DTU After Dark can read a page wrong. Do not rely on this list alone. "
             + "Check every date on DTU's exam page and with your teacher. DTU After Dark is not made by DTU. "));
@@ -1127,7 +912,7 @@
                     var r = threeWeek
                         ? core.resolveThreeWeekExam(item.code, fields, table.sections, period, period.season === 'J' ? 1 : null)
                         : core.resolveCourseExam(item.code, fields, core.findExamSection(table.sections, period), period);
-                    var row = { code: item.code, status: r.status, format: r.format, date: r.date, endDate: null, range: r.range, evidence: r.evidence, reason: r.reason };
+                    var row = { code: item.code, status: r.status, format: r.format, date: r.date, endDate: null, range: r.range, pageDays: !!r.pageDays, evidence: r.evidence, reason: r.reason };
                     return { key: period.key, label: labels[period.key] || core.periodLabel(period), row: row };
                 });
             })).then(function (exams) {
@@ -1143,6 +928,7 @@
             if (_state !== state) return;
             var table = loaded[0];
             state.store = loaded[1];
+            state.sections = table.sections;
             renderDisclaimer(state, table.fetchedAt);
             var tables = plannerPeriodTables();
             var periods = tables.map(function (t) { return t.period; });
@@ -1170,7 +956,7 @@
                 });
             });
             if (!count) { state.ready = true; renderRows(state); return; }
-            showMessage(state, 'Reading ' + count + ' course page' + (count === 1 ? '' : 's') + '...');
+            showSkeleton(state, 'Reading ' + count + ' course page' + (count === 1 ? '' : 's'), count);
             return Promise.all(state.groups.filter(function (g) { return !g.later; }).map(function (g) {
                 var section = core.findExamSection(table.sections, g.period);
                 var threeWeek = g.period.season === 'J' || g.period.season === 'S';
@@ -1198,7 +984,7 @@
 
     function openPanel(button) {
         closePanel();
-        ensureStyles();
+        ensureStyles(STYLE_ID, scheduleStyles.CSS);
         var backdrop = el('div', 'dtu-es-backdrop');
         backdrop.addEventListener('mousedown', function (e) { e.preventDefault(); closePanel(); });
         document.body.appendChild(backdrop);
@@ -1207,7 +993,7 @@
         pop.setAttribute('aria-modal', 'true');
         pop.setAttribute('aria-labelledby', 'dtu-es-title');
         pop.tabIndex = -1;
-        applyTheme(pop);
+        scheduleStyles.applyTheme(pop, dep('isDarkModeEnabled'));
         document.body.appendChild(pop);
         button.setAttribute('aria-expanded', 'true');
         var state = { button: button, pop: pop, backdrop: backdrop, groups: [], names: {}, resolved: {}, store: {}, editing: null, open: null, activeKey: null, ready: false, ects: {}, exportKeys: {}, exportOpen: false, shownKeys: [], basket: null, workload: {}, loadCells: {} };
@@ -1216,6 +1002,7 @@
         document.addEventListener('keydown', state.onKey, true);
         _state = state;
         try { pop.focus({ preventScroll: true }); } catch (e0) { }
+        showSkeleton(state, 'Loading DTU\'s exam table', 3);
         loadPanel(state);
     }
 
@@ -1246,7 +1033,7 @@
         button.setAttribute('data-dtu-exam-schedule', 'plan');
         button.setAttribute('aria-expanded', 'false');
         button.setAttribute('aria-haspopup', 'dialog');
-        applyTheme(button);
+        scheduleStyles.applyTheme(button, dep('isDarkModeEnabled'));
         // The planner's own button rules outrank a class rule; inline wins.
         button.style.setProperty('color', 'var(--dtu-es-on-accent)', 'important');
         button.style.setProperty('background', 'var(--dtu-es-accent)', 'important');
@@ -1306,7 +1093,7 @@
         function addButton() {
             var place = scheduleButtonPlace(plannerPeriodTables());
             if (!place || document.querySelector('[data-dtu-exam-schedule]')) return;
-            ensureStyles();
+            ensureStyles(STYLE_ID, scheduleStyles.CSS);
             var button = makeScheduleButton();
             var node = button;
             if (place.tabs) {
@@ -1328,8 +1115,23 @@
             // the button stays and the panel says why it has no dates, instead
             // of the feature quietly disappearing.
             addButton();
+        }).then(null, function (err) {
+            // A failed insert must not block the next try for the rest of the page.
+            try { console.warn('[DTU After Dark] exam schedule button:', err); } catch (eLog) { }
         }).then(function () { _inserting = false; });
     }
+
+    var EDITOR_HELPERS = {
+        courseTitle: courseTitle,
+        isCustom: isCustom,
+        FORMAT_LABELS: FORMAT_LABELS,
+        EDIT_FORMATS: EDIT_FORMATS,
+        MONTH_LONG: MONTH_LONG,
+        periodEntries: periodEntries,
+        saveEntry: saveEntry,
+        basisOf: basisOf,
+        renderRows: renderRows
+    };
 
     try {
         globalThis.DTUAfterDarkExamSchedule = {

@@ -10,19 +10,6 @@
         return globalThis.DTUAfterDarkParticipantIntelBackfillDeps || null;
     }
 
-    function getIsDark() {
-        var deps = getDeps();
-        if (!deps || typeof deps.isDarkMode !== 'function') return false;
-        return !!deps.isDarkMode();
-    }
-
-    // Fetched archive pages go through the same parser as the live page, so a
-    // "Users (1 234)" count and students listed only by e-mail are read here too.
-    function parseParticipantListFromDoc(doc) {
-        var deps = getDeps();
-        return (deps && doc) ? deps.parseParticipantList(doc) : [];
-    }
-
     function parseCampusnetArchivedElementsFromDoc(doc) {
         var deps = getDeps();
         var out = [];
@@ -40,8 +27,7 @@
 
             var title = deps.normalizeWhitespace(link.textContent);
             var codeHint = null;
-            var codeMatch = title.match(/\b(\d{5}|KU\d{3})\b/i);
-            if (codeMatch) codeHint = (codeMatch[1] || '').toUpperCase();
+            codeHint = globalThis.DTUAfterDarkParticipantIntelHost.findIntelCourseCode(title) || null;
             var semesterHint = deps.parseDTUSemesterFromText(title);
             if (codeHint && !deps.isCampusnetLikelyAcademicCourse(codeHint, title, { title: title })) return;
 
@@ -311,7 +297,7 @@
                 var semester = deps.getCampusnetExplicitSemesterFromPage(doc) || item.semesterHint || null;
                 var courseName = deps.getCampusnetCourseNameFromPage(courseCode, doc);
 
-                var participants = parseParticipantListFromDoc(doc);
+                var participants = deps.parseParticipantList(doc);
                 if (!participants.length) throw new Error('no_participants');
 
                 upsertParticipantsIntoIntel(intel, participants, courseCode, semester, courseName, { archived: true, title: (item && item.title) ? item.title : '' });
@@ -349,7 +335,10 @@
         var anchor = document.querySelector('.archived-elements__content') || document.querySelector('main') || document.body;
         if (!anchor) return;
 
-        var isDark = getIsDark();
+        if (typeof deps.isDarkMode !== 'function') {
+            throw new Error('DTUAfterDarkParticipantIntelBackfillDeps.isDarkMode missing');
+        }
+        var isDark = !!deps.isDarkMode();
         var items = parseCampusnetArchivedElements();
         var courseItems = items.filter(function (it) {
             return !!it.codeHint && deps.isCampusnetLikelyAcademicCourse(it.codeHint, it.title, { title: it.title });

@@ -43,6 +43,7 @@ globalThis.DTUAfterDarkBackground = true;
     const fetchCoursePageCached = DTUAfterDarkExam.fetchCoursePageCached;
     const EXAM_TABLE_URL = DTUAfterDarkExam.EXAM_TABLE_URL;
     const COURSE_CODE_RE = DTUAfterDarkExam.COURSE_CODE_RE;
+    const isExamTablePage = DTUAfterDarkExam.isExamTablePage;
     const fetchCourseEvaluation = DTUAfterDarkEvaluation.fetchCourseEvaluation;
     const resolveMazemapPoi = DTUAfterDarkMazemap.resolveMazemapPoi;
     const fetchLibraryEvents = DTUAfterDarkLibrary.fetchLibraryEvents;
@@ -78,12 +79,16 @@ globalThis.DTUAfterDarkBackground = true;
             'kurser.dtu.dk',
             'karakterer.dtu.dk',
             'sites.dtu.dk',
-            'campusnet.dtu.dk'
+            'campusnet.dtu.dk',
+            'eksamensplan.dtu.dk'
         ];
 
         function isAllowedSender(sender) {
-            // Messages from the extension itself (popup, background, etc.) are always OK
-            if (!sender || !sender.url) return true;
+            // Every sender of ours has a URL: a content script its page's, an
+            // extension page its own. Anything else, or another extension, is refused.
+            if (!sender || !sender.url) return false;
+            const ownId = runtime.runtime && runtime.runtime.id;
+            if (ownId && sender.id && sender.id !== ownId) return false;
             try {
                 const url = new URL(sender.url);
                 // Extension pages (moz-extension://, chrome-extension://)
@@ -141,19 +146,28 @@ globalThis.DTUAfterDarkBackground = true;
 
             if (message.type === 'dtu-student-deadlines') {
                 const forceRefresh = !!message.forceRefresh;
-                fetchStudentDeadlines(forceRefresh)
+                fetchStudentDeadlines(forceRefresh, !!message.exchange)
                     .then(sendResponse)
                     .catch(() => sendResponse({ ok: false, error: 'fetch_failed' }));
                 return true;
             }
 
+            // Content scripts cannot ask for a permission, so open the extension page that does.
+            if (message.type === 'dtu-open-exchange-permission') {
+                runtime.tabs.create({ url: runtime.runtime.getURL('exchange-permission.html') });
+                sendResponse({ ok: true });
+                return false;
+            }
+
             if (message.type === 'dtu-exam-table') {
-                fetchPageCached(CACHE_PREFIX_EXAM_TABLE, 'en', EXAM_TABLE_CACHE_TTL_MS, EXAM_TABLE_URL, 'omit').then(sendResponse);
+                fetchPageCached(CACHE_PREFIX_EXAM_TABLE, 'en', EXAM_TABLE_CACHE_TTL_MS, EXAM_TABLE_URL, 'omit', isExamTablePage).then(sendResponse);
                 return true;
             }
 
+            // Course codes are matched and cached in capitals: a code sent in
+            // lower case is the same course and shares its cache entry.
             if (message.type === 'dtu-course-page') {
-                const code = String(message.code || '');
+                const code = String(message.code || '').trim().toUpperCase();
                 if (!COURSE_CODE_RE.test(code)) {
                     sendResponse({ ok: false, error: 'invalid_course' });
                     return;
@@ -172,7 +186,7 @@ globalThis.DTUAfterDarkBackground = true;
             }
 
             if (message.type === 'dtu-course-workload') {
-                const code = String(message.code || '');
+                const code = String(message.code || '').trim().toUpperCase();
                 if (!COURSE_CODE_RE.test(code)) {
                     sendResponse({ ok: false, error: 'invalid_course' });
                     return;
@@ -192,7 +206,8 @@ globalThis.DTUAfterDarkBackground = true;
             if (message.type === 'dtu-course-evaluation') {
                 const evalUrl = String(message.url || '').trim();
                 // Cache by eval URL path (strip protocol/host for shorter key)
-                const evalCacheId = evalUrl.replace(/^https?:\/\/[^/]+/, '').replace(/[^a-zA-Z0-9]/g, '_');
+                // encodeURIComponent keeps distinct paths distinct ("/a-b" and "/a_b" both became "_a_b").
+                const evalCacheId = encodeURIComponent(evalUrl.replace(/^https?:\/\/[^/]+/, ''));
                 serveCached({
                     prefix: CACHE_PREFIX_EVAL,
                     id: evalCacheId,
@@ -248,9 +263,7 @@ globalThis.DTUAfterDarkBackground = true;
                     sendResponse({ ok: false, error: 'not_configured' });
                     return;
                 }
-                const cacheId = (apiUrl + '|lb=' + String(Math.max(3, Math.min(365, lookback))))
-                    .replace(/[^a-zA-Z0-9]/g, '_')
-                    .slice(0, 180);
+                const cacheId = encodeURIComponent(apiUrl) + '_lb' + String(Math.max(3, Math.min(365, lookback)));
                 serveCached({
                     prefix: CACHE_PREFIX_LIB_CROWD,
                     id: () => cacheId,

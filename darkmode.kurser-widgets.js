@@ -29,30 +29,81 @@
     }
 
     function isKurserCoursePage() {
-        var deps = getDeps();
-        return !!(deps && typeof deps.isKurserCoursePage === 'function' && deps.isKurserCoursePage());
+        return window.location.hostname === 'kurser.dtu.dk'
+            && /\/course\/(?:\d{4}-\d{4}\/)?[A-Za-z0-9]+/i.test(window.location.pathname);
     }
 
     function getKurserCourseCode() {
-        var deps = getDeps();
-        if (deps && typeof deps.getKurserCourseCode === 'function') return deps.getKurserCourseCode();
-        return null;
+        var match = window.location.pathname.match(/\/course\/(?:\d{4}-\d{4}\/)?([A-Za-z0-9]+)/i);
+        if (!match || !match[1]) return null;
+        return match[1].toUpperCase();
     }
 
     function findKurserCourseTitleElement(courseCode) {
-        var deps = getDeps();
-        if (deps && typeof deps.findKurserCourseTitleElement === 'function') {
-            return deps.findKurserCourseTitleElement(courseCode);
+        var headings = Array.prototype.slice.call(document.querySelectorAll('h1, h2'));
+        if (!headings.length) return null;
+        var normalizedCode = (courseCode || '').toUpperCase();
+
+        for (var i = 0; i < headings.length; i++) {
+            var txt = (headings[i].textContent || '').trim().toUpperCase();
+            if (normalizedCode && txt.indexOf(normalizedCode) === 0) return headings[i];
         }
-        return null;
+
+        // DTU course pages commonly use an h2 title.
+        var styledH2 = document.querySelector('h2[style*="font-family:verdana"]');
+        if (styledH2) return styledH2;
+
+        return document.querySelector('h1') || document.querySelector('h2');
     }
 
     function findKurserGradeStatsInsertAnchor(titleEl) {
-        var deps = getDeps();
-        if (deps && typeof deps.findKurserGradeStatsInsertAnchor === 'function') {
-            return deps.findKurserGradeStatsInsertAnchor(titleEl);
+        if (!titleEl) return null;
+        var titleCol = titleEl.closest('.col-sm-9, .col-md-9, .col-lg-9, [class*="col-"]');
+        if (titleCol && titleCol.parentElement) {
+            var row = titleCol.parentElement;
+            var cls = row.className || '';
+            if (/\brow\b/.test(cls)) return row;
         }
-        return null;
+        return titleEl;
+    }
+
+    function requireInsightDep(name) {
+        var deps = getDeps();
+        if (!deps || typeof deps[name] !== 'function') {
+            throw new Error('DTUAfterDarkCourseWidgetsLayout.getKurserInsightTheme needs DTUAfterDarkKurserWidgetsDeps.'
+                + name);
+        }
+        return deps[name];
+    }
+
+    function getKurserInsightTheme() {
+        var isDark = !!requireInsightDep('isDarkModeEnabled')();
+        var accentDeep = isDark ? null : requireInsightDep('getResolvedAccentDeep')();
+        return {
+            containerBg: isDark ? 'rgba(255,255,255,0.026)' : 'rgba(248,250,252,0.96)',
+            containerBorder: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(148,163,184,0.24)',
+            text: isDark ? '#e6e9ee' : '#1f2937',
+            mutedText: isDark ? '#aeb6c2' : '#667385',
+            subtleText: isDark ? '#cdd3db' : '#334155',
+            surfaceBg: isDark ? 'rgba(255,255,255,0.04)' : '#ffffff',
+            surfaceInset: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(15,23,42,0.06)',
+            divider: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.10)',
+            quietTrack: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(15,23,42,0.08)',
+            linkColor: isDark ? 'var(--dtu-ad-accent-soft)' : 'var(--dtu-ad-accent-deep-text, ' + accentDeep + ')',
+            accentText: isDark ? 'var(--dtu-ad-accent-soft)' : 'var(--dtu-ad-accent-deep-text, ' + accentDeep + ')'
+        };
+    }
+
+    function getKurserInsightContainerStyle(theme) {
+        return 'margin: 7px 0 9px 0; padding: 9px 11px 10px; border-radius: 7px; width: 100%; max-width: none; '
+            + 'box-sizing: border-box; background:' + theme.containerBg + '; border: 1px solid ' + theme.containerBorder + '; '
+            + 'color: ' + theme.text + '; font-family: inherit; font-size: 11px;';
+    }
+
+    function getKurserInsightSurfaceStyle(theme, extra) {
+        return 'padding: 7px 9px; border-radius: 6px; background: ' + theme.surfaceBg + '; '
+            + 'box-shadow: inset 0 0 0 1px ' + theme.surfaceInset + ';'
+            + (extra || '');
     }
 
     function getGradeStatsFeatureKey() {
@@ -64,8 +115,15 @@
     var _gradeStatsCourseCode = null;
     var _gradeStatsRetryTimer = null;
 
+    // Today in Denmark as a local Date, so getFullYear and getMonth read Danish values:
+    // exam terms change on Danish dates, whatever the browser's time zone.
+    function danishToday() {
+        var p = globalThis.DTUAfterDarkDom.copenhagenParts();
+        return new Date(p.year, p.month - 1, p.day);
+    }
+
     function buildGradeStatsSemesters() {
-        var now = new Date();
+        var now = danishToday();
         var year = now.getFullYear();
         var month = now.getMonth();
         var startYear = (month <= 5) ? (year - 1) : year;
@@ -75,6 +133,16 @@
             semesters.push('Summer-' + y);
         }
         return semesters;
+    }
+
+    // Terms to ask karakterer for: from the shipped exam data when it knows the course
+    // (one or two requests), else the full walk above.
+    function gradeStatsRequestSemesters(courseCode) {
+        var stats = globalThis.DTUAfterDarkKurserExamStats;
+        if (!stats || typeof stats.loadExamStatsData !== 'function') return Promise.resolve(buildGradeStatsSemesters());
+        return stats.loadExamStatsData().then(function (data) {
+            return stats.gradeStatsSemesters(data, courseCode, danishToday()) || buildGradeStatsSemesters();
+        }, function () { return buildGradeStatsSemesters(); });
     }
 
 
@@ -108,6 +176,8 @@
         '.dtu-cw-title{font-size:15px;font-weight:700;color:var(--dtu-cw-ink)!important}',
         '.dtu-cw-meta{font-size:13px;color:var(--dtu-cw-muted)!important;text-align:right;min-width:0}',
         '.dtu-cw-status{font-size:13px;color:var(--dtu-cw-muted)!important;line-height:1.45}',
+        '.dtu-cw-col .dtu-skel-block{gap:18px}',
+        '.dtu-cw-col .dtu-skel-line.dtu-cw-skel-chart{gap:12px;height:104px}',
         '.dtu-cw-empty{display:flex;flex-direction:column;gap:4px;max-width:420px}',
         '.dtu-cw-empty-lead{font-size:14px;color:var(--dtu-cw-ink)!important}',
         '.dtu-cw-chips{display:flex;flex-wrap:wrap;gap:8px}',
@@ -278,6 +348,37 @@
         return wrap;
     }
 
+    function skeletonApi() {
+        var skel = globalThis.DTUAfterDarkSkeleton;
+        if (!skel) throw new Error('DTUAfterDarkSkeleton missing: load darkmode.skeleton.js before darkmode.kurser-widgets.js');
+        return skel;
+    }
+
+    // Loading placeholders shaped like the Grades and Student evaluation
+    // columns, so the real column fades in over the same outline.
+    function makeColumnSkeleton(kind) {
+        var skel = skeletonApi();
+        function grow(height) { return ['', height, 'dtu-skel-grow']; }
+        if (kind === 'grades') {
+            return skel.block('Loading exam results', [
+                [['92px', '44px'], ['92px', '44px'], ['92px', '44px'], ['92px', '44px']],
+                { className: 'dtu-skel-end', bars: [['140px', '38px'], ['52px', '14px']] },
+                { className: 'dtu-skel-end dtu-cw-skel-chart', bars: [20, 96, 96, 96, 96, 72, 8].map(function (h) { return grow(h + 'px'); }) },
+                [grow('12px')],
+                [['62%', '12px']]
+            ], markExt);
+        }
+        var lines = [[['104px', '38px'], ['64px', '14px']]];
+        for (var i = 0; i < 5; i++) lines.push([['120px', '12px'], grow('8px'), ['32px', '12px']]);
+        lines.push([['56%', '12px']]);
+        return skel.block('Loading the student evaluation', lines, markExt);
+    }
+
+    // The real content replacing a skeleton fades in instead of popping.
+    function revealColumn(container) {
+        skeletonApi().reveal(container, markExt);
+    }
+
     function prepareCourseWidgetColumn(container) {
         ensureCourseWidgetsStyles();
         container.className = 'dtu-cw-col';
@@ -417,9 +518,13 @@
         var foot = makeEl('div', 'dtu-cw-foot');
         var footMain = makeEl('span', 'dtu-cw-foot-main');
         var total = Number(data.total) || 0;
-        footMain.appendChild(makeEl('span', '', data.registered
-            ? total + ' of ' + data.registered + ' registered students sat the exam.'
-            : plural(total, 'student', 'students') + ' sat the exam.'));
+        var registered = Number(data.registered) || 0;
+        var sentence = registered
+            ? total + ' of ' + registered + ' registered students sat the exam'
+            : plural(total, 'student', 'students') + ' sat the exam';
+        // No-shows: registered students who did not sit the exam, the one number the chart does not show.
+        if (registered > total) sentence += ' (' + plural(registered - total, 'no-show', 'no-shows') + ', ' + Math.round(100 * (registered - total) / registered) + ' %)';
+        footMain.appendChild(makeEl('span', '', sentence + '.'));
         var note = buildGradeNotes(iter, iterations[mainIndex]);
         if (note) footMain.appendChild(makeInfoTip(note, 'About this exam'));
         foot.appendChild(footMain);
@@ -567,20 +672,30 @@
         prepareCourseWidgetColumn(container);
         container.setAttribute('data-dtu-cw-state', 'loading');
         container.appendChild(makeColumnHead('Grades'));
-        container.appendChild(makeEl('div', 'dtu-cw-status', 'Loading exam results...'));
+        container.appendChild(makeColumnSkeleton('grades'));
         refreshCourseWidgetsLayout();
 
         if (_gradeStatsRequested && _gradeStatsCourseCode === courseCode) return;
         _gradeStatsRequested = true;
         _gradeStatsCourseCode = courseCode;
 
-        sendRuntimeMessage({
+        gradeStatsRequestSemesters(courseCode).then(function (semesters) { sendRuntimeMessage({
             type: 'dtu-grade-stats',
             courseCode: courseCode,
-            semesters: buildGradeStatsSemesters()
+            semesters: semesters
         }, function (response) {
+            // The page can replace the column while the request runs; the new column for
+            // this course waits on this answer (it is not asked twice), so draw into it.
+            if (!container.isConnected) {
+                var redrawn = document.querySelector('[data-dtu-grade-stats]');
+                if (redrawn && String(redrawn.getAttribute('data-dtu-grade-stats-course') || '').toUpperCase() === courseCode) container = redrawn;
+            }
             if (!container.isConnected || !isFeatureFlagEnabled(getGradeStatsFeatureKey())
-                || getKurserCourseCode() !== courseCode) return;
+                || getKurserCourseCode() !== courseCode) {
+                // Nothing left to draw into: the next check asks again.
+                if (_gradeStatsCourseCode === courseCode) _gradeStatsRequested = false;
+                return;
+            }
             if (!response || (!response.ok && response.error !== 'no_data')) {
                 renderGradeStatsUnavailable(container);
                 container.setAttribute('data-dtu-grade-stats-nexttry', String(Date.now() + 600000));
@@ -602,11 +717,13 @@
                 // New courses have no exam yet, and DTU hides exams with three
                 // or fewer students, so this is a normal state, not an error.
                 renderGradeStatsEmpty(container);
+                revealColumn(container);
                 return;
             }
             var mainIndex = (response && typeof response.mainIndex === 'number' && iterations[response.mainIndex]) ? response.mainIndex : 0;
             renderGradeStatsColumn(container, iterations, mainIndex);
-        });
+            revealColumn(container);
+        }); });
     }
 
     try {
@@ -619,8 +736,21 @@
             refresh: refreshCourseWidgetsLayout,
             makeEl: makeEl,
             makeColumnHead: makeColumnHead,
+            makeColumnSkeleton: makeColumnSkeleton,
+            revealColumn: revealColumn,
             makeInfoTip: makeInfoTip,
-            applyTheme: applyCourseWidgetsTheme
+            ensureStyles: ensureCourseWidgetsStyles,
+            applyTheme: applyCourseWidgetsTheme,
+            sendRuntimeMessage: sendRuntimeMessage,
+            isFeatureFlagEnabled: isFeatureFlagEnabled,
+            isKurserCoursePage: isKurserCoursePage,
+            getKurserCourseCode: getKurserCourseCode,
+            findKurserCourseTitleElement: findKurserCourseTitleElement,
+            findKurserGradeStatsInsertAnchor: findKurserGradeStatsInsertAnchor,
+            getKurserInsightTheme: getKurserInsightTheme,
+            getKurserInsightContainerStyle: getKurserInsightContainerStyle,
+            getKurserInsightSurfaceStyle: getKurserInsightSurfaceStyle,
+            pruneCourseWidgetsGrid: pruneCourseWidgetsGrid
         };
     } catch (eKurserWidgetsUi) { }
 })();

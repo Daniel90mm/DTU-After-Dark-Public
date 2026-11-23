@@ -208,3 +208,19 @@ test('a file that fails is returned by name, and the status names it', async () 
     assert.match(many, /7 files could not be downloaded: a\.pdf, b\.pdf, c\.pdf, d\.pdf, e\.pdf and 2 more\./);
     assert.match(api.describeLessonsBundleResult({ ok: true, parts: 1, fileCount: 2, failByReason: {}, failedNames: [] }), /^Started 1 bundled ZIP download \(2 files\)\.$/);
 });
+
+test('course activity entries go into the ZIP first, in their folders, with no file URLs', async () => {
+    const env = loadZipOnly(async (url) => response({ url, contentType: 'text/plain', contentDisposition: 'attachment; filename="notes.txt"', body: 'notes' }));
+    const extra = [
+        { path: 'Announcements/Announcements.html', bytes: new TextEncoder().encode('<p>a</p>') },
+        { path: 'Assignments/Lab 1/Your submission/report.pdf', bytes: new Uint8Array([1, 2, 3]) }
+    ];
+    const onlyActivity = await env.api.downloadSingleBundledZipFromUrls(null, [], extra);
+    assert.equal(onlyActivity.ok, true);
+    assert.equal(onlyActivity.fileCount, 2);
+    assert.deepEqual(readZipEntries(await savedZipBuffer(env.saved, 0)).map((e) => e.name), extra.map((e) => e.path));
+
+    const both = await env.api.downloadSingleBundledZipFromUrls(null, [LEARN + '/content/enforced/1/notes.txt'], extra);
+    assert.equal(both.fileCount, 3);
+    assert.deepEqual(readZipEntries(await savedZipBuffer(env.saved, 1)).map((e) => e.name), [extra[0].path, extra[1].path, 'notes.txt']);
+});

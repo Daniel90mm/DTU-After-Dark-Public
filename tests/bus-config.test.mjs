@@ -91,12 +91,16 @@ function findElement(root, predicate) {
     return null;
 }
 
-function loadBusConfigApi(initialStorage = {}, { homepage = false } = {}) {
+function loadBusConfigApi(initialStorage = {}, { homepage = false, loadAddLine = true } = {}) {
     const fileUrl = new URL('darkmode.bus.js', ROOT);
+    const apiUrl = new URL('darkmode.bus.api.js', ROOT);
+    const presetsUrl = new URL('darkmode.bus.presets.js', ROOT);
+    const addLineUrl = new URL('darkmode.bus.setup.addline.js', ROOT);
+    const setupUrl = new URL('darkmode.bus.setup.js', ROOT);
     let source = fs.readFileSync(fileUrl, 'utf8');
     source = source.replace(
         /\}\)\(\);\s*$/,
-        'globalThis.__busConfigTestApi = { getBusConfig, showBusConfigModal, insertBusDisplay };})();'
+        'globalThis.__busConfigTestApi = { getBusConfig, insertBusDisplay, showBusConfigModal: globalThis.DTUAfterDarkBusSetup.showBusConfigModal };})();'
     );
 
     const values = new Map(Object.entries(initialStorage));
@@ -134,6 +138,10 @@ function loadBusConfigApi(initialStorage = {}, { homepage = false } = {}) {
     };
     sandbox.globalThis = sandbox;
     loadDom(sandbox);
+    vm.runInNewContext(fs.readFileSync(presetsUrl, 'utf8'), sandbox, { filename: presetsUrl.pathname });
+    if (loadAddLine) vm.runInNewContext(fs.readFileSync(addLineUrl, 'utf8'), sandbox, { filename: addLineUrl.pathname });
+    vm.runInNewContext(fs.readFileSync(setupUrl, 'utf8'), sandbox, { filename: setupUrl.pathname });
+    vm.runInNewContext(fs.readFileSync(apiUrl, 'utf8'), sandbox, { filename: apiUrl.pathname });
     vm.runInNewContext(source, sandbox, { filename: fileUrl.pathname });
     sandbox.DTUAfterDarkBusDeps = {
         getUiState() { return {}; },
@@ -144,6 +152,12 @@ function loadBusConfigApi(initialStorage = {}, { homepage = false } = {}) {
     };
     return { ...sandbox.__busConfigTestApi, document };
 }
+
+test('the bus lines dialog fails loudly when the add-line module is missing', () => {
+    const view = loadBusConfigApi({}, { loadAddLine: false });
+
+    assert.throws(() => view.showBusConfigModal(), /darkmode\.bus\.setup\.addline\.js must load before darkmode\.bus\.setup\.js/);
+});
 
 test('an explicitly saved empty bus-line list remains empty when read back', () => {
     const api = loadBusConfigApi({
@@ -227,7 +241,7 @@ test('unreadable saved bus settings say so instead of showing the default stops'
     nav.className = 'd2l-navigation-s-main-wrapper';
     api.document.body.appendChild(nav);
     api.insertBusDisplay();
-    assert.equal(nav.querySelector('.dtu-bus-status').textContent, 'Loading bus times', 'no saved settings is a first visit');
+    assert.equal(nav.querySelector('.dtu-skel-sr').textContent, 'Loading bus times', 'no saved settings is a first visit');
 });
 
 test('bus setup is a named modal dialog that Escape closes, and each remove button names its line', () => {

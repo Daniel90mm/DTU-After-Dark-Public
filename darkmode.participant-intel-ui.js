@@ -7,7 +7,9 @@
 
     function getIsDark() {
         var deps = getDeps();
-        if (!deps || typeof deps.isDarkMode !== 'function') return false;
+        if (!deps || typeof deps.isDarkMode !== 'function') {
+            throw new Error('DTUAfterDarkParticipantIntelUiDeps.isDarkMode missing');
+        }
         return !!deps.isDarkMode();
     }
 
@@ -456,7 +458,6 @@
         var list = makePiEl('ul', 'dtu-pi-rows');
         var popover = makePiEl('div', 'dtu-pi-pop');
         popover.hidden = true;
-        popover.setAttribute('aria-hidden', 'true');
         var hiddenRows = [];
         var hiddenUsers = 0;
         sorted.forEach(function (entry, i) {
@@ -613,13 +614,12 @@
                 + ' on this page. The rest of the list could not be loaded.';
         }
         if (onPage + added < total) {
-            return 'Showing ' + onPage + ' of the ' + total + ' ' + noun + ' in ' + program
-                + '. The others are on other pages of this list.';
+            // added: the other pages were read, so the rest are not on them either.
+            return 'Showing ' + (onPage + added) + ' of the ' + total + ' ' + noun + ' in ' + program
+                + (added ? '. ' + (total - onPage - added) + ' could not be found in the list.' : '. The others are on other pages of this list.');
         }
-        var text = 'Showing the ' + total + ' ' + noun + ' in ' + program + '.';
-        if (!added) return text;
-        return text + ' ' + (onPage ? added + ' of them ' + (added === 1 ? 'is' : 'are') : 'All of them are')
-            + ' from other pages of this list.';
+        // "N of them are from other pages" read as if they were not on screen (Daniel, 2026-11-23).
+        return 'Showing ' + (total === 1 ? 'the 1 student' : 'all ' + total + ' students') + ' in ' + program + '.';
     }
 
     function fillProgramPopover(popover, entry) {
@@ -721,6 +721,10 @@
         var card = document.querySelector('[data-dtu-participant-demographics]');
         var bar = card ? card.querySelector('.dtu-pi-filter') : null;
         labelUsersHeading(deps, members ? Object.keys(onPage).length + added : null);
+        // CampusNet's Next page loads its own next 50 of everyone and drops the filter,
+        // so hide its pager while the filter already shows the whole study line here.
+        setCampusnetPagerHidden(!!members && piListComplete && !loading
+            && Object.keys(onPage).length + added >= Object.keys(wanted).length);
         if (!members) {
             if (bar) bar.remove();
             return;
@@ -873,6 +877,14 @@
         var onclick = arrow.getAttribute('onclick');
         if (onclick) arrow.setAttribute('onclick', onclick.replace(/\(\s*\d+\s*\)/, '(' + n + ')'));
         if (info) info.id = 'participantinformation' + n;
+    }
+
+    function setCampusnetPagerHidden(hide) {
+        ['nextPageButton', 'previousPageButton'].forEach(function (id) {
+            var button = document.getElementById(id);
+            var group = button && button.closest ? button.closest('.arc-buttongroup--list') || button : button;
+            if (group) setFilteredOut(group, hide);
+        });
     }
 
     function setFilteredOut(el, out) {

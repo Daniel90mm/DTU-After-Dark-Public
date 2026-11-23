@@ -1,3 +1,4 @@
+import * as fsx from 'node:fs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
@@ -11,6 +12,10 @@ test('retention rejects malformed snapshots and uses a single current count with
  const r=summary.buildRetentionRadarSummary([null,{count:NaN,ts:1},{count:3,ts:'bad'}],42);
  assert.equal(r.latestCount,42);assert.equal(r.snapshotCount,1);assert.equal(r.previousDeltaCount,null);assert.equal(r.windowDeltaCount,null);
  assert.equal(summary.buildRetentionRadarSummary([],0),null);
+});
+test('the shared dark-mode lookup stops when the UI dark-mode dependency is missing', () => {
+ const {api}=extractFunctions('darkmode.participant-intel-ui.js',['getIsDark'],{globals:{getDeps:()=>({})}});
+ assert.throws(()=>api.getIsDark(),/isDarkMode missing/);
 });
 function depsFixture(){
  const flags={master:true,composition:true,history:true,retention:true};let pending,saves=0;
@@ -56,7 +61,8 @@ test('turning Shared History off during storage read prevents participant persis
 
 test('turning Participant Intelligence off during an archive fetch stops collection and further requests',async()=>{
  const f=depsFixture();let resolve,requests=0,upserts=0;const timers=[];
- const {api}=extractFunctions('darkmode.participant-intel-backfill.js',['runCampusnetArchiveBackfill'],{prelude:'var campusnetArchiveBackfillRunning=false,campusnetArchiveBackfillAbort=false,campusnetArchiveBackfillProgress=null;',globals:{getDeps:()=>f.deps,window:{location:{hostname:'campusnet.dtu.dk'}},updateCampusnetArchiveBackfillWidgetStatus(){},fetchBestCampusnetParticipantsDoc:()=>{requests++;return new Promise(r=>resolve=r);},parseParticipantListFromDoc:()=>[{sNumber:'s123456'}],upsertParticipantsIntoIntel:()=>upserts++,setTimeout:fn=>timers.push(fn)}});
+ f.deps.parseParticipantList=()=>[{sNumber:'s123456'}];
+ const {api}=extractFunctions('darkmode.participant-intel-backfill.js',['runCampusnetArchiveBackfill'],{prelude:'var campusnetArchiveBackfillRunning=false,campusnetArchiveBackfillAbort=false,campusnetArchiveBackfillProgress=null;',globals:{getDeps:()=>f.deps,window:{location:{hostname:'campusnet.dtu.dk'}},updateCampusnetArchiveBackfillWidgetStatus(){},fetchBestCampusnetParticipantsDoc:()=>{requests++;return new Promise(r=>resolve=r);},upsertParticipantsIntoIntel:()=>upserts++,setTimeout:fn=>timers.push(fn)}});
  f.deps.getCampusnetExplicitSemesterFromPage=()=> 'E2026';f.deps.getCampusnetCourseNameFromPage=()=> 'Synthetic course';
  const intel={self:null,backfill:{scanned:{}}};api.runCampusnetArchiveBackfill([{elementId:'1'},{elementId:'2'}],intel);
  f.flags.master=false;resolve({doc:{}});await Promise.resolve();await Promise.resolve();timers.shift()?.();
@@ -97,10 +103,10 @@ function archiveWidgetFixture() {
     }
     const anchor = node(); const append = anchor.appendChild;
     anchor.appendChild = function (n) { mounts++; append.call(this, n); };
-    Object.assign(f.deps, { isCampusnetGroupArchivePage: () => onArchive, isCampusnetLikelyAcademicCourse: () => true, markExt() {} });
+    Object.assign(f.deps, { isCampusnetGroupArchivePage: () => onArchive, isCampusnetLikelyAcademicCourse: () => true, markExt() {}, isDarkMode: () => false });
     const { api } = extractFunctions('darkmode.participant-intel-backfill.js', ['insertCampusnetArchiveBackfillWidget'], {
         prelude: 'var archiveBackfillInsertPending=false,campusnetArchiveBackfillRunning=false,campusnetArchiveBackfillProgress=null;',
-        globals: { getDeps: () => f.deps, getIsDark: () => false,
+        globals: { getDeps: () => f.deps,
             parseCampusnetArchivedElements: () => [{ elementId: '1', codeHint: '34032', semesterHint: 'E2026', title: 'Synthetic course' }],
             formatShortDateTime: () => '', updateCampusnetArchiveBackfillWidgetStatus() {},
             runCampusnetArchiveBackfill() {}, document: { hidden: true, body: anchor,
@@ -184,6 +190,7 @@ test('the Users heading count reads thousands written with a space, nbsp, dot or
     assert.equal(host.getCampusnetUsersCountFromPage(doc('Brugere (1 234)')), 1234);
     assert.equal(host.getCampusnetUsersCountFromPage(doc('Users (1.234)')), 1234);
     assert.equal(host.getCampusnetUsersCountFromPage(doc('Users (1,234)')), 1234);
+    assert.equal(host.getCampusnetUsersCountFromPage(doc('Users (1500)')), 1500, 'no thousands separator');
     assert.equal(host.getCampusnetUsersCountFromPage(doc('Users')), null);
     assert.equal(host.getProgramLevel('BEng in Civil Engineering'), 2);
     assert.equal(host.getProgramLevel('Civilingeniør, cand.polyt.'), 3);
@@ -218,9 +225,10 @@ test('study line hover lists who a program counts, then how many more',()=>{
  assert.deepEqual(plain(pf.summarizeProgramMembers(g.Physics,12)),{names:['Anna','Bo'],more:1});
 });
 test('study line filter says when part of the program is on other list pages',()=>{
- assert.equal(pf.describeProgramFilter('Physics',2,0,2),'Showing the 2 students in Physics.');
- assert.equal(pf.describeProgramFilter('Physics',0,68,68),'Showing the 68 students in Physics. All of them are from other pages of this list.');
- assert.equal(pf.describeProgramFilter('Physics',5,4,9),'Showing the 9 students in Physics. 4 of them are from other pages of this list.');
+ assert.equal(pf.describeProgramFilter('Physics',2,0,2),'Showing all 2 students in Physics.');
+ assert.equal(pf.describeProgramFilter('Physics',0,68,68),'Showing all 68 students in Physics.');
+ assert.equal(pf.describeProgramFilter('Physics',1,0,1),'Showing the 1 student in Physics.');
+ assert.equal(pf.describeProgramFilter('Physics',5,4,9),'Showing all 9 students in Physics.');
  assert.equal(pf.describeProgramFilter('Physics',5,0,9),'Showing 5 of the 9 students in Physics. The others are on other pages of this list.');
 });
 const {api: pk}=extractFunctions('darkmode.participant-intel-ui.js',['participantKey','groupParticipantsByProgram','describeProgramFilter','renumberBorrowedEntry'],{prelude:'var PI_BORROWED_ID_OFFSET=100000;'});
@@ -252,7 +260,7 @@ test('entries copied in by the study line filter are not counted as CampusNet Us
 });
 test('a failed refresh of the full list keeps the last full list instead of only this page',async()=>{
  const deps={getCampusnetUsersCountFromPage:()=>786,getCampusnetUsersParticipantElements:()=>new Array(17)};
- const {api}=extractFunctions('darkmode.participant-intel-core.js',['getFullParticipantList'],{prelude:'var FULL_PARTICIPANT_LIST_TTL_MS=600000;var fullParticipantListCache={key:"/p",ts:0,participants:[{sNumber:"s1"},{sNumber:"s2"}],total:786,doc:{}};var fullParticipantListFailure=null;var fullParticipantListInFlight=null;var fullListDocCache=null;',globals:{getDeps:()=>deps,parseParticipantList:()=>[{sNumber:'s1'}],window:{location:{pathname:'/p'}},fetchParticipantExport:()=>Promise.reject(new Error('http_500')),fetchFullParticipantsHtml:()=>Promise.reject(new Error('http_500')),DOMParser:class{}}});
+ const {api}=extractFunctions('darkmode.participant-intel-core.js',['getFullParticipantList'],{prelude:'var FULL_PARTICIPANT_LIST_TTL_MS=600000;var fullParticipantListCache={key:"/p",ts:0,participants:[{sNumber:"s1"},{sNumber:"s2"}],total:786,doc:{}};var fullParticipantListFailure=null;var fullParticipantListInFlight=null;var fullListDocCache=null;',globals:{getDeps:()=>deps,parseParticipantList:()=>[{sNumber:'s1'}],window:{location:{pathname:'/p'}},fetchFullParticipantsHtml:()=>Promise.reject(new Error('http_500')),DOMParser:class{}}});
  const got=await new Promise(r=>api.getFullParticipantList((p,info)=>r({n:p.length,info})));
  assert.equal(got.n,2);assert.equal(got.info.complete,true);
  const again=await new Promise(r=>api.getFullParticipantList((p,info)=>r({n:p.length,info})));
@@ -260,43 +268,32 @@ test('a failed refresh of the full list keeps the last full list instead of only
 });
 test('a list view without a Users heading (Roles) still loads the full list',async()=>{
  let fetched=0;const deps={getCampusnetUsersCountFromPage:d=>d?786:null,getCampusnetUsersParticipantElements:()=>new Array(50)};
- const {api}=extractFunctions('darkmode.participant-intel-core.js',['getFullParticipantList'],{prelude:'var FULL_PARTICIPANT_LIST_TTL_MS=600000;var fullParticipantListCache=null;var fullParticipantListFailure=null;var fullParticipantListInFlight=null;var fullListDocCache=null;',globals:{getDeps:()=>deps,parseParticipantList:d=>d?new Array(786).fill({}):new Array(50).fill({}),window:{location:{pathname:'/p'}},fetchParticipantExport:()=>Promise.reject(new Error('export_not_file')),fetchFullParticipantsHtml:()=>{fetched++;return Promise.resolve('<html>');},DOMParser:class{parseFromString(){return {doc:1};}}}});
+ const {api}=extractFunctions('darkmode.participant-intel-core.js',['getFullParticipantList'],{prelude:'var FULL_PARTICIPANT_LIST_TTL_MS=600000;var fullParticipantListCache=null;var fullParticipantListFailure=null;var fullParticipantListInFlight=null;var fullListDocCache=null;',globals:{getDeps:()=>deps,parseParticipantList:d=>d?new Array(786).fill({}):new Array(50).fill({}),window:{location:{pathname:'/p'}},fetchFullParticipantsHtml:()=>{fetched++;return Promise.resolve('<html>');},DOMParser:class{parseFromString(){return {doc:1};}}}});
  const got=await new Promise(r=>api.getFullParticipantList((p,info)=>r({n:p.length,info})));
  assert.equal(fetched,1);assert.equal(got.n,786);assert.equal(got.info.total,786);
 });
-const exportText='First name;Last name;Study number;Education;\r\nAmy;Ng;s234988;Bachelor program in Biomedical Engineering, Biomaterial Engineering for Medicine;\r\nBo;Li;;enkeltfag;\r\nCy;Ek;S215848;Process and Innovation, B. Eng.;\r\n';
-const exportDeps={normalizeWhitespace:t=>String(t).replace(/\s+/g,' ').trim(),readExportProgram:t=>t,getCampusnetUsersCountFromPage:()=>786,getCampusnetUsersParticipantElements:()=>new Array(50)};
-test('the composition is read from CampusNet\'s export when it answers, without the slow one-page list',async()=>{
- let html=0;
- const {api}=extractFunctions('darkmode.participant-intel-core.js',['getFullParticipantList','parseParticipantExport'],{prelude:'var FULL_PARTICIPANT_LIST_TTL_MS=600000;var fullParticipantListCache=null;var fullParticipantListFailure=null;var fullParticipantListInFlight=null;var fullListDocCache=null;',globals:{getDeps:()=>exportDeps,parseParticipantList:()=>[{sNumber:'s234988',userId:'356212'}],window:{location:{pathname:'/p'}},fetchParticipantExport:()=>Promise.resolve(exportText),fetchFullParticipantsHtml:()=>{html++;return Promise.resolve('');},DOMParser:class{}}});
- const got=await new Promise(r=>api.getFullParticipantList((p,info)=>r({p,info})));
- assert.equal(html,0);assert.equal(got.info.complete,true);assert.equal(got.info.total,786);
- assert.equal(got.p.map(x=>x.sNumber).join(','),'s234988,s215848','rows without a study number are skipped, study numbers lower-cased');
- assert.equal(got.p[0].name,'Amy Ng');assert.equal(got.p[0].userId,'356212','user id taken from this page');
-});
-test('an export with other columns is refused so the one-page list is used instead',()=>{
- const {api}=extractFunctions('darkmode.participant-intel-core.js',['parseParticipantExport'],{globals:{getDeps:()=>exportDeps}});
- assert.throws(()=>api.parseParticipantExport('First name;Last name;Email;Role;\r\nA;B;a@b;x;'),/export_columns/);
- assert.throws(()=>api.parseParticipantExport(''),/export_columns/);
-});
-test('the export file is read as UTF-16LE, as CampusNet sends it',()=>{
- const {api}=extractFunctions('darkmode.participant-intel-core.js',['decodeParticipantExport']);
- const bytes=Buffer.from('\uFEFFStudy number;Gæst udl.;','utf16le');
- assert.equal(api.decodeParticipantExport(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.length)),'Study number;Gæst udl.;');
- const utf8=Buffer.from('Study number;','utf8');
- assert.equal(api.decodeParticipantExport(utf8.buffer.slice(utf8.byteOffset,utf8.byteOffset+utf8.length)),'Study number;');
-});
-test('the export\'s comma-joined programs are split, keeping "B. Eng." with its label',()=>{
- const host=loadModuleInternals('darkmode.participant-intel-host.js',['readExportProgram'],{document:{title:'',querySelector:()=>null,querySelectorAll:()=>[]},window:{location:{pathname:'/p',hostname:'campusnet.dtu.dk'}}}).api;
- assert.equal(host.readExportProgram('Process and Innovation, B. Eng., Master of Science in Sustainable Energy Technologies'),'Master of Science in Sustainable Energy Technologies');
- assert.equal(host.readExportProgram('enkeltfag, Bachelor program in Biomedical Engineering'),'Bachelor program in Biomedical Engineering');
- assert.equal(host.readExportProgram('Biomaterial Engineering for Medicine, Bachelor program in Biomedical Engineering'),'Biomaterial Engineering for Medicine');
- assert.equal(host.readExportProgram('Process and Innovation, B. Eng.'),'Process and Innovation, B. Eng.');
+test('no content script asks CampusNet for its participant export file (it once landed in Downloads as export.csv)',()=>{
+ for(const f of fsx.readdirSync('.').filter(n=>/^darkmode.*\.js$/.test(n))){
+  const src=fsx.readFileSync(f,'utf8');
+  assert.ok(!/['"]\/export['"]/.test(src),f+' requests CampusNet /export');
+ }
 });
 const {api: pfl}=extractFunctions('darkmode.participant-intel-ui.js',['describeProgramFilter']);
 test('while the other pages load, the filter bar says so',()=>{
  assert.equal(pfl.describeProgramFilter('Biotechnology',0,0,68,false,true),'Showing 0 of the 68 students in Biotechnology. Loading the others from the other pages of this list.');
- assert.equal(pfl.describeProgramFilter('Biotechnology',68,0,68,false,true),'Showing the 68 students in Biotechnology.');
+ assert.equal(pfl.describeProgramFilter('Biotechnology',68,0,68,false,true),'Showing all 68 students in Biotechnology.');
+});
+const {api: sn}=extractFunctions('darkmode.participant-intel-host.js',['getCampusnetParticipantSNumber']);
+test('an entry that shows no s-number is read from its detail box, so the filter still finds it',()=>{
+ const box={classList:{contains:c=>c==='ui-participant-informationbox'},textContent:' Study number s245678 Education Master of Science '};
+ const bare={querySelector:()=>null,nextElementSibling:box};
+ assert.equal(sn.getCampusnetParticipantSNumber(bare),'s245678');
+ const other={querySelector:()=>null,nextElementSibling:{classList:{contains:()=>false},textContent:'s111111'}};
+ assert.equal(sn.getCampusnetParticipantSNumber(other),'');
+});
+test('when a few of a study line cannot be found, the filter bar counts every entry it shows',()=>{
+ assert.equal(pfl.describeProgramFilter('Physics',5,122,128),'Showing 127 of the 128 students in Physics. 1 could not be found in the list.');
+ assert.equal(pfl.describeProgramFilter('Physics',5,0,9),'Showing 5 of the 9 students in Physics. The others are on other pages of this list.');
 });
 const {api: uh}=extractFunctions('darkmode.participant-intel-ui.js',['usersHeadingLabel']);
 test('a filtered Users heading reads how many of the total are shown',()=>{
@@ -319,14 +316,105 @@ test('two features reading and saving participant data at once never drop each o
  assert.equal(store.pi.retention.c.length,1,'the retention reading is kept');
 });
 
-test('archive backfill reads fetched pages with the one shared participant parser', () => {
+test('the archive backfill and the live page give the same participants for the same page', async () => {
     const src = readFileSync(new URL('../darkmode.participant-intel-backfill.js', import.meta.url), 'utf8');
+    const uiSrc = readFileSync(new URL('../darkmode.participant-intel-ui.js', import.meta.url), 'utf8');
     assert.doesNotMatch(src, /\.ui-participant-additional|\\\(\(\\d\+\)\\\)/, 'no second copy of the list parser or count regex');
-    const doc = { tag: 'archived page' };
-    let seen = null;
-    const { api } = extractFunctions('darkmode.participant-intel-backfill.js', ['parseParticipantListFromDoc'], {
-        globals: { getDeps: () => ({ parseParticipantList: (d) => { seen = d; return [{ sNumber: 's123456' }]; } }) }
+    assert.doesNotMatch(src, /function parseParticipantListFromDoc/, 'no forwarding parser wrapper in the backfill');
+    assert.doesNotMatch(src, /function getIsDark/, 'no second dark-mode lookup');
+    assert.equal((uiSrc.match(/function getIsDark/g) || []).length, 1, 'the UI owns the one dark-mode lookup');
+
+    const nameLink = {
+        textContent: 'Anna Berg',
+        getAttribute: (k) => (k === 'href' ? '/cnnet/participants/showperson.aspx?id=42' : null)
+    };
+    const infoDiv = {};
+    const header = { textContent: 'Education', closest: () => infoDiv };
+    const infoBox = { querySelectorAll: (s) => (s === '.info-header span' ? [header] : []) };
+    const item = {
+        querySelector: (s) => (s === '.ui-participant-fullname a' ? nameLink : null),
+        nextElementSibling: infoBox
+    };
+    const doc = {
+        getElementById: (id) => (id === 'participantinformation0' ? infoBox : null)
+    };
+    const coreDeps = {
+        getCampusnetUsersParticipantElements: (root) => (root === doc ? [item] : []),
+        getCampusnetParticipantSNumber: () => 's123456',
+        normalizeWhitespace: (s) => String(s || '').replace(/\s+/g, ' ').trim(),
+        readParticipantProgram: () => 'Physics'
+    };
+    const liveParser = extractFunctions('darkmode.participant-intel-core.js', ['parseParticipantList'], {
+        globals: { getDeps: () => coreDeps }
+    }).api.parseParticipantList;
+    const live = liveParser(doc);
+
+    const f = depsFixture();
+    let parsedDoc = null, captured = null, resolveFetch = null;
+    f.deps.getCampusnetExplicitSemesterFromPage = () => 'E2026';
+    f.deps.getCampusnetCourseNameFromPage = () => 'Synthetic course';
+    f.deps.parseParticipantList = (d) => {
+        parsedDoc = d;
+        return liveParser(d);
+    };
+    const { api } = extractFunctions('darkmode.participant-intel-backfill.js', ['runCampusnetArchiveBackfill'], {
+        prelude: 'var campusnetArchiveBackfillRunning=false,campusnetArchiveBackfillAbort=false,campusnetArchiveBackfillProgress=null;',
+        globals: {
+            getDeps: () => f.deps,
+            window: { location: { hostname: 'campusnet.dtu.dk' } },
+            updateCampusnetArchiveBackfillWidgetStatus() {},
+            fetchBestCampusnetParticipantsDoc: () => new Promise((resolve) => { resolveFetch = resolve; }),
+            upsertParticipantsIntoIntel: (intel, participants) => { captured = participants; },
+            setTimeout: () => {}
+        }
     });
-    assert.equal(api.parseParticipantListFromDoc(doc).length, 1);
-    assert.equal(seen, doc, 'the fetched document, not the live page, is parsed');
+    api.runCampusnetArchiveBackfill([{ elementId: '1', codeHint: '34032', semesterHint: 'E2026' }], { self: null, backfill: { scanned: {} } });
+    resolveFetch({ doc });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    assert.equal(parsedDoc, doc, 'the fetched document, not the live page, is parsed');
+    assert.deepEqual(plain(captured), plain(live));
+    assert.deepEqual(plain(captured), [{
+        name: 'Anna Berg',
+        userId: '42',
+        sNumber: 's123456',
+        program: 'Physics'
+    }]);
+});
+
+test('a missing participant API warns once and still returns the fallback', () => {
+    const warned = [];
+    const { api } = loadModuleInternals('darkmode.participant-intel-bridge.js', [
+        'normalizeIntelCourseCode',
+        'normalizeIntelCourseSemester'
+    ], {
+        console: { warn: message => warned.push(message) },
+        DTUAfterDarkFeatureFlags: {
+            FEATURE_PARTICIPANT_INTEL_KEY: 'participantIntel',
+            FEATURE_PARTICIPANT_INTEL_DEMOGRAPHICS_KEY: 'participantIntelDemographics',
+            FEATURE_PARTICIPANT_INTEL_SHARED_HISTORY_KEY: 'participantIntelSharedHistory',
+            FEATURE_PARTICIPANT_INTEL_RETENTION_KEY: 'participantIntelRetention',
+            isFeatureFlagEnabled: () => false
+        }
+    });
+    assert.equal(api.normalizeIntelCourseCode('02105'), '');
+    assert.equal(api.normalizeIntelCourseSemester('F2025'), '');
+    assert.equal(warned.length, 1);
+    assert.match(warned[0], /DTUAfterDarkParticipantIntelHost is missing/);
+});
+
+test('course codes with letters count as courses, lower-case words do not', () => {
+    const host = loadModuleInternals('darkmode.participant-intel-host.js', ['findIntelCourseCode', 'normalizeIntelCourseCode', 'isCampusnetLikelyAcademicCourse', 'isCampusnetNonCourseTitle'], {
+        document: { title: '', querySelector: () => null, querySelectorAll: () => [] },
+        window: { location: { pathname: '/p', hostname: 'campusnet.dtu.dk' } }
+    }).api;
+    assert.equal(host.findIntelCourseCode('41B02 Product development F26'), '41B02');
+    assert.equal(host.findIntelCourseCode('02105 Algorithms'), '02105');
+    assert.equal(host.findIntelCourseCode('ku123 Something'), 'KU123');
+    assert.equal(host.findIntelCourseCode('Meet for 10min after class'), '');
+    assert.equal(host.normalizeIntelCourseCode('Course 41B02, spring'), '41B02');
+    assert.equal(host.isCampusnetLikelyAcademicCourse('41B02', 'Product development'), true);
+    assert.equal(host.isCampusnetLikelyAcademicCourse('02105', 'Algorithms'), true);
+    assert.equal(host.isCampusnetNonCourseTitle('41B02 Group 7'), true);
 });

@@ -5,7 +5,12 @@
 // prerequisites are read live so a mid-semester edit still shows.
 (function () {
     'use strict';
-    var markExt = globalThis.DTUAfterDarkDom.markExt;
+    var DOM = globalThis.DTUAfterDarkDom;
+    var markExt = DOM.markExt;
+    var el = DOM.el;
+    var ensureStyles = DOM.ensureStyles;
+    var makeButton = DOM.makeButton;
+    var formatReadDate = DOM.formatReadDate;
 
     var CODE_SOURCE = '[0-9]{2}[0-9A-Z]{3}';
     var MAX_PER_COLUMN = 10;
@@ -27,8 +32,7 @@
     }
 
     function dep(name) {
-        var deps = getDeps();
-        return deps && typeof deps[name] === 'function' ? deps[name] : null;
+        return DOM.dep(getDeps(), name);
     }
 
 
@@ -444,6 +448,31 @@
         return map.back.length > 0 || map.forward.length > 0;
     }
 
+    // How many courses `code` lists as prerequisites (catalogue or not) and
+    // how many list it: the first column on each side, before the cap.
+    function courseMapCounts(courses, followers, code, centerOverride) {
+        var map = buildCourseMap(courses, followers, code, { back: 1, forward: 1 }, centerOverride);
+        var before = {};
+        var back = map.back[0];
+        if (back) back.blocks.forEach(function (b) { b.codes.forEach(function (c) { before[c] = true; }); });
+        var forward = map.forward[0];
+        return {
+            before: Object.keys(before).length + (back ? back.more : 0),
+            after: forward ? forward.nodes.length + forward.more : 0
+        };
+    }
+
+    // The line under "Open course map" on the preview.
+    function courseMapCaption(code, counts) {
+        var before = counts.before
+            ? counts.before + (counts.before === 1 ? ' course' : ' courses') + ' before ' + code
+            : 'No prerequisites listed';
+        var after = counts.after
+            ? counts.after + (counts.after === 1 ? ' course builds' : ' courses build') + ' on it'
+            : 'no course builds on it';
+        return before + ', ' + after;
+    }
+
     // ===== Page reading =====
 
     function labelText(label) {
@@ -536,7 +565,20 @@
     // ===== Rendering =====
 
     var CSS = [
-        '.dtu-cm-btn-note{margin-left:10px;color:var(--dtu-cm-muted)}',
+        '.dtu-cm-btn-note{color:var(--dtu-cm-muted)}',
+        // The row: a small, still picture of the map with "Open course map" over its foot. A click
+        // anywhere on the card presses that button. kurser's cells pad 12px on top only; the bottom margin
+        // matches it, so the card sits in the middle of its row.
+        '.dtu-cm-card{position:relative;display:block;margin:0 auto 12px;cursor:pointer;box-sizing:border-box;width:340px;height:120px;overflow:hidden;border:1px solid var(--dtu-cm-faint)!important;border-radius:6px;background:var(--dtu-cw-tip-bg)!important}',
+        '.dtu-cm-card:hover,.dtu-cm-card:focus-within,.dtu-cm-card.open{border-color:var(--dtu-cm-accent)!important}',
+        '.dtu-cm-thumb{position:absolute;inset:0;overflow:hidden;pointer-events:none;opacity:.55;font:13px/1.4 Arial,Helvetica,sans-serif;text-align:left;transition:opacity .15s}',
+        '.dtu-cm-card:hover .dtu-cm-thumb,.dtu-cm-card:focus-within .dtu-cm-thumb{opacity:.85}',
+        '.dtu-cm-thumb .dtu-cm-grid{position:absolute;left:0;top:0;margin:0;transform-origin:0 0}',
+        '.dtu-cm-thumb .dtu-skel-block{padding:14px}',
+        '.dtu-cm-card button.dtu-cm-open{appearance:none;-webkit-appearance:none;position:absolute;left:0;right:0;bottom:0;z-index:1;display:flex;flex-direction:column;align-items:flex-start;gap:1px;margin:0;padding:18px 10px 7px;border:0!important;border-radius:0;background:linear-gradient(to top,var(--dtu-cw-tip-bg) 40%,transparent)!important;color:var(--dtu-cm-ink)!important;font:inherit;font-size:12px;line-height:1.35;text-align:left;cursor:pointer;outline:none}',
+        '.dtu-cm-card button.dtu-cm-open:focus-visible{text-decoration:underline}',
+        '.dtu-cm-open b{font-weight:700}',
+        '.dtu-cm-open span{color:var(--dtu-cm-muted)!important}',
         '.dtu-cm-btn{appearance:none;-webkit-appearance:none;display:inline-block;margin:0;padding:1px 8px;border:1px solid var(--dtu-cm-faint)!important;border-radius:4px;background:transparent!important;color:var(--dtu-cm-ink)!important;font:inherit;font-size:12px;line-height:18px;cursor:pointer;vertical-align:baseline}',
         '.dtu-cm-btn:hover,.dtu-cm-btn[aria-expanded="true"]{border-color:var(--dtu-cm-accent)!important}',
         // Same blurred, see-through backdrop as Settings and Library. The extra [data-dtu-ext] outranks
@@ -562,7 +604,7 @@
         '.dtu-cm-col{position:relative;z-index:1;display:flex;flex-direction:column;align-items:stretch;gap:8px}',
         '.dtu-cm-group{display:flex;flex-direction:column;gap:5px;padding:5px;border:1px dashed var(--dtu-cw-faint)!important;border-radius:6px}',
         '.dtu-cm-cap{font-size:11px;color:var(--dtu-cw-muted)!important}',
-        '.dtu-cm-pop button.dtu-cm-node{appearance:none;-webkit-appearance:none;display:flex;align-items:baseline;gap:6px;margin:0;max-width:220px;padding:3px 8px;border:1px solid var(--dtu-cw-faint)!important;border-radius:4px;background:var(--dtu-cw-tip-bg)!important;color:var(--dtu-cw-ink)!important;font:inherit;font-size:12px;line-height:1.35;text-align:left;cursor:pointer;white-space:normal}',
+        ':is(.dtu-cm-pop,.dtu-cm-thumb) button.dtu-cm-node{appearance:none;-webkit-appearance:none;display:flex;align-items:baseline;gap:6px;margin:0;max-width:220px;padding:3px 8px;border:1px solid var(--dtu-cw-faint)!important;border-radius:4px;background:var(--dtu-cw-tip-bg)!important;color:var(--dtu-cw-ink)!important;font:inherit;font-size:12px;line-height:1.35;text-align:left;cursor:pointer;white-space:normal}',
         '.dtu-cm-node b{flex:none;font-weight:700;white-space:nowrap}',
         '.dtu-cm-node span{min-width:0;overflow-wrap:anywhere;color:var(--dtu-cw-muted)!important}',
         '.dtu-cm-node small.dtu-cm-gone{display:block;font-size:11px}',
@@ -570,29 +612,14 @@
         '.dtu-cm-missing{display:inline-flex;align-items:center;gap:5px;margin:0;font-weight:400!important;color:var(--dtu-cw-muted)!important;font-size:12px;cursor:pointer}',
         '.dtu-cm-missing input{margin:0;accent-color:var(--dtu-cw-accent)}',
         '.dtu-cm-pop button.dtu-cm-node:hover,.dtu-cm-pop button.dtu-cm-node.on{border-color:var(--dtu-cw-accent)!important}',
-        '.dtu-cm-pop button.dtu-cm-node.me{max-width:320px;border-color:var(--dtu-cw-accent)!important;cursor:default}',
-        '.dtu-cm-pop button.dtu-cm-node.me span{color:var(--dtu-cw-ink)!important}',
-        '.dtu-cm-pop button.dtu-cm-more{appearance:none;-webkit-appearance:none;align-self:flex-start;margin:0;padding:2px 8px;border:1px dashed var(--dtu-cw-faint)!important;border-radius:4px;background:transparent!important;color:var(--dtu-cw-accent)!important;font:inherit;font-size:12px;cursor:pointer}',
+        ':is(.dtu-cm-pop,.dtu-cm-thumb) button.dtu-cm-node.me{max-width:320px;border-color:var(--dtu-cw-accent)!important;cursor:default}',
+        ':is(.dtu-cm-pop,.dtu-cm-thumb) button.dtu-cm-node.me span{color:var(--dtu-cw-ink)!important}',
+        ':is(.dtu-cm-pop,.dtu-cm-thumb) button.dtu-cm-more{appearance:none;-webkit-appearance:none;align-self:flex-start;margin:0;padding:2px 8px;border:1px dashed var(--dtu-cw-faint)!important;border-radius:4px;background:transparent!important;color:var(--dtu-cw-accent)!important;font:inherit;font-size:12px;cursor:pointer}',
         '.dtu-cm-pop button.dtu-cm-more:hover{border-color:var(--dtu-cw-accent)!important}',
         '.dtu-cm-empty,.dtu-cm-foot{color:var(--dtu-cw-muted)!important;font-size:12px}',
         '.dtu-cm-scroll .dtu-cm-empty{margin:auto;padding:24px;text-align:center}',
         '.dtu-cm-foot{margin-top:8px}'
     ].join('\n');
-
-    function ensureStyles() {
-        if (document.getElementById(STYLE_ID)) return;
-        var style = markExt(document.createElement('style'));
-        style.id = STYLE_ID;
-        style.textContent = CSS;
-        (document.head || document.documentElement).appendChild(style);
-    }
-
-    function el(tag, className, text) {
-        var node = markExt(document.createElement(tag));
-        if (className) node.className = className;
-        if (text != null) node.textContent = text;
-        return node;
-    }
 
     function applyTheme(node) {
         var layout = null;
@@ -740,12 +767,6 @@
         Array.prototype.forEach.call(view.grid.querySelectorAll('.dtu-cm-node'), function (n) {
             n.classList.toggle('on', !!linked[n.getAttribute('data-code')]);
         });
-    }
-
-    function formatReadDate(iso) {
-        var d = new Date(iso);
-        if (isNaN(d.getTime())) return '';
-        try { return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); } catch (e0) { return iso.slice(0, 10); }
     }
 
     var _state = null;
@@ -939,7 +960,7 @@
             });
         }
 
-        var read = formatReadDate(data.generatedAt);
+        var read = formatReadDate(data.generatedAt, { month: 'short', invalid: '' });
         var foot = 'Lines join a course to the courses it lists as prerequisites.';
         if (read) foot += ' Other courses as listed on kurser.dtu.dk on ' + read + '.';
         if (missing && state.hideMissing) {
@@ -1001,16 +1022,52 @@
         state.view.svg.animate([{ opacity: 0 }, { opacity: 1 }], { duration: MOVE_MS / 2, delay: MOVE_MS, fill: 'backwards' });
     }
 
+    function skeletonApi() {
+        var skel = globalThis.DTUAfterDarkSkeleton;
+        if (!skel) throw new Error('DTUAfterDarkSkeleton missing: load darkmode.skeleton.js before darkmode.kurser-course-map.js');
+        return skel;
+    }
+
+    // The map's outline while its data loads, in the popover's own layout
+    // classes: the header line, columns of course boxes leading to the course
+    // itself, and the foot note.
+    function courseMapSkeleton() {
+        var skel = skeletonApi();
+        var box = skel.block('Loading course map', [], markExt);
+        box.style.cssText = 'flex:1 1 auto;min-height:0;gap:0';
+        function bar(w, h) { return skel.bar(w, h, null, markExt); }
+        function hidden(tag, cls) { var n = el(tag, cls); n.setAttribute('aria-hidden', 'true'); return n; }
+        var head = hidden('div', 'dtu-cm-head');
+        var title = bar('220px', '16px');
+        title.style.marginRight = 'auto';
+        head.appendChild(title);
+        [['130px', '18px'], ['90px', '22px'], ['86px', '22px'], ['78px', '22px']].forEach(function (s) { head.appendChild(bar(s[0], s[1])); });
+        box.appendChild(head);
+        var scroll = hidden('div', 'dtu-cm-scroll');
+        var grid = hidden('div', 'dtu-cm-grid');
+        [5, 4, 1].forEach(function (count, i) {
+            var col = hidden('div', 'dtu-cm-col');
+            for (var n = 0; n < count; n++) col.appendChild(bar(i === 2 ? '200px' : '220px', i === 2 ? '24px' : '38px'));
+            grid.appendChild(col);
+        });
+        scroll.appendChild(grid);
+        box.appendChild(scroll);
+        var foot = hidden('div', 'dtu-cm-foot');
+        foot.appendChild(bar('62%', '12px'));
+        box.appendChild(foot);
+        return box;
+    }
+
     function openCourseMap(button, pageCode) {
         closeCourseMap();
-        ensureStyles();
+        ensureStyles(STYLE_ID, CSS);
         var pop = el('div', 'dtu-cm-pop');
         pop.setAttribute('role', 'dialog');
         pop.setAttribute('aria-label', 'Course map for ' + pageCode);
         pop.setAttribute('aria-modal', 'true');
         pop.tabIndex = -1;
         applyTheme(pop);
-        pop.appendChild(el('div', 'dtu-cm-empty', 'Loading course map...'));
+        pop.appendChild(courseMapSkeleton());
         var backdrop = el('div', 'dtu-cm-backdrop');
         document.body.appendChild(backdrop);
         document.body.appendChild(pop);
@@ -1044,6 +1101,8 @@
             state.data = data;
             state.liveEntry = readLiveCenterEntry(function (c) { return !!data.courses[c]; });
             renderPopover(state);
+            var scroll = pop.querySelector('.dtu-cm-scroll');
+            if (scroll) skeletonApi().reveal(scroll, markExt);
         }, function () {
             if (_state !== state) return;
             while (pop.firstChild) pop.removeChild(pop.firstChild);
@@ -1052,19 +1111,6 @@
     }
 
     // ===== Button =====
-
-    function makeButton(pageCode) {
-        var button = el('button', 'dtu-cm-btn', 'Show map');
-        button.type = 'button';
-        button.setAttribute('data-dtu-course-map', '1');
-        button.setAttribute('aria-expanded', 'false');
-        button.setAttribute('aria-haspopup', 'dialog');
-        button.addEventListener('click', function () {
-            if (_state && _state.button === button) closeCourseMap();
-            else openCourseMap(button, pageCode);
-        });
-        return button;
-    }
 
     function removeKurserCourseMap() {
         closeCourseMap();
@@ -1087,8 +1133,7 @@
         }
         var pageCode = getCode();
         if (!pageCode || document.querySelector('[data-dtu-course-map]')) return;
-        ensureStyles();
-        var button = makeButton(pageCode);
+        ensureStyles(STYLE_ID, CSS);
         // A row of its own under Academic prerequisites (or under the ECTS
         // row when a course lists none), so the prerequisite text stays whole.
         var anchor = findInfoRow(PREREQ_LABEL_RE) || findInfoRow(POINTS_LABEL_RE);
@@ -1098,25 +1143,81 @@
             });
             return;
         }
+        var button = el('button', 'dtu-cm-open');
+        button.type = 'button';
+        button.setAttribute('data-dtu-course-map', '1');
+        button.setAttribute('aria-expanded', 'false');
+        button.setAttribute('aria-haspopup', 'dialog');
+        button.appendChild(el('b', null, 'Open course map'));
+        var caption = button.appendChild(el('span', null, 'Courses before ' + pageCode + ' and the courses that build on it'));
+        button.addEventListener('click', function () {
+            if (_state && _state.button === button) closeCourseMap();
+            else openCourseMap(button, pageCode);
+        });
+        var card = el('div', 'dtu-cm-card');
+        var thumb = el('div', 'dtu-cm-thumb');
+        thumb.setAttribute('aria-hidden', 'true');
+        thumb.setAttribute('inert', '');
+        thumb.appendChild(skeletonApi().block('Loading course map', [0, 1, 2].map(function () { return [['26%', '14px'], ['20%', '14px'], ['26%', '14px']]; }), markExt));
+        card.appendChild(thumb);
+        card.appendChild(button);
+        card.addEventListener('click', function (e) { if (!button.contains(e.target)) button.click(); });
         var row = markExt(document.createElement('tr'));
         row.setAttribute('data-dtu-course-map', 'row');
         applyTheme(row);
         var labelCell = markExt(document.createElement('td'));
         labelCell.appendChild(markExt(document.createElement('label'))).textContent = 'Course map';
         var valueCell = markExt(document.createElement('td'));
-        valueCell.appendChild(button);
-        var note = valueCell.appendChild(el('span', 'dtu-cm-btn-note', 'Courses before ' + pageCode + ' and the courses that build on it'));
+        valueCell.appendChild(card);
         row.appendChild(labelCell);
         row.appendChild(valueCell);
         anchor.row.parentNode.insertBefore(row, anchor.row.nextSibling);
-        // Nothing to draw either way: grey the button out and say why.
         loadCourseMapData().then(function (data) {
+            if (!card.isConnected) return;
             var live = readLiveCenterEntry(function (c) { return !!data.courses[c]; });
-            if (courseMapHasContent(data.courses, data.followers, pageCode, live)) return;
-            button.disabled = true;
-            button.title = 'Nothing to show';
-            note.textContent = 'No prerequisites listed, and no course lists ' + pageCode + ' as a prerequisite';
-        }, function () { });
+            var counts = courseMapCounts(data.courses, data.followers, pageCode, live);
+            // Nothing to draw: no card, just say why.
+            if (!counts.before && !counts.after) {
+                valueCell.replaceChild(el('span', 'dtu-cm-btn-note', 'No prerequisites listed, and no course lists ' + pageCode + ' as a prerequisite'), card);
+                return;
+            }
+            caption.textContent = courseMapCaption(pageCode, counts);
+            drawPreview(thumb, data, pageCode, live);
+        }, function () {
+            if (card.isConnected) valueCell.replaceChild(el('span', 'dtu-cm-btn-note', 'The course map data could not be loaded.'), card);
+        });
+    }
+
+    // Draws the map as the popover first shows it (the student's saved depth
+    // and hide setting) into `thumb`, scaled down to fill it, the course
+    // itself in the middle of the space above the caption.
+    function drawPreview(thumb, data, pageCode, live) {
+        var depth = readDepth();
+        var full = buildCourseMap(data.courses, data.followers, pageCode, depth, live, { hideMissing: true });
+        var map = full.hidden && !readHideMissing() ? buildCourseMap(data.courses, data.followers, pageCode, depth, live) : full;
+        while (thumb.firstChild) thumb.removeChild(thumb.firstChild);
+        if (!map.back.length && !map.forward.length) return;
+        var view = renderColumns({ data: data, map: map });
+        thumb.appendChild(view.grid);
+        drawLines(view);
+        var w = thumb.clientWidth;
+        var h = thumb.clientHeight - 34;
+        var gw = view.grid.offsetWidth;
+        var gh = view.grid.offsetHeight;
+        var me = view.grid.querySelector('.dtu-cm-node.me');
+        if (!w || !gw || !gh || !me) return;
+        var scale = Math.min(0.5, Math.max(w / gw, h / gh));
+        var g = view.grid.getBoundingClientRect();
+        var m = me.getBoundingClientRect();
+        var place = function (size, gridSize, centre) {
+            var s = gridSize * scale;
+            if (s <= size) return (size - s) / 2;
+            return Math.min(0, Math.max(size - s, size / 2 - centre * scale));
+        };
+        var x = place(w, gw, m.left + m.width / 2 - g.left);
+        var y = place(h, gh, m.top + m.height / 2 - g.top);
+        view.grid.style.transform = 'translate(' + x + 'px,' + y + 'px) scale(' + scale + ')';
+        skeletonApi().reveal(thumb, markExt);
     }
 
     try {
@@ -1127,6 +1228,8 @@
             buildFollowerIndex: buildFollowerIndex,
             buildCourseMap: buildCourseMap,
             courseMapHasContent: courseMapHasContent,
+            courseMapCounts: courseMapCounts,
+            courseMapCaption: courseMapCaption,
             readHideMissing: readHideMissing,
             saveHideMissing: saveHideMissing,
             insertKurserCourseMap: insertKurserCourseMap,

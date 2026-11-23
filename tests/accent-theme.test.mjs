@@ -266,3 +266,18 @@ test('surface mark accents keep each preset hue and reach 4.5:1 on both widget s
     const navy = api.parseHexColorToRgb(props.get('--dtu-ad-accent-mark-dark'));
     assert.ok(navy.b - navy.r > 50, 'navy stays blue on dark instead of draining to grey: ' + props.get('--dtu-ad-accent-mark-dark'));
 });
+
+test('a failed logo SVG fetch is tried once per page, not again on every logo redraw', async () => {
+    let fetches = 0;
+    let redraws = 0;
+    const { api } = extractFunctions('darkmode.accent-theme.js', ['ensureAccentLogoSvgLoaded'], {
+        prelude: 'var _accentLogoSvgTemplate = null; var _accentLogoSvgLoadPromise = null; var _accentLogoSvgLoadFailed = false;',
+        globals: {
+            fetch: () => { fetches++; return Promise.reject(new Error('blocked')); },
+            replaceLogoImage: () => { redraws++; if (redraws < 5) api.ensureAccentLogoSvgLoaded('x.svg'); }
+        }
+    });
+    api.ensureAccentLogoSvgLoaded('x.svg');
+    for (let i = 0; i < 10; i++) await new Promise((r) => setTimeout(r, 0));
+    assert.equal(fetches, 1);
+});

@@ -283,6 +283,11 @@
 
     function examFormat(fields) {
         var text = fields.durationText + ' ' + fields.assessmentText;
+        // The official type ("Written examination and exercises") and Exam duration decide
+        // first; the prose after it ("an oral group presentation") only when they say nothing.
+        var official = fields.durationText + ' ' + String(fields.assessmentText || '').split(';')[0];
+        if (/\boral\b|mundtlig/i.test(official)) return 'oral';
+        if (/written|skriftlig/i.test(official)) return 'written';
         if (/\boral\b|mundtlig/i.test(text)) return 'oral';
         if (/written|skriftlig/i.test(text)) return 'written';
         // "Evaluation of exercises/reports" with a day in the exam period (a
@@ -293,6 +298,27 @@
 
     function outcome(status, format, date, evidence, reason) {
         return { status: status, format: format, date: date, range: !!date && format === 'oral', evidence: evidence, reason: reason };
+    }
+
+    // A date read from a row of DTU's exam table, with that row's grading deadline. A
+    // coursework course has no exam to grade on that day, so it gets no grading deadline.
+    // pageDays: not an oral exam, but the course page says the exam may take more than one
+    // day (62117 "Several days of exam can be occur", 62276 "cannot be completed on the
+    // stipulated examination day"). 461 of 463 written exams in the 2026-2027 catalogue say nothing.
+    function fromRow(format, row, evidence, fields) {
+        var result = outcome('suggested', format, row.date, evidence, null);
+        if (format !== 'hand-in' && row.grading) result.grading = row.grading;
+        if (!result.range && fields && SEVERAL_DAYS_RE.test([fields.examText, fields.durationText, fields.assessmentText].join(' '))) result.pageDays = true;
+        return result;
+    }
+    var SEVERAL_DAYS_RE = /several days|more than one day|cannot be completed on the stipulated|flere (eksamens)?dage/i;
+
+    // The one sentence about an exam that may take more than one day, or ''.
+    function severalDaysNote(result) {
+        if (!result) return '';
+        if (result.range) return 'Oral exams may run over several days.';
+        if (result.pageDays) return 'The course page says the exam may be held on more than one day.';
+        return '';
     }
 
     function countWord(n) { return n === 2 ? 'two' : String(n); }
@@ -307,10 +333,10 @@
         if (!section || !period) return outcome('unconfirmed', format, null, null, 'DTU has not published exam dates for this period yet');
 
         var named = section.rows.filter(function (row) { return rowNamesCourse(row.text, code); });
-        if (named.length === 1) return outcome('suggested', format, named[0].date, 'named: ' + code, null);
+        if (named.length === 1) return fromRow(format, named[0], 'named: ' + code, fields);
         if (named.length > 1) {
             var ordinary = named.filter(function (row) { return !lineSaysReExam(row.text, code); });
-            if (ordinary.length === 1) return outcome('suggested', format, ordinary[0].date, 'named: ' + code, null);
+            if (ordinary.length === 1) return fromRow(format, ordinary[0], 'named: ' + code, fields);
             return outcome('unconfirmed', format, null, null, 'listed on ' + countWord(named.length) + ' dates');
         }
 
@@ -323,11 +349,19 @@
         var assessment = fields.durationText + ' ' + fields.assessmentText;
         if (!EXAM_WORD_RE.test(assessment) && COURSEWORK_RE.test(assessment)) return outcome('no-exam', 'none', null, null, null);
 
+        if (saysNoExam(fields)) return outcome('no-exam', 'none', null, null, null);
+
         var codes = slotCodes(fields.examText).filter(function (c) { return c[0] === period.season; });
-        if (!codes.length) return outcome('unconfirmed', format, null, null, 'no exam slot for this season on the course page');
+        if (!codes.length && WITH_TEACHER_RE.test(fields.examText || '')) return outcome('teacher', format, null, null, 'the course page says to agree the exam date with the teacher');
+        if (!codes.length) {
+            // 10406: taught in spring, but the page gives only the autumn slot E5A. Say so.
+            var other = slotCodes(fields.examText);
+            if (other.length) return outcome('unconfirmed', format, null, null, OTHER_SEASON_REASON + other.map(slotLabel).join(', ') + ', ' + (other[0][0] === 'E' ? 'an autumn' : 'a spring') + ' slot');
+            return outcome('unconfirmed', format, null, null, NO_SLOT_REASON);
+        }
         if (codes.length > 1) return outcome('unconfirmed', format, null, null, 'several exam slots on the course page');
         var rows = section.rows.filter(function (row) { return slotCodes(row.text).indexOf(codes[0]) >= 0; });
-        if (rows.length === 1) return outcome('suggested', format, rows[0].date, slotLabel(codes[0]), null);
+        if (rows.length === 1) return fromRow(format, rows[0], slotLabel(codes[0]), fields);
         if (!rows.length) return outcome('unconfirmed', format, null, null, 'exam slot ' + slotLabel(codes[0]) + ' is not in DTU\'s table');
         return outcome('unconfirmed', format, null, null, 'exam slot ' + slotLabel(codes[0]) + ' is on ' + countWord(rows.length) + ' dates');
     }
@@ -335,6 +369,14 @@
     var MONTH_NAMES = { 1: 'January', 6: 'June', 7: 'July', 8: 'August' };
     var LAST_DAY_RE = /last day|sidste (undervisnings)?dag/i;
     var WITH_TEACHER_RE = /decide[sd]? with|agree[sd]? with|aftales med|aftal(es)? med/i;
+    var NO_EXAM_TEXT_RE = /^\s*(no exam|ingen eksamen)\b/i;
+    // "No exam" under Date of examination, unless the official type names one (28316: "No exam"
+    // but "Oral examination and reports"): a page that contradicts itself stays unconfirmed.
+    function saysNoExam(fields) {
+        return NO_EXAM_TEXT_RE.test(fields.examText || '') && !EXAM_WORD_RE.test(String(fields.assessmentText || '').split(';')[0]);
+    }
+    var NO_SLOT_REASON = 'no exam slot for this season on the course page';
+    var OTHER_SEASON_REASON = 'the course page gives only exam slot ';
 
     // The table row of the general exam day for 3-week courses of a month:
     // "3-weeks course from January", not its re-exam or replacement exam.
@@ -361,7 +403,7 @@
         var section = findExamSection(sections, period, month);
         if (section) {
             var named = section.rows.filter(function (row) { return rowNamesCourse(row.text, code) && !lineSaysReExam(row.text, code); });
-            if (named.length === 1) return outcome('suggested', format, named[0].date, 'named: ' + code, null);
+            if (named.length === 1) return fromRow(format, named[0], 'named: ' + code, fields);
         }
 
         var wanted = academicYearOf(period);
@@ -370,17 +412,19 @@
 
         var assessment = fields.durationText + ' ' + fields.assessmentText;
         if (!EXAM_WORD_RE.test(assessment) && COURSEWORK_RE.test(assessment)) return outcome('no-exam', 'none', null, null, null);
+        if (saysNoExam(fields)) return outcome('no-exam', 'none', null, null, null);
         if (WITH_TEACHER_RE.test(fields.examText)) return outcome('teacher', format, null, null, 'the course page says to agree the exam date with the teacher');
         if (!LAST_DAY_RE.test(fields.examText)) return outcome('unconfirmed', format, null, null, 'the course page does not give the exam day');
         if (month === 7) return outcome('unconfirmed', format, null, null, 'DTU\'s table has no exam day for July courses');
         if (!section) return outcome('unconfirmed', format, null, null, 'DTU has not published exam dates for this period yet');
         var rows = threeWeekExamRows(section, month);
-        if (rows.length === 1) return outcome('suggested', format, rows[0].date, 'last day of the ' + MONTH_NAMES[month] + ' 3 weeks', null);
+        if (rows.length === 1) return fromRow(format, rows[0], 'last day of the ' + MONTH_NAMES[month] + ' 3 weeks', fields);
         return outcome('unconfirmed', format, null, null, rows.length
             ? MONTH_NAMES[month] + ' 3-week courses are on ' + countWord(rows.length) + ' dates'
             : 'DTU\'s table has no exam day for ' + MONTH_NAMES[month] + ' 3-week courses');
     }
 
+    var PLACEMENT_LINE_RE = /^\s*(autumn|spring|efterår|forår|january|januar|june|juni|july|juli|august)\b/i;
     var SEASON_WORDS = { E: /autumn|efterår/i, F: /spring|forår/i };
     var MONTH_WORDS = { 1: /january|januar/i, 6: /june|juni/i, 7: /july|juli/i, 8: /august/i };
 
@@ -397,9 +441,17 @@
     function coursePageExams(code, fields, sections, todayIso) {
         if (!fields || !fields.volume) return [];
         var start = +fields.volume.slice(0, 4);
-        var placement = String(fields.scheduleText || '').split('; ')[0];
-        var codes = slotCodes(fields.examText + ' ' + placement);
+        // The first line, and each later line that starts with a period ("Autumn E3A; Spring F4A").
+        var placement = String(fields.scheduleText || '').split('; ').filter(function (line, i) {
+            return i === 0 || PLACEMENT_LINE_RE.test(line);
+        }).join('; ');
+        // When Schedule names a semester it alone places the course: an exam slot from the
+        // other semester is the re-exam ("E4A, F4A, Oral re-exam", 22111). Off the normal
+        // schedule, the exam slots place it.
+        var codes = slotCodes(placement);
+        if (!codes.length && !SEASON_WORDS.E.test(placement) && !SEASON_WORDS.F.test(placement)) codes = slotCodes(fields.examText);
         var out = [];
+        var placedAny = false;
         function keep(label, period, section, result) {
             if (sectionOver(section, todayIso) || (!section && periodStartIso(period) <= todayIso)) return;
             out.push({ label: label, result: result });
@@ -407,16 +459,33 @@
         [{ season: 'E', year: start }, { season: 'F', year: start + 1 }].forEach(function (period) {
             var placed = codes.some(function (c) { return c[0] === period.season; }) || SEASON_WORDS[period.season].test(placement);
             if (!placed) return;
+            placedAny = true;
             var section = findExamSection(sections, period);
             keep((period.season === 'E' ? 'Autumn ' : 'Spring ') + period.year, period, section, resolveCourseExam(code, fields, section, period));
         });
         [1, 6, 7, 8].forEach(function (month) {
             if (!MONTH_WORDS[month].test(placement)) return;
+            placedAny = true;
             var period = { season: month === 1 ? 'J' : 'S', year: start + 1 };
             keep(MONTH_NAMES[month] + ' ' + period.year, period, findExamSection(sections, period, month),
                 resolveThreeWeekExam(code, fields, sections, period, month));
         });
+        // Off DTU's normal schedule (mostly PhD courses): say what the page says, under the catalogue year.
+        if (!placedAny) out.push({ label: yearLabel(fields.volume), result: unplacedExam(fields) });
+        // Taught over two periods with one exam (10033: Autumn and Spring, exam F2A): the
+        // period without a slot is teaching only, so it gets no line of its own.
+        var noSlot = function (e) {
+            return e.result.status === 'unconfirmed' && (e.result.reason === NO_SLOT_REASON || e.result.reason.indexOf(OTHER_SEASON_REASON) === 0);
+        };
+        if (out.some(function (e) { return !noSlot(e); })) out = out.filter(function (e) { return !noSlot(e); });
         return out;
+    }
+
+    function unplacedExam(fields) {
+        var format = examFormat(fields);
+        if (TEACHER_RE.test(fields.name)) return outcome('teacher', format, null, null, null);
+        if (WITH_TEACHER_RE.test(fields.examText || '')) return outcome('teacher', format, null, null, 'the course page says to agree the exam date with the teacher');
+        return outcome('unconfirmed', format, null, null, 'the course page places it in no exam period');
     }
 
     // Where DTU's date comes from: the course's slot, the course named in the
@@ -428,10 +497,52 @@
         return 'DTU\'s exam table: ' + evidence;
     }
 
+    // DTU's grading deadline for an exam day, as a fact: the date, and once it has
+    // passed, how many days ago. Whether grades are out is not known here.
+    // forDayIso names the exam day the deadline belongs to, for an exam whose day is not
+    // one fixed date (an oral exam that runs over several days).
+    function gradingText(gradingIso, todayIso, format, forDayIso) {
+        if (!gradingIso) return '';
+        var text = 'DTU\'s grading deadline' + (forDayIso ? ' for an exam on ' + format(forDayIso) : '') + ': ' + format(gradingIso);
+        var days = dayNumber(todayIso) - dayNumber(gradingIso);
+        if (days > 0) text += ', ' + days + (days === 1 ? ' day' : ' days') + ' ago';
+        return text;
+    }
+
+    // DTU's exam table gives a grading deadline per exam day, about five weeks after it.
+    // A planner row's deadline is the one for its own day: DTU's suggested day, or the
+    // day the student set (the last day of a range). Coursework and undated rows get none.
+    function gradingForRow(row, sections) {
+        if (!row || !row.date || row.format === 'hand-in' || row.format === 'none') return null;
+        if (row.status === 'suggested' && !row.range) return row.grading ? { grading: row.grading, day: null } : null;
+        var day = row.endDate || row.date;
+        var grading = null;
+        (sections || []).forEach(function (section) {
+            (section.rows || []).forEach(function (r) { if (r.date === day && r.grading) grading = r.grading; });
+        });
+        return grading ? { grading: grading, day: day } : null;
+    }
+
+    // The exams CampusNet Grades watches for a missing grade, kept in extension storage.
+    // The planner's rows are the truth for what it shows now; an exam already held stays
+    // after the planner moves on to the next period, until 200 days past its deadline.
+    function mergeGradingWatch(stored, current, todayIso) {
+        var byCode = Object.create(null);
+        (current || []).forEach(function (e) { byCode[e.code] = e; });
+        var kept = (Array.isArray(stored) ? stored : []).filter(function (e) {
+            return e && e.code && !byCode[e.code] && e.exam < todayIso
+                && dayNumber(todayIso) - dayNumber(e.grading) <= 200;
+        });
+        return kept.concat(current || []).sort(function (a, b) {
+            return a.exam < b.exam ? -1 : a.exam > b.exam ? 1 : (a.code < b.code ? -1 : 1);
+        });
+    }
+
     // Where a resolved exam outcome comes from, or why it has no date.
     function outcomeText(result) {
         if (result.status === 'suggested') {
-            return evidenceText(result.evidence) + (result.range ? '. Oral exams may run over several days.' : '');
+            var note = severalDaysNote(result);
+            return evidenceText(result.evidence) + (note ? '. ' + note : '');
         }
         if (result.status === 'unconfirmed') return 'Not confirmed: ' + result.reason;
         if (result.status === 'no-exam') return 'Assessed on coursework, per the course page';
@@ -456,12 +567,12 @@
             var entry = Object.prototype.hasOwnProperty.call(saved, code) ? saved[code] : null;
             var dtuDate = r.status === 'suggested' ? r.date : null;
             if (!entry) {
-                return { code: code, status: r.status, format: r.format, date: r.date, endDate: null, range: r.range, evidence: r.evidence, reason: r.reason, dtuDate: dtuDate };
+                return { code: code, status: r.status, format: r.format, date: r.date, endDate: null, range: r.range, pageDays: !!r.pageDays, evidence: r.evidence, reason: r.reason, dtuDate: dtuDate, grading: r.grading || null };
             }
             // A saved entry that says exactly what DTU's table says is not the
             // student's own date (older versions saved suggestions in bulk).
             if (dtuDate && entry.date === dtuDate && !entry.endDate && entry.format === r.format) {
-                return { code: code, status: r.status, format: r.format, date: r.date, endDate: null, range: r.range, evidence: r.evidence, reason: r.reason, dtuDate: dtuDate };
+                return { code: code, status: r.status, format: r.format, date: r.date, endDate: null, range: r.range, pageDays: !!r.pageDays, evidence: r.evidence, reason: r.reason, dtuDate: dtuDate, grading: r.grading || null };
             }
             var basisDate = entry.basis && entry.basis.date ? entry.basis.date : null;
             // An unconfirmed outcome means today's check could not be made, not
@@ -562,44 +673,12 @@
         return out.sort(function (a, b) { return a.days - b.days || (a.code < b.code ? -1 : a.code > b.code ? 1 : 0); });
     }
 
-    // iCalendar text (RFC 5545) for a list of exams, one all-day event each.
-    // events: [{ uid, date, endDate, summary, description }] with ISO dates;
-    // stamp: a UTC "YYYYMMDDTHHMMSSZ". Lines end in CRLF and fold at 75 octets.
-    function icsEscape(text) {
-        return String(text || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
-    }
-
-    function icsFold(line) {
-        var out = '';
-        var octets = 0;
-        for (var i = 0; i < line.length; i++) {
-            var c = line.charCodeAt(i);
-            var n = c < 0x80 ? 1 : c < 0x800 ? 2 : (c >= 0xd800 && c < 0xdc00) ? 4 : (c >= 0xdc00 && c < 0xe000) ? 0 : 3;
-            if (octets + n > 75) { out += '\r\n '; octets = 1; }
-            out += line[i];
-            octets += n;
-        }
-        return out;
-    }
-
-    function icsDate(iso) { return iso.replace(/-/g, ''); }
-
-    function nextIsoDay(iso) {
-        var d = new Date(dayNumber(iso) * 86400000 + 86400000);
-        return d.getUTCFullYear() + '-' + pad2(d.getUTCMonth() + 1) + '-' + pad2(d.getUTCDate());
-    }
-
+    // The exam export as iCalendar text; the format lives in darkmode.ics.js, shared with the
+    // DTU Learn deadlines export.
     function buildExamCalendar(events, stamp) {
-        var lines = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//DTU After Dark//Exam schedule//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:DTU exams'];
-        (events || []).forEach(function (e) {
-            if (!e || !e.date) return;
-            var last = e.endDate && e.endDate > e.date ? e.endDate : e.date;
-            lines.push('BEGIN:VEVENT', 'UID:' + icsEscape(e.uid), 'DTSTAMP:' + stamp,
-                'DTSTART;VALUE=DATE:' + icsDate(e.date), 'DTEND;VALUE=DATE:' + icsDate(nextIsoDay(last)),
-                'SUMMARY:' + icsEscape(e.summary), 'DESCRIPTION:' + icsEscape(e.description), 'END:VEVENT');
-        });
-        lines.push('END:VCALENDAR');
-        return lines.map(icsFold).join('\r\n') + '\r\n';
+        var ics = globalThis.DTUAfterDarkIcs;
+        if (!ics) throw new Error('darkmode.studyplan-exam-schedule-core.js needs darkmode.ics.js loaded first');
+        return ics.buildCalendar(events, stamp, 'DTU exams');
     }
 
     try {
@@ -617,6 +696,11 @@
             coursePageExams: coursePageExams,
             outcomeText: outcomeText,
             evidenceText: evidenceText,
+            severalDaysNote: severalDaysNote,
+            slotCodes: slotCodes,
+            gradingText: gradingText,
+            gradingForRow: gradingForRow,
+            mergeGradingWatch: mergeGradingWatch,
             mergeStudentEntries: mergeStudentEntries,
             computeExamGaps: computeExamGaps,
             buildExamCalendar: buildExamCalendar,

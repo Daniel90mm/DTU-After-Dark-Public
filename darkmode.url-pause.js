@@ -1,7 +1,11 @@
 (function () {
     'use strict';
 
+    // The rules live in extension storage, which every DTU site shares; each site's
+    // localStorage holds a copy so a page can be paused before anything runs.
     const URL_PAUSE_PATTERNS_KEY = 'dtuAfterDarkUrlPausePatterns';
+    // Set once this site's own rules (from before they were shared) joined the shared list.
+    const URL_PAUSE_SHARED_KEY = 'dtuAfterDarkUrlPauseSharedV1';
     const IS_TOP_WINDOW = (() => {
         try {
             return window === window.top;
@@ -67,10 +71,66 @@
         }
     }
 
-    function saveUrlPausePatterns(patterns) {
+    function writeLocalUrlPausePatterns(patterns) {
         try {
             localStorage.setItem(URL_PAUSE_PATTERNS_KEY, JSON.stringify(patterns || []));
         } catch (e) { }
+    }
+
+    function getSharedStorage() {
+        var storage = globalThis.DTUAfterDarkStorage;
+        if (!storage) throw new Error('darkmode.url-pause.js: DTUAfterDarkStorage is missing (load darkmode.storage.js first)');
+        return storage;
+    }
+
+    // Saved on one site, a rule must pause the page on the site it names.
+    // Resolves once the shared copy is written: reload only then, or the next
+    // load reads the old shared list and undoes the change.
+    function saveUrlPausePatterns(patterns) {
+        writeLocalUrlPausePatterns(patterns);
+        return getSharedStorage().storageLocalSet({ [URL_PAUSE_PATTERNS_KEY]: (patterns || []).slice() });
+    }
+
+    // Brings this site's copy in line with the shared rules. A top page whose
+    // paused state changes reloads once, into the new state.
+    function syncSharedUrlPausePatterns(pausedNow, isPausedFn) {
+        var storage = getSharedStorage();
+        storage.storageLocalGet({ [URL_PAUSE_PATTERNS_KEY]: null }, function (items) {
+            var shared = items && Array.isArray(items[URL_PAUSE_PATTERNS_KEY]) ? items[URL_PAUSE_PATTERNS_KEY] : null;
+            var next;
+            var joined = false;
+            try { joined = localStorage.getItem(URL_PAUSE_SHARED_KEY) === '1'; } catch (e0) { }
+            if (joined) {
+                next = shared || [];
+            } else {
+                next = [];
+                (shared || []).concat(getUrlPausePatterns()).forEach(function (pattern) {
+                    var normalized = normalizeUrlPausePattern(pattern);
+                    if (normalized && next.indexOf(normalized) === -1) next.push(normalized);
+                });
+                if (!shared || next.length !== shared.length) storage.storageLocalSet({ [URL_PAUSE_PATTERNS_KEY]: next });
+                try { localStorage.setItem(URL_PAUSE_SHARED_KEY, '1'); } catch (e1) { }
+            }
+            writeLocalUrlPausePatterns(next);
+            if (IS_TOP_WINDOW && isPausedFn() !== pausedNow) window.location.reload();
+        });
+    }
+
+    // A frame follows the page it sits in: pausing a page pauses its frames on the
+    // same site. A frame from another site cannot read the page's address.
+    function getTopUrlWithoutHash() {
+        try {
+            return String(window.top.location.href || '').split('#')[0];
+        } catch (e) {
+            return '';
+        }
+    }
+
+    function getPausingPatterns() {
+        var matching = getMatchingUrlPausePatterns();
+        if (matching.length || IS_TOP_WINDOW) return matching;
+        var topUrl = getTopUrlWithoutHash();
+        return topUrl ? getMatchingUrlPausePatterns(topUrl) : [];
     }
 
     function wildcardPatternToRegExp(pattern) {
@@ -174,8 +234,7 @@
             var remaining = allPatterns.filter(function (pattern) {
                 return (matchingPatterns || []).indexOf(pattern) === -1;
             });
-            saveUrlPausePatterns(remaining);
-            window.location.reload();
+            saveUrlPausePatterns(remaining).then(function () { window.location.reload(); });
         });
 
         wrap.appendChild(text);
@@ -185,7 +244,8 @@
 
 
     function initUrlPause() {
-        var _matchingUrlPausePatterns = getMatchingUrlPausePatterns();
+        var _matchingUrlPausePatterns = getPausingPatterns();
+        syncSharedUrlPausePatterns(_matchingUrlPausePatterns.length > 0, function () { return getPausingPatterns().length > 0; });
         if (_matchingUrlPausePatterns.length) {
             if (document.readyState === 'loading') {
                 document.addEventListener('DOMContentLoaded', function () {

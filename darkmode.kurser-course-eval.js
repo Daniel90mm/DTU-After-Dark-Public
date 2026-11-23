@@ -3,60 +3,36 @@
     var markExt = globalThis.DTUAfterDarkDom.markExt;
     var isTopWindow = globalThis.DTUAfterDarkDom.isTopWindow;
 
-    function getDeps() {
-        try { return globalThis.DTUAfterDarkKurserCourseEvalDeps || null; } catch (e0) { return null; }
+    // Shared page helpers from darkmode.kurser-widgets.js, which loads first.
+    var courseWidgetsLayout = globalThis.DTUAfterDarkCourseWidgetsLayout;
+    if (!courseWidgetsLayout) {
+        throw new Error('DTU After Dark: darkmode.kurser-widgets.js must load before darkmode.kurser-course-eval.js');
     }
 
-
-    function sendRuntimeMessage(msg, cb) {
-        var deps = getDeps();
-        if (deps && typeof deps.sendRuntimeMessage === 'function') {
-            deps.sendRuntimeMessage(msg, cb);
-            return;
+    function requireLayoutFunction(name) {
+        var fn = courseWidgetsLayout[name];
+        if (typeof fn !== 'function') {
+            throw new Error('DTU After Dark: DTUAfterDarkCourseWidgetsLayout.' + name
+                + ' is missing; darkmode.kurser-widgets.js must load first');
         }
-        if (cb) cb(null);
+        return fn;
     }
 
+    var sendRuntimeMessage = requireLayoutFunction('sendRuntimeMessage');
+    var isFeatureFlagEnabled = requireLayoutFunction('isFeatureFlagEnabled');
+    var isKurserCoursePage = requireLayoutFunction('isKurserCoursePage');
+    var getKurserCourseCode = requireLayoutFunction('getKurserCourseCode');
+    var findKurserCourseTitleElement = requireLayoutFunction('findKurserCourseTitleElement');
+    var findKurserGradeStatsInsertAnchor = requireLayoutFunction('findKurserGradeStatsInsertAnchor');
+    var pruneCourseWidgetsGrid = requireLayoutFunction('pruneCourseWidgetsGrid');
 
-    function isFeatureFlagEnabled(key) {
-        var deps = getDeps();
-        return !!(deps && typeof deps.isFeatureFlagEnabled === 'function' && deps.isFeatureFlagEnabled(key));
-    }
-
-    function isKurserCoursePage() {
-        var deps = getDeps();
-        return !!(deps && typeof deps.isKurserCoursePage === 'function' && deps.isKurserCoursePage());
-    }
-
-    function getKurserCourseCode() {
-        var deps = getDeps();
-        if (deps && typeof deps.getKurserCourseCode === 'function') return deps.getKurserCourseCode();
-        return null;
-    }
-
-    // Shared layout helpers from darkmode.kurser-widgets.js, which loads first.
     function getLayout() {
-        try { return globalThis.DTUAfterDarkCourseWidgetsLayout || null; } catch (e0) { return null; }
-    }
-
-    function findKurserCourseTitleElement(courseCode) {
-        var deps = getDeps();
-        if (deps && typeof deps.findKurserCourseTitleElement === 'function') {
-            return deps.findKurserCourseTitleElement(courseCode);
-        }
-        return null;
-    }
-
-    function findKurserGradeStatsInsertAnchor(titleEl) {
-        var deps = getDeps();
-        if (deps && typeof deps.findKurserGradeStatsInsertAnchor === 'function') {
-            return deps.findKurserGradeStatsInsertAnchor(titleEl);
-        }
-        return null;
+        return courseWidgetsLayout;
     }
 
     function getFeatureKurserCourseEvalKey() {
-        var deps = getDeps();
+        var deps;
+        try { deps = globalThis.DTUAfterDarkKurserCourseEvalDeps || null; } catch (e0) { deps = null; }
         return deps && deps.featureKurserCourseEvalKey;
     }
 
@@ -142,9 +118,18 @@
 
         status.textContent = 'Loading evaluation data...';
 
+        // The page can replace the column while the request runs; the new column for
+        // this course waits on this request (it is not asked twice), so it takes over.
         function isCurrentEvaluationRequest() {
-            return container.isConnected && isFeatureFlagEnabled(getFeatureKurserCourseEvalKey())
+            if (!container.isConnected) {
+                var redrawn = document.querySelector('[data-dtu-course-eval]');
+                if (redrawn && String(redrawn.getAttribute('data-dtu-course-eval-code') || '').toUpperCase() === courseCode) container = redrawn;
+            }
+            var current = container.isConnected && isFeatureFlagEnabled(getFeatureKurserCourseEvalKey())
                 && getKurserCourseCode() === courseCode;
+            // Nothing left to draw into: the next check asks again.
+            if (!current && _courseEvalCourseCode === courseCode) _courseEvalRequested = false;
+            return current;
         }
 
         function scheduleCourseEvalRetry(ms, isCookieFallback) {
@@ -180,13 +165,14 @@
                 if (!isCurrentEvaluationRequest()) return;
                 if (!response || !response.ok || !response.data) {
                     var reason = (response && response.error) ? response.error : 'unknown';
-                    status.textContent = 'Evaluation data unavailable. Retrying in 10 minutes.';
+                    status = renderCourseEvalShell(container, 'Evaluation data unavailable. Retrying in 10 minutes.');
                     console.log('[DTU After Dark] Course eval: background fetch failed', reason, response);
                     scheduleCourseEvalRetry(12000);
                     return;
                 }
                 container.setAttribute('data-dtu-course-eval-loaded', '1');
                 renderCourseEvaluationPanel(container, response.data, latestEvalUrl);
+                getLayout().revealColumn(container);
             });
         }
 
@@ -363,17 +349,10 @@
             })
             .catch(function (err) {
                 if (!isCurrentEvaluationRequest()) return;
-                status.textContent = 'Evaluation data unavailable. Retrying in 10 minutes.';
+                status = renderCourseEvalShell(container, 'Evaluation data unavailable. Retrying in 10 minutes.');
                 console.log('[DTU After Dark] Course eval error:', err && err.message || err);
                 scheduleCourseEvalRetry(8000);
             });
-    }
-
-    function pruneCourseWidgetsGrid() {
-        var grid = document.querySelector('[data-dtu-course-widgets-grid]');
-        if (grid && !grid.querySelector('[data-dtu-grade-stats], [data-dtu-course-eval]')) grid.remove();
-        var layout = getLayout();
-        if (layout) layout.refresh();
     }
 
     // Header plus a status line; returns the status element, which the
@@ -386,6 +365,12 @@
         var status = layout.makeEl('div', 'dtu-cw-status', statusText);
         status.setAttribute('data-dtu-course-eval-status', '1');
         container.appendChild(status);
+        // While loading, the skeleton shows instead of the words; a problem
+        // draws the shell again with its message and no skeleton.
+        if (!statusText || /^(Loading|Waiting)/.test(statusText)) {
+            status.hidden = true;
+            container.appendChild(layout.makeColumnSkeleton('evaluation'));
+        }
         layout.refresh();
         return status;
     }

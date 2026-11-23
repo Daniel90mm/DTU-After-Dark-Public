@@ -2,6 +2,9 @@
 (function() {
     'use strict';
 
+    const fetchWithTimeLimit = DTUAfterDarkShared.fetchWithTimeLimit;
+    // DTU's library API answered in about 30 s on 2026-11-23, so it gets more than the default 20 s.
+    const LIBRARY_API_TIME_LIMIT_MS = 60000;
     const decodeHtmlBasic = DTUAfterDarkShared.decodeHtmlBasic;
 
     // --- Library events & news (bibliotek.dtu.dk) ---
@@ -26,7 +29,7 @@
         try {
             // Note: Do NOT set a `Referer` header here. It's a forbidden header name in fetch and can
             // cause the request to fail entirely in some extension contexts.
-            const resp = await fetch('https://www.bibliotek.dtu.dk/api/v1/calendar/calendareventlist', {
+            const resp = await fetchWithTimeLimit('https://www.bibliotek.dtu.dk/api/v1/calendar/calendareventlist', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -35,7 +38,7 @@
                 },
                 credentials: 'omit',
                 body: JSON.stringify(body)
-            });
+            }, LIBRARY_API_TIME_LIMIT_MS);
             if (!resp.ok) return { ok: false, error: 'http', status: resp.status };
             const json = await resp.json();
             const results = (json && (json.Results || json.results)) ? (json.Results || json.results) : [];
@@ -50,8 +53,8 @@
                     excerpt: r.FormatedDate
                         ? formattedDate + (r.Location ? ' | ' + location : '')
                         : decodeHtmlBasic(r.Text || '').slice(0, 120),
-                    day: d ? String(d.getDate()) : '',
-                    month: d ? d.toLocaleString('en', { month: 'short' }) : '',
+                    day: d ? d.toLocaleString('en', { day: 'numeric', timeZone: 'Europe/Copenhagen' }) : '',
+                    month: d ? d.toLocaleString('en', { month: 'short', timeZone: 'Europe/Copenhagen' }) : '',
                     location: location,
                     formattedDate: formattedDate,
                     startIso: (d && !isNaN(d.getTime())) ? d.toISOString() : '',
@@ -77,7 +80,7 @@
         try {
             // Note: Do NOT set a `Referer` header here. It's a forbidden header name in fetch and can
             // cause the request to fail entirely in some extension contexts.
-            const resp = await fetch('https://www.bibliotek.dtu.dk/api/v1/news/newslist', {
+            const resp = await fetchWithTimeLimit('https://www.bibliotek.dtu.dk/api/v1/news/newslist', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -86,7 +89,7 @@
                 },
                 credentials: 'omit',
                 body: JSON.stringify(body)
-            });
+            }, LIBRARY_API_TIME_LIMIT_MS);
             if (!resp.ok) return { ok: false, error: 'http', status: resp.status };
             const json = await resp.json();
             const results = (json && (json.Results || json.results)) ? (json.Results || json.results) : [];
@@ -97,7 +100,7 @@
                     title: decodeHtmlBasic(r.Title || ''),
                     excerpt: decodeHtmlBasic(r.Summary || '').slice(0, 120),
                     badge: r.Badge && r.Badge.Title ? decodeHtmlBasic(r.Badge.Title) : '',
-                    date: d ? d.toLocaleDateString('en', { day: '2-digit', month: 'long', year: 'numeric' }) : ''
+                    date: d ? d.toLocaleDateString('en', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'Europe/Copenhagen' }) : ''
                 };
             });
             return { ok: true, news };
@@ -107,7 +110,7 @@
     }
 
     function parseIntLoose(text) {
-        const digits = String(text || '').replace(/[^\d]/g, '');
+        const digits = String(text == null ? '' : text).replace(/[^\d]/g, '');
         if (!digits) return null;
         const n = parseInt(digits, 10);
         return Number.isFinite(n) ? n : null;
@@ -142,7 +145,7 @@
         }
 
         try {
-            const resp = await fetch(finalUrl, {
+            const resp = await fetchWithTimeLimit(finalUrl, {
                 method: 'GET',
                 headers: { Accept: 'application/json, text/plain, */*' },
                 credentials: 'omit',

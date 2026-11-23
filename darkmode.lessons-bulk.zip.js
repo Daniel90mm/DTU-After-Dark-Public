@@ -29,6 +29,10 @@
         return [];
     }
 
+    function getDocHref(doc) {
+        try { return String(doc && doc.location && doc.location.href ? doc.location.href : ''); } catch (e0) { return ''; }
+    }
+
 
 
     function isLessonsBulkDebugEnabled() {
@@ -53,8 +57,7 @@
             sig: '',
             running: false,
             lastRefreshAt: 0,
-            activeDoc: null,
-            lastLegacyExpandAt: 0
+            activeDoc: null
         },
         urlNameHints: new Map(),
         legacyApiSectionsCache: {
@@ -64,15 +67,10 @@
             promise: null,
             ts: 0,
             lastAttemptTs: 0,
-            source: ''
+            source: '',
+            runId: 0
         },
         legacyModuleStructureCache: new Map(),
-        legacyBackgroundResolveState: {
-            orgUnitId: '',
-            running: false,
-            token: 0,
-            resolvedKeys: new Set()
-        },
         lessonsTopicApiVersion: '',
         lessonsTocIndex: { orgUnitId: '', index: null },
         runAbort: null,
@@ -141,7 +139,8 @@
     }
 
     function hasFilenameExtension(name) {
-        return /\.[a-z0-9]{1,12}$/i.test(String(name || ''));
+        // An extension has a letter: "Lecture 5.1" has none and still gets ".pdf".
+        return /\.(?=[a-z0-9]*[a-z])[a-z0-9]{1,12}$/i.test(String(name || ''));
     }
 
     function isGenericDownloadFileName(name) {
@@ -481,9 +480,12 @@
         }, 2500);
     }
 
-    async function downloadSingleBundledZipFromUrls(rootEl, urls) {
+    // extraEntries: files the run made itself ({path, bytes}, path already unique, may hold
+    // folders), such as the course activity pages; they go first.
+    async function downloadSingleBundledZipFromUrls(rootEl, urls, extraEntries) {
         var list = Array.from(new Set((urls || []).filter(function (u) { return isStrictFileDownloadUrl(u); })));
-        if (!list.length) return { ok: false, reason: 'no-files' };
+        var extra = Array.isArray(extraEntries) ? extraEntries : [];
+        if (!list.length && !extra.length) return { ok: false, reason: 'no-files' };
 
         var limits = getLessonsBulkZipPartLimits();
         var baseName = getLessonsBulkZipNameBase();
@@ -515,7 +517,7 @@
                 logLessonsBulkDebug('bundle_fetch_fail', { url: list[i], result: r || null });
                 return;
             }
-            var entryName = sanitizeZipEntryName(r.name, 'file-' + String(i + 1));
+            var entryName = r.path || sanitizeZipEntryName(r.name, 'file-' + String(i + 1));
             // Number a repeated name until the result is unused: "a (1).txt" may
             // itself be a real file name further down the list.
             var finalName = entryName;
@@ -535,6 +537,7 @@
         // Fetch a few files at once, but add them to parts strictly in list
         // order so entry order and duplicate-name numbering match a one-by-one
         // run. A result is dropped from `fetched` as soon as it is placed.
+        extra.forEach(function (e) { addToPart({ ok: true, path: e.path, bytes: e.bytes }, -1); });
         var fetched = new Array(list.length);
         var nextFetch = 0;
         var nextPlace = 0;
@@ -575,6 +578,7 @@
             isFeatureFlagEnabled: isFeatureFlagEnabled,
             isDarkModeEnabled: isDarkModeEnabled,
             deepQueryAll: deepQueryAll,
+            getDocHref: getDocHref,
             normalizeWhitespace: normalizeWhitespace,
             markExt: markExt,
             isLessonsBulkDebugEnabled: isLessonsBulkDebugEnabled,

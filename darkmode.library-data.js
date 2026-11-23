@@ -12,14 +12,24 @@
     var isTopWindow = busRuntime.isTopWindow;
     var isFeatureFlagEnabled = busRuntime.isFeatureFlagEnabled;
     var isDTULearnHomepage = busRuntime.isDTULearnHomepage;
+    // The library is in Lyngby: its hours, days and dates are Danish, whatever the browser's time zone.
+    var dom = globalThis.DTUAfterDarkDom;
+    if (!dom || typeof dom.copenhagenParts !== 'function' || typeof dom.copenhagenTs !== 'function') {
+        throw new Error('DTU After Dark: darkmode.library-data.js needs DTUAfterDarkDom.copenhagenParts and copenhagenTs');
+    }
+
+    function copenhagenMinuteOfDay(ts) {
+        var p = dom.copenhagenParts(ts);
+        return p.hour * 60 + p.minute;
+    }
 
     function getDeps() {
-        try { return globalThis.DTUAfterDarkBusDeps || null; } catch (e0) { return null; }
+        return globalThis.DTUAfterDarkBusDeps || null;
     }
 
     function getLibraryDropdownFeatureKey() {
         var deps = getDeps();
-        return (deps && deps.featureLibraryDropdownKey) || 'dtuAfterDarkFeatureLibraryDropdown';
+        return (deps && deps.featureLibraryDropdownKey) || globalThis.DTUAfterDarkFeatureFlags.FEATURE_LIBRARY_DROPDOWN_KEY;
     }
 
     // ===== LIBRARY NAV DROPDOWN =====
@@ -28,30 +38,22 @@
         return isFeatureFlagEnabled(getLibraryDropdownFeatureKey());
     }
 
-    var _libraryEventsCache = null;
-    var _libraryNewsCache = null;
+    var _libraryFeedCache = { events: null, news: null };
     var _libraryCrowdingCache = null;
     var _libraryEscHandler = null;
     var _libraryOccupancyAutoTimer = null;
 
-    function requestLibraryEvents(cb, forceRefresh) {
-        sendRuntimeMessage({ type: 'dtu-library-events', forceRefresh: !!forceRefresh }, function (resp) {
-            if (!forceRefresh && resp && resp.ok && Array.isArray(resp.events) && !resp.events.length) {
-                requestLibraryEvents(cb, true);
+    function requestLibraryFeed(kind, cb, forceRefresh) {
+        if (kind !== 'events' && kind !== 'news') {
+            throw new Error('DTU After Dark: unknown library feed type ' + kind);
+        }
+        var listKey = kind === 'events' ? 'events' : 'news';
+        sendRuntimeMessage({ type: 'dtu-library-' + kind, forceRefresh: !!forceRefresh }, function (resp) {
+            if (!forceRefresh && resp && resp.ok && Array.isArray(resp[listKey]) && !resp[listKey].length) {
+                requestLibraryFeed(kind, cb, true);
                 return;
             }
-            if (resp && resp.ok) _libraryEventsCache = resp;
-            if (cb) cb(resp);
-        });
-    }
-
-    function requestLibraryNews(cb, forceRefresh) {
-        sendRuntimeMessage({ type: 'dtu-library-news', forceRefresh: !!forceRefresh }, function (resp) {
-            if (!forceRefresh && resp && resp.ok && Array.isArray(resp.news) && !resp.news.length) {
-                requestLibraryNews(cb, true);
-                return;
-            }
-            if (resp && resp.ok) _libraryNewsCache = resp;
+            if (resp && resp.ok) _libraryFeedCache[kind] = resp;
             if (cb) cb(resp);
         });
     }
@@ -98,14 +100,6 @@
         }
     }
 
-    function formatHourWindow(hour) {
-        var h = (hour % 24 + 24) % 24;
-        var n = (h + 1) % 24;
-        var hs = (h < 10 ? '0' : '') + h + ':00';
-        var ns = (n < 10 ? '0' : '') + n + ':00';
-        return hs + '-' + ns;
-    }
-
     function parseLibraryIntLoose(value, fallback) {
         var digits = String(value == null ? '' : value).match(/-?\d+/);
         if (!digits) return (typeof fallback === 'number' ? fallback : null);
@@ -121,10 +115,7 @@
     function toLibraryDateKey(ts) {
         var d = new Date(ts);
         if (!(d instanceof Date) || isNaN(d.getTime())) return '';
-        var y = d.getFullYear();
-        var m = d.getMonth() + 1;
-        var day = d.getDate();
-        return y + '-' + (m < 10 ? '0' : '') + m + '-' + (day < 10 ? '0' : '') + day;
+        return dom.copenhagenDateIso(d.getTime());
     }
 
     function parseLibraryMinuteOfDay(raw) {
@@ -132,7 +123,7 @@
             if (raw >= 0 && raw < 24 * 60) return Math.round(raw);
             if (raw > 24 * 60) {
                 var d0 = new Date(raw);
-                if (!isNaN(d0.getTime())) return d0.getHours() * 60 + d0.getMinutes();
+                if (!isNaN(d0.getTime())) return copenhagenMinuteOfDay(d0.getTime());
             }
         }
         var s = String(raw || '').trim();
@@ -146,7 +137,7 @@
             }
         }
         var d = new Date(s);
-        if (!isNaN(d.getTime())) return d.getHours() * 60 + d.getMinutes();
+        if (!isNaN(d.getTime())) return copenhagenMinuteOfDay(d.getTime());
         return null;
     }
 
@@ -180,42 +171,8 @@
                         : row.avg_now),
                 null
             );
-            var minV = parseLibraryNumLoose(
-                row && (row.min_visitors != null ? row.min_visitors
-                    : row.minNow != null ? row.minNow
-                        : row.min_now),
-                null
-            );
-            var maxV = parseLibraryNumLoose(
-                row && (row.max_visitors != null ? row.max_visitors
-                    : row.maxNow != null ? row.maxNow
-                        : row.max_now),
-                null
-            );
-            var samples = parseLibraryIntLoose(row && row.samples, 0);
             if (hour == null || hour < 0 || hour > 23 || avg == null || !isFinite(avg)) return;
-
-            if (minV == null && maxV == null) {
-                var spread = Math.max(8, Math.abs(avg) * 0.08);
-                minV = Math.max(0, avg - spread);
-                maxV = avg + spread;
-            } else {
-                if (minV == null) minV = Math.max(0, avg - Math.max(5, Math.abs(avg - maxV)));
-                if (maxV == null) maxV = Math.max(avg, avg + Math.max(5, Math.abs(avg - minV)));
-            }
-            if (maxV < minV) {
-                var tmp = minV;
-                minV = maxV;
-                maxV = tmp;
-            }
-            map[hour] = {
-                hour: hour,
-                avg: avg,
-                min: minV,
-                max: maxV,
-                samples: Math.max(0, samples || 0),
-                window: formatHourWindow(hour)
-            };
+            map[hour] = { hour: hour, avg: avg };
         });
         var out = Object.keys(map).map(function (k) { return map[k]; });
         out.sort(function (a, b) { return a.hour - b.hour; });
@@ -235,17 +192,23 @@
     }
 
     function formatLibraryWeekdayObservations(weekdayName, count) {
-        var labels = {
-            sunday: 'Sunday',
-            monday: 'Monday',
-            tuesday: 'Tuesday',
-            wednesday: 'Wednesday',
-            thursday: 'Thursday',
-            friday: 'Friday',
-            saturday: 'Saturday'
-        };
-        var base = labels[normalizeLibraryWeekdayKey(weekdayName)] || 'day';
+        var key = normalizeLibraryWeekdayKey(weekdayName);
+        var base = key && key !== 'generic' ? key.charAt(0).toUpperCase() + key.slice(1) : 'day';
         return count === 1 ? base : (base + 's');
+    }
+
+    // DTU posts library news a few times a term, so its latest ten reach back many
+    // months and read as stale. Only the last three months are shown; when nothing
+    // is that recent, the newest item stays so the section is never blank.
+    var LIBRARY_NEWS_MAX_AGE_MS = 92 * 86400000;
+
+    function selectRecentLibraryNews(news, nowTs) {
+        var list = Array.isArray(news) ? news : [];
+        var recent = list.filter(function (item) {
+            var ts = Date.parse(item && (item.dateIso || item.date) || '');
+            return !isFinite(ts) || (nowTs - ts) <= LIBRARY_NEWS_MAX_AGE_MS;
+        });
+        return recent.length ? recent : list.slice(0, 1);
     }
 
     var LIBRARY_SNAPSHOT_MAX_AGE_MS = 2 * 60 * 60 * 1000;
@@ -307,6 +270,12 @@
         return snap;
     }
 
+    function librarySamplesFromMap(byMinute) {
+        return Object.keys(byMinute).map(function (k) {
+            return { minute: parseInt(k, 10), visitors: byMinute[k] };
+        }).sort(function (a, b) { return a.minute - b.minute; });
+    }
+
     function buildLibraryTodaySamplesFromPayload(crowdingResp, referenceTs) {
         var today = crowdingResp && crowdingResp.today ? crowdingResp.today : null;
         if (!today || !Array.isArray(today.samples)) return [];
@@ -341,33 +310,27 @@
             byMinute[minute] = visitors;
         });
 
-        return Object.keys(byMinute).map(function (k) {
-            return { minute: parseInt(k, 10), visitors: byMinute[k] };
-        }).sort(function (a, b) { return a.minute - b.minute; });
+        return librarySamplesFromMap(byMinute);
     }
 
-    function mergeLibraryTodaySamples(primary, fallback, currentMinute, currentVisitors) {
+    function mergeLibraryTodaySamples(samples, currentMinute, currentVisitors) {
         var byMinute = {};
-        (fallback || []).forEach(function (p) {
-            if (p && isFinite(p.minute) && isFinite(p.visitors)) byMinute[p.minute] = p.visitors;
-        });
-        (primary || []).forEach(function (p) {
+        (samples || []).forEach(function (p) {
             if (p && isFinite(p.minute) && isFinite(p.visitors)) byMinute[p.minute] = p.visitors;
         });
         if (isFinite(currentMinute) && isFinite(currentVisitors)) {
             byMinute[currentMinute] = currentVisitors;
         }
-        return Object.keys(byMinute).map(function (k) {
-            return { minute: parseInt(k, 10), visitors: byMinute[k] };
-        }).sort(function (a, b) { return a.minute - b.minute; });
+        return librarySamplesFromMap(byMinute);
     }
 
     function buildLibraryCrowdingModel(crowdingResp, fallbackOccupancyResp) {
         var nowTs = Date.now();
         var snapshot = extractLibraryCurrentSnapshot(crowdingResp, fallbackOccupancyResp);
-        var nowDate = new Date(snapshot.fetchedAt || nowTs);
-        var nowMinute = nowDate.getHours() * 60 + nowDate.getMinutes();
-        var weekdayName = getLibraryWeekdayName(nowDate.getDay());
+        var refTs = new Date(snapshot.fetchedAt || nowTs).getTime();
+        if (!isFinite(refTs)) refTs = nowTs;
+        var nowMinute = copenhagenMinuteOfDay(refTs);
+        var weekdayName = getLibraryWeekdayName(dom.copenhagenParts(refTs).weekday);
 
         var historical = crowdingResp && crowdingResp.historical ? crowdingResp.historical : null;
         var weekdayMap = normalizeLibraryWeekdayAverages(historical && historical.weekday_averages);
@@ -389,7 +352,6 @@
         var todaySamplesPayload = buildLibraryTodaySamplesFromPayload(crowdingResp, snapshot.fetchedAt || nowTs);
         var todaySamples = mergeLibraryTodaySamples(
             todaySamplesPayload,
-            [],
             nowMinute,
             snapshot.visitors
         );
@@ -483,10 +445,9 @@
 
     function buildLibraryEventIntervals(eventsResp, model) {
         if (!eventsResp || eventsResp.ok === false || !Array.isArray(eventsResp.events) || !model) return [];
-        var dayStart = new Date(model.nowTs || Date.now());
-        dayStart.setHours(0, 0, 0, 0);
-        var dayStartTs = dayStart.getTime();
-        var dayEndTs = dayStartTs + 24 * 60 * 60 * 1000;
+        var today = dom.copenhagenParts(model.nowTs || Date.now());
+        var dayStartTs = dom.copenhagenTs(today.year, today.month, today.day, 0, 0);
+        var dayEndTs = dom.copenhagenTs(today.year, today.month, today.day + 1, 0, 0);
         var graphStart = model.startHour * 60;
         var graphEnd = model.endHour * 60;
         var out = [];
@@ -504,9 +465,9 @@
             if (!isFinite(endTs) || endTs <= startTs) {
                 var parsed = parseLibraryTimeRangeFromText(ev.formattedDate || ev.excerpt || '');
                 if (parsed) {
-                    var base = new Date(startTs);
-                    startTs = new Date(base.getFullYear(), base.getMonth(), base.getDate(), Math.floor(parsed.startMinute / 60), parsed.startMinute % 60).getTime();
-                    endTs = new Date(base.getFullYear(), base.getMonth(), base.getDate(), Math.floor(parsed.endMinute / 60), parsed.endMinute % 60).getTime();
+                    var base = dom.copenhagenParts(startTs);
+                    startTs = dom.copenhagenTs(base.year, base.month, base.day, Math.floor(parsed.startMinute / 60), parsed.startMinute % 60);
+                    endTs = dom.copenhagenTs(base.year, base.month, base.day, Math.floor(parsed.endMinute / 60), parsed.endMinute % 60);
                     if (endTs <= startTs) endTs += 24 * 60 * 60 * 1000;
                 } else {
                     endTs = startTs + 60 * 60 * 1000;
@@ -517,10 +478,8 @@
 
             var clippedStart = Math.max(startTs, dayStartTs);
             var clippedEnd = Math.min(endTs, dayEndTs);
-            var sDate = new Date(clippedStart);
-            var eDate = new Date(clippedEnd);
-            var startMinute = sDate.getHours() * 60 + sDate.getMinutes();
-            var endMinute = eDate.getHours() * 60 + eDate.getMinutes();
+            var startMinute = copenhagenMinuteOfDay(clippedStart);
+            var endMinute = copenhagenMinuteOfDay(clippedEnd);
 
             if (clippedEnd === dayEndTs) endMinute = 24 * 60;
             startMinute = Math.max(graphStart, startMinute);
@@ -660,6 +619,7 @@
             buildLibraryCrowdingInsightLine: buildLibraryCrowdingInsightLine,
             buildLibraryCrowdingConfidenceLine: buildLibraryCrowdingConfidenceLine,
             formatLibraryOccupancyCount: formatLibraryOccupancyCount,
+            selectRecentLibraryNews: selectRecentLibraryNews,
             selectLibraryWeekdayView: selectLibraryWeekdayView,
             buildLibraryWeekdaySummaryLine: buildLibraryWeekdaySummaryLine,
             buildLibraryHourBars: buildLibraryHourBars,
@@ -675,16 +635,16 @@
             isLibraryEnabled: isLibraryEnabled,
             isDTULearnHomepage: existingLibraryDeps.isDTULearnHomepage || function () { return isDTULearnHomepage(); },
             deepQueryAll: existingLibraryDeps.deepQueryAll || null,
-            requestLibraryEvents: requestLibraryEvents,
-            requestLibraryNews: requestLibraryNews,
+            requestLibraryFeed: requestLibraryFeed,
             requestLibraryCrowding: requestLibraryCrowding,
             extractLibraryCurrentSnapshot: extractLibraryCurrentSnapshot,
             formatLibraryOccupancyCount: formatLibraryOccupancyCount,
+            selectRecentLibraryNews: selectRecentLibraryNews,
             markExt: existingLibraryDeps.markExt || function (el) { return markExt(el); },
             getLibraryUiState: function () {
                 return {
-                    eventsCache: _libraryEventsCache,
-                    newsCache: _libraryNewsCache,
+                    eventsCache: _libraryFeedCache.events,
+                    newsCache: _libraryFeedCache.news,
                     crowdingCache: _libraryCrowdingCache,
                     escHandler: _libraryEscHandler,
                     occupancyAutoTimer: _libraryOccupancyAutoTimer
@@ -692,8 +652,8 @@
             },
             setLibraryUiState: function (next) {
                 if (!next || typeof next !== 'object') return;
-                if (Object.prototype.hasOwnProperty.call(next, 'eventsCache')) _libraryEventsCache = next.eventsCache || null;
-                if (Object.prototype.hasOwnProperty.call(next, 'newsCache')) _libraryNewsCache = next.newsCache || null;
+                if (Object.prototype.hasOwnProperty.call(next, 'eventsCache')) _libraryFeedCache.events = next.eventsCache || null;
+                if (Object.prototype.hasOwnProperty.call(next, 'newsCache')) _libraryFeedCache.news = next.newsCache || null;
                 if (Object.prototype.hasOwnProperty.call(next, 'crowdingCache')) _libraryCrowdingCache = next.crowdingCache || null;
                 if (Object.prototype.hasOwnProperty.call(next, 'escHandler')) _libraryEscHandler = next.escHandler || null;
                 if (Object.prototype.hasOwnProperty.call(next, 'occupancyAutoTimer')) _libraryOccupancyAutoTimer = next.occupancyAutoTimer || null;

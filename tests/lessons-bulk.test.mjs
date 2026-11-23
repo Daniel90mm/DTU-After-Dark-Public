@@ -5,7 +5,7 @@ import { extractFunctions, loadModulesInternals, makeLocation, plain } from './_
 
 // A non-Learn host keeps the module's page-load init from running.
 const location = makeLocation('https://learn.inside.dtu.dk/d2l/le/lessons/123');
-const { api } = loadModulesInternals(['darkmode.lessons-bulk.zip.js', 'darkmode.lessons-bulk.tree.js', 'darkmode.lessons-bulk.fetch.js', 'darkmode.lessons-bulk.js'], [
+const { api } = loadModulesInternals(['darkmode.lessons-bulk.zip.js', 'darkmode.lessons-bulk.tree.js', 'darkmode.lessons-bulk.fetch.js', 'darkmode.lessons-bulk.pdf-ink.js', 'darkmode.lessons-bulk.activity.js', 'darkmode.lessons-bulk.video.js', 'darkmode.lessons-bulk.js'], [
     'toAbsoluteSamePageUrl',
     'decodeEscapedUrlText',
     'isLikelyDownloadUrl',
@@ -28,7 +28,7 @@ const { api } = loadModulesInternals(['darkmode.lessons-bulk.zip.js', 'darkmode.
 ], { location: { ...location, hostname: 'not-learn.test' } });
 
 // The URL checks compare against the page host, so give them the real one.
-const learnModule = loadModulesInternals(['darkmode.lessons-bulk.zip.js', 'darkmode.lessons-bulk.tree.js', 'darkmode.lessons-bulk.fetch.js', 'darkmode.lessons-bulk.js'], [
+const learnModule = loadModulesInternals(['darkmode.lessons-bulk.zip.js', 'darkmode.lessons-bulk.tree.js', 'darkmode.lessons-bulk.fetch.js', 'darkmode.lessons-bulk.pdf-ink.js', 'darkmode.lessons-bulk.activity.js', 'darkmode.lessons-bulk.video.js', 'darkmode.lessons-bulk.js'], [
     'isLikelyDownloadUrl',
     'isStrictFileDownloadUrl',
     'classifyTopicFromTocIndex'
@@ -88,6 +88,9 @@ test('URL filenames and extensions', () => {
     assert.equal(api.getExtensionFromUrlPath(LEARN + '/a/noext'), '');
     assert.equal(api.hasFilenameExtension('x.docx'), true);
     assert.equal(api.hasFilenameExtension('README'), false);
+    // A version number is not an extension, so "Lecture 5.1" still gets ".pdf" appended.
+    assert.equal(api.hasFilenameExtension('Lecture 5.1'), false);
+    assert.equal(api.hasFilenameExtension('notes.7z'), true);
 });
 
 test('generic names are recognised so a better hint can replace them', () => {
@@ -247,7 +250,7 @@ test('zip part names: plain when there is one part, numbered once split', () => 
 
 // Exercise cancellation against a pending metadata request. No course material
 // is fetched: scanned topics are explicitly non-file topics.
-async function runnerFixture({ legacy = false } = {}) {
+async function runnerFixture({ legacy = false, extra = {} } = {}) {
     const { extractFunctions } = await import('./_harness.mjs');
     const pending = [], legacyPending = [];
     const statuses = [];
@@ -262,7 +265,6 @@ async function runnerFixture({ legacy = false } = {}) {
                 urlNameHints: new Map(),
                 legacyApiSectionsCache: { orgUnitId: '', sections: [], loading: false, promise: null, ts: 0, lastAttemptTs: 0, source: '' },
                 legacyModuleStructureCache: new Map(),
-                legacyBackgroundResolveState: { orgUnitId: '', running: false, token: 0, resolvedKeys: new Set() },
                 runAbort: null,
                 zipPartsSaved: 0
             };
@@ -270,7 +272,6 @@ async function runnerFixture({ legacy = false } = {}) {
             let _lessonsBulkUrlNameHints = _lessonsBulkState.urlNameHints;
             let _lessonsLegacyApiSectionsCache = _lessonsBulkState.legacyApiSectionsCache;
             let _lessonsLegacyModuleStructureCache = _lessonsBulkState.legacyModuleStructureCache;
-            let _lessonsLegacyBackgroundResolveState = _lessonsBulkState.legacyBackgroundResolveState;
             const LESSONS_BULK_SCAN_CONCURRENCY = 4;`,
         globals: {
             AbortController, document: {},
@@ -296,10 +297,11 @@ async function runnerFixture({ legacy = false } = {}) {
             collectTopicFileUrlsInCurrentPage: async () => [],
             downloadSingleBundledZipFromUrls: async () => ({ ok: false }),
             lessonsBulkDelay: async () => {},
-            isStrictFileDownloadUrl: () => false
+            isStrictFileDownloadUrl: () => false,
+            ...extra
         }
     });
-    const root = { isConnected: true, ownerDocument: {}, querySelectorAll: () => [{ checked: true, getAttribute: () => 'section' }] };
+    const root = { isConnected: true, ownerDocument: {}, querySelectorAll: (sel) => (/data-activity-key/.test(sel) ? [] : [{ checked: true, getAttribute: () => 'section' }]) };
     const seed = () => { api.getLessonsBulkStateRefs().uiState.sections = [{key:'section',unitUrls:['https://learn.inside.dtu.dk/d2l/le/lessons/123/topics/456']}]; };
     seed();
     return { api, root, seed, pending, legacyPending, statuses, enable(v) { enabled = v; }, page(v) { lessonsPage = v; } };
@@ -321,6 +323,24 @@ test('turning download off and back on cannot overlap a still-cancelling run', a
     f.pending[1]();
     await third;
 });
+test('a run that saved files ends with DTU\'s do-not-forward rule; a run that saved nothing does not', async () => {
+    const FORWARD_NOTE = 'For your own study: do not forward.';
+    const extra = {
+        _lessonsBulkActivity: { FORWARD_NOTE, collectCourseActivity: async () => ({ entries: [], notes: [], failed: [] }) },
+        _lessonsBulkVideo: { isVideoUrl: () => false },
+        loadLessonsTocIndex: async () => null,
+        fetchLessonsUnitDownloadResult: async () => ({ links: ['https://learn.inside.dtu.dk/content/enforced/123/notes.pdf'] }),
+        isStrictFileDownloadUrl: () => true,
+        describeLessonsBundleResult: () => 'Saved 1 file.'
+    };
+    const ok = await runnerFixture({ extra: { ...extra, downloadSingleBundledZipFromUrls: async () => ({ ok: true, failedNames: [] }) } });
+    await ok.api.runLessonsBulkDownload(ok.root);
+    assert.match(ok.statuses.at(-1), /Saved 1 file\. For your own study: do not forward\./);
+    const bad = await runnerFixture({ extra: { ...extra, downloadSingleBundledZipFromUrls: async () => ({ ok: false }) } });
+    await bad.api.runLessonsBulkDownload(bad.root);
+    assert.doesNotMatch(bad.statuses.at(-1), /forward/);
+});
+
 test('disabled content download does not request metadata or files', async () => {
     const f = await runnerFixture();
     f.enable(false);
@@ -328,34 +348,35 @@ test('disabled content download does not request metadata or files', async () =>
     assert.equal(f.pending.length, 0);
 });
 
-test('late Lessons TOC mounting is retried without unrelated page mutations', async () => {
+test('late Lessons TOC mounting is placed on page changes and stops when mounted', async () => {
     const { extractFunctions, readSource } = await import('./_harness.mjs');
-    const timers = new Map(); let nextId = 0, passes = 0, enabled = true;
+    let passes = 0, enabled = true, placement = null;
     const { api, context } = extractFunctions('darkmode.lessons-bulk.js', ['runLessonsBulkDownloadChecks', ...(readSource('darkmode.lessons-bulk.js').includes('function scheduleLessonsBulkBootstrap(') ? ['scheduleLessonsBulkBootstrap'] : [])], {
-        prelude: 'let _lessonsBulkUiInserted = false, _lessonsBulkBootstrapTimer = null;',
+        prelude: 'let _lessonsBulkUiInserted = false, _lessonsBulkBootstrapWatch = null;',
         globals: {
             window: { location: { hostname: 'learn.inside.dtu.dk' } },
             isTopWindow: () => true, isLessonsBulkDownloadEnabled: () => enabled, isDTULearnLessonsPage: () => true,
             insertLessonsBulkDownloadControl: () => { passes++; if (passes === 4) context.evalInserted(); },
             removeLessonsBulkDownloadControl() {},
-            scheduleLessonsBulkBootstrap() {},
-            setInterval: fn => { timers.set(++nextId, fn); return nextId; },
-            clearInterval: id => timers.delete(id)
+            schedulePlacement(options) {
+                placement = options;
+                return { active: () => true, trigger() {}, stop() {} };
+            }
         }
     });
     // Set the same insertion flag the production mount path sets.
     const vm = await import('node:vm');
     context.evalInserted = () => vm.runInContext('_lessonsBulkUiInserted = true', context);
     api.runLessonsBulkDownloadChecks();
-    assert.equal(timers.size, 1);
-    for (let i = 0; i < 4; i++) [...timers.values()].forEach(fn => fn());
+    assert.equal(passes, 1);
+    assert.ok(placement);
+    for (let i = 0; i < 3; i++) placement.run();
     assert.equal(passes, 4);
-    assert.equal(timers.size, 0, 'the poll ends as soon as the control mounts');
+    assert.equal(placement.run(), true, 'the placement pass reports done as soon as the control mounts');
     vm.runInContext('_lessonsBulkUiInserted = false', context);
     api.runLessonsBulkDownloadChecks();
     enabled = false;
-    [...timers.values()].forEach(fn => fn());
-    assert.equal(timers.size, 0, 'switching the setting off stops the bootstrap');
+    assert.equal(placement.run(), true, 'switching the setting off stops the bootstrap');
 });
 
 async function settleLegacyPreflight(f, runs) {
@@ -385,7 +406,7 @@ test('duplicate download clicks cannot overlap legacy preflight', async () => {
 
 test('a lesson page that could not be fetched is reported as unread, not as empty', async () => {
     const topic = LEARN + '/d2l/le/lessons/123/topics/456';
-    const load = (fetch) => loadModulesInternals(['darkmode.lessons-bulk.zip.js', 'darkmode.lessons-bulk.tree.js', 'darkmode.lessons-bulk.fetch.js', 'darkmode.lessons-bulk.js'],
+    const load = (fetch) => loadModulesInternals(['darkmode.lessons-bulk.zip.js', 'darkmode.lessons-bulk.tree.js', 'darkmode.lessons-bulk.fetch.js', 'darkmode.lessons-bulk.pdf-ink.js', 'darkmode.lessons-bulk.activity.js', 'darkmode.lessons-bulk.video.js', 'darkmode.lessons-bulk.js'],
         ['fetchLessonsUnitDownloadResult', 'describeLessonsBulkEmptyResult'],
         { location: { ...location, hostname: 'not-learn.test' }, fetch }).api;
 
@@ -406,7 +427,7 @@ test('a lesson page that could not be fetched is reported as unread, not as empt
 
 test('the legacy module tree reads topics and child modules from the structure API', async () => {
     const structure = { Modules: [{ Id: 50009, Title: 'Week 2' }], Topics: [{ TopicId: 40041, Title: 'Slides' }] };
-    const { api } = loadModulesInternals(['darkmode.lessons-bulk.zip.js', 'darkmode.lessons-bulk.tree.js', 'darkmode.lessons-bulk.fetch.js', 'darkmode.lessons-bulk.js'],
+    const { api } = loadModulesInternals(['darkmode.lessons-bulk.zip.js', 'darkmode.lessons-bulk.tree.js', 'darkmode.lessons-bulk.fetch.js', 'darkmode.lessons-bulk.pdf-ink.js', 'darkmode.lessons-bulk.activity.js', 'darkmode.lessons-bulk.video.js', 'darkmode.lessons-bulk.js'],
         ['buildLegacyModuleTreeViaApi'],
         {
             location: { ...location, hostname: 'not-learn.test' },
@@ -443,4 +464,43 @@ test('the hidden-frame scanner moves to the next URL on an empty tree read, then
 
     const failed = await api.scanLegacyTreeInHiddenFrame(hostDoc, ['https://a/1'], 5000, async () => { throw new Error('x'); });
     assert.deepEqual(plain(failed), [], 'a failing read on the last URL gives an empty list, not a rejection');
+});
+
+test('a legacy section load for the previous course cannot fill or end the next course\'s load', async () => {
+    const cache = { orgUnitId: '', sections: [], loading: false, promise: null, ts: 0, lastAttemptTs: 0, source: '', runId: 0 };
+    let ou = 'A';
+    const pending = [];
+    const { api } = extractFunctions('darkmode.lessons-bulk.tree.js', ['maybeStartLegacyApiSectionsHydration'], {
+        prelude: 'var _lessonsLegacyApiSectionsCache = globalThis.cacheObj; var _lessonsBulkUiState = { activeDoc: null };',
+        globals: {
+            cacheObj: cache,
+            document: {},
+            getLessonsRuntimeDocument: (d) => d,
+            isLegacyLessonsTreeDocument: () => true,
+            getCurrentLessonsOrgUnitId: () => ou,
+            normalizeLessonsBulkSections: (s) => s || [],
+            shouldAttemptLegacyHiddenSectionBuild: () => false,
+            buildLegacySectionsViaHiddenFrame: async () => [],
+            buildLegacyApiSectionsDeep: () => new Promise((resolve) => pending.push(resolve)),
+            isLegacyQualityBetter: () => false,
+            logLessonsBulkDebug() {},
+            refreshLessonsBulkDownloadUi() {}
+        }
+    });
+    const settle = async () => { for (let i = 0; i < 6; i++) await Promise.resolve(); };
+    api.maybeStartLegacyApiSectionsHydration({}, null);
+    await settle();
+    ou = 'B';
+    api.maybeStartLegacyApiSectionsHydration({}, null);
+    await settle();
+    assert.equal(pending.length, 2);
+    pending[0]([{ key: 'from-A' }]);
+    await settle();
+    assert.equal(cache.orgUnitId, 'B');
+    assert.deepEqual(plain(cache.sections), []);
+    assert.equal(cache.loading, true, 'B is still loading');
+    pending[1]([{ key: 'from-B' }]);
+    await settle();
+    assert.deepEqual(plain(cache.sections), [{ key: 'from-B' }]);
+    assert.equal(cache.loading, false);
 });

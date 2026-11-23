@@ -73,7 +73,7 @@ class FakeElement {
         return child;
     }
 
-    addEventListener() {}
+    addEventListener(type, fn) { (this.listeners = this.listeners || {})[type] = (this.listeners[type] || []).concat(fn); }
 
     get nextSibling() {
         if (!this.parentNode) return null;
@@ -256,7 +256,7 @@ function buildGradesFixture(document, grades = SCREENSHOT_GRADES) {
     return table;
 }
 
-function loadCampusnetGpaApi({ document = new FakeDocument(), dark = false, storage = null, location = { hostname: 'test.invalid', pathname: '/' } } = {}) {
+function loadCampusnetGpaApi({ document = new FakeDocument(), dark = false, deps = true, storage = null, location = { hostname: 'test.invalid', pathname: '/' }, suppressLog = null } = {}) {
     const fileUrl = new URL('darkmode.campusnet-gpa.js', ROOT);
     let source = fs.readFileSync(fileUrl, 'utf8');
     source = source.replace(
@@ -274,6 +274,10 @@ function loadCampusnetGpaApi({ document = new FakeDocument(), dark = false, stor
             clearCampusnetActualGradeColumnLayout,
             createSimRow,
             saveSimEntries,
+            findMissingGrades,
+            campusnetTermForExam,
+            updateProjectedGPA: typeof updateProjectedGPA === 'function'
+                ? updateProjectedGPA : undefined,
             publicApi: globalThis.DTUAfterDarkCampusnetGpa
         };})();`
     );
@@ -285,12 +289,14 @@ function loadCampusnetGpaApi({ document = new FakeDocument(), dark = false, stor
         localStorage: storage || { getItem() { return null; }, setItem() {} },
         window: { location }
     };
-    sandbox.DTUAfterDarkCampusnetGpaDeps = {
-        isTopWindow() { return true; },
-        isFeatureEnabled() { return true; },
-        isDarkMode() { return dark; },
-        setSuppressHeavyWork() {}
-    };
+    if (deps) {
+        sandbox.DTUAfterDarkCampusnetGpaDeps = {
+            isTopWindow() { return true; },
+            isFeatureEnabled() { return true; },
+            isDarkMode() { return dark; },
+            setSuppressHeavyWork(value) { if (suppressLog) suppressLog.push(value); }
+        };
+    }
     sandbox.globalThis = sandbox;
     loadDom(sandbox);
     vm.runInNewContext(source, sandbox, { filename: fileURLToPath(fileUrl) });
@@ -342,6 +348,14 @@ test('the CampusNet GPA public API exposes no speculative degree-progress render
     const api = loadCampusnetGpaApi();
 
     assert.equal(api.publicApi?.insertECTSProgressBar, undefined);
+});
+
+test('missing GPA dependencies fail loudly instead of silently disabling the tools', () => {
+    const api = loadCampusnetGpaApi({ deps: false });
+
+    assert.throws(
+        () => api.publicApi.insertGPARow(),
+        /CampusNet GPA dependencies are missing/);
 });
 
 test('CampusNet grade course numbers read as accent links after extension-owned styles are refreshed', () => {
@@ -603,6 +617,42 @@ test('"Add planned grade" sits beside "Only show passed courses" and the estimat
     }
 });
 
+test('a failed save while adding a planned grade still switches page watching back on', () => {
+    const document = new FakeDocument();
+    buildGradesFixture(document);
+    const controls = document.createElement('div');
+    controls.className = 'educationPassedOnly';
+    document.body.appendChild(controls);
+    const suppressLog = [];
+    const storage = { getItem() { return null; }, setItem() { throw new Error('QuotaExceededError'); } };
+    const api = loadCampusnetGpaApi({ document, storage, suppressLog });
+    api.publicApi.insertGPASimulator();
+    const button = controls.children.find(child => child.className === 'gpa-sim-add-btn');
+    const click = (button.listeners && button.listeners.click || [])[0];
+    assert.ok(click, 'Add planned grade has a click handler');
+    assert.throws(() => click({ preventDefault() {} }), /QuotaExceededError/);
+    assert.deepEqual(suppressLog, [true, false]);
+});
+
+test('the projected GPA uses the same weighted average as the actual GPA', () => {
+    const document = new FakeDocument();
+    const table = buildGradesFixture(document);
+    const saved = JSON.stringify([{ code: '22052', name: 'Signals', grade: 10, ects: 5 }]);
+    const api = loadCampusnetGpaApi({
+        document,
+        storage: { getItem: k => k === 'gpaSimEntries' ? saved : null, setItem() {} }
+    });
+    api.publicApi.insertGPASimulator();
+    api.publicApi.insertGPARow();
+    table.querySelector('.gpa-sim-row').children[2].children[0].value = '10';
+    api.updateProjectedGPA();
+
+    const cells = table.querySelector('.gpa-projected-row').children;
+    assert.equal(cells[1].textContent, '7.40');
+    assert.equal(cells[2].textContent, 175);
+    assert.equal(cells[3].textContent, '+0.08');
+});
+
 test('a -3 grade written with a Unicode minus still counts', () => {
     const document = new FakeDocument();
     const table = buildGradesFixture(document, [
@@ -638,4 +688,57 @@ test('a cleared ECTS field is saved and restored empty, never as 5', () => {
     assert.equal(String(rows[0].children[3].children[0].value), '');
     assert.equal(table2.querySelector('.gpa-sim-unread-row'), null);
     assert.equal(table2.querySelector('.gpa-projected-row'), null, 'no ECTS means no projection');
+});
+
+test('Add course finds the last planned row by class, not with :last-of-type (which matches by tag)', () => {
+    const src = fs.readFileSync(new URL('darkmode.campusnet-gpa.js', ROOT), 'utf8');
+    assert.doesNotMatch(src, /\.[a-zA-Z_-]+:(?:last|first|nth)-of-type/);
+});
+
+test('a grade that arrived since the last visit gets one small "New" mark, shown on that visit only', () => {
+    const saved = new Map();
+    const storage = { getItem: (k) => (saved.has(k) ? saved.get(k) : null), setItem: (k, v) => saved.set(k, String(v)) };
+    const location = { hostname: 'campusnet.dtu.dk', pathname: '/cnnet/Grades/Grades.aspx' };
+    const visit = (grades) => {
+        const document = new FakeDocument();
+        document.readyState = 'complete';
+        const table = buildGradesFixture(document, grades);
+        loadCampusnetGpaApi({ document, storage, location });
+        return table.querySelectorAll('.gpa-new-grade').map((chip) => allText(chip.parentNode));
+    };
+    assert.deepEqual(visit(SCREENSHOT_GRADES), [], 'the first visit only remembers the rows');
+    const withNew = [...SCREENSHOT_GRADES, ['02402', 'Introduction to Statistics', '10', '5']];
+    const marked = visit(withNew);
+    assert.equal(marked.length, 1);
+    assert.match(marked[0], /Introduction to Statistics New/);
+    assert.deepEqual(visit(withNew), [], 'gone on the next visit');
+    // A page where every row looks new (CampusNet changed its rows) shows no marks.
+    assert.deepEqual(visit(withNew.map(([c, t, g, e]) => [c + 'x', t, g, e])), []);
+});
+
+test('the New mark does not change the row signature that ignored courses are saved under', () => {
+    const src = fs.readFileSync(new URL('darkmode.campusnet-gpa.js', ROOT), 'utf8');
+    assert.match(src, /clone\.querySelectorAll\('\.gpa-actual-toggle-btn, \.gpa-new-grade'\)/);
+});
+
+test('an exam past DTU\'s grading deadline with no grade for its term is listed; a graded or not yet due one is not', () => {
+    const api = loadCampusnetGpaApi();
+    assert.equal(api.campusnetTermForExam('2025-12-10'), 'v25');
+    assert.equal(api.campusnetTermForExam('2026-01-22'), 'v25');
+    assert.equal(api.campusnetTermForExam('2026-05-20'), 's26');
+    assert.equal(api.campusnetTermForExam('2026-08-14'), 's26');
+    assert.equal(api.campusnetTermForExam('2026-10-01'), null);
+    const watch = [
+        { code: '02110', name: 'Algorithms 2', exam: '2026-12-10', grading: '2027-01-18' },
+        { code: '02402', name: 'Statistics', exam: '2026-12-19', grading: '2027-01-26' },
+        { code: '01005', name: 'Maths 1', exam: '2026-12-06', grading: '2027-01-12' },
+        { code: '34034', name: 'Lasers', exam: '2026-12-07', grading: '2027-02-20' }
+    ];
+    const grades = [
+        { code: '02402', term: 'v26' },
+        { code: '01005', term: 's26' }
+    ];
+    const missing = JSON.parse(JSON.stringify(api.findMissingGrades(watch, grades, '2027-01-27')));
+    assert.deepEqual(missing.map((m) => [m.code, m.daysAgo]), [['02110', 9], ['01005', 15]],
+        '02402 is graded in v26; 01005 has only an older s26 grade (a retake); 34034 is not due');
 });

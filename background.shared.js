@@ -41,7 +41,16 @@
             )
         );
     }
+    // Every background request has a time limit: a DTU server that never answers must
+    // end in an error reply, not leave a widget on its loading bars forever. The signal
+    // also covers reading the body.
+    const FETCH_TIME_LIMIT_MS = 20000;
+    function fetchWithTimeLimit(url, init, ms) {
+        return fetch(url, Object.assign({}, init, { signal: AbortSignal.timeout(ms || FETCH_TIME_LIMIT_MS) }));
+    }
+
     globalThis.DTUAfterDarkShared = {
+        fetchWithTimeLimit,
         normalizeSpace,
         decodeBasicHtmlEntities,
         decodeHtmlBasic,

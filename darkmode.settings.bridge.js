@@ -3,8 +3,20 @@
     var markExt = globalThis.DTUAfterDarkDom.markExt;
     var isTopWindow = globalThis.DTUAfterDarkDom.isTopWindow;
 
+    var _warnedMissingDeps = {};
+    function warnMissingDep(name) {
+        if (_warnedMissingDeps[name]) return;
+        _warnedMissingDeps[name] = true;
+        try {
+            console.warn('[DTU After Dark] ' + name + ' is missing; Settings uses a fallback until it loads.');
+        } catch (e0) { }
+    }
+
     function getDeps() {
-        try { return globalThis.DTUAfterDarkSettingsDeps || null; } catch (e0) { return null; }
+        var deps;
+        try { deps = globalThis.DTUAfterDarkSettingsDeps || null; } catch (e0) { deps = null; }
+        if (!deps) warnMissingDep('DTUAfterDarkSettingsDeps');
+        return deps;
     }
 
     function callDep(name, args, fallback) {
@@ -12,12 +24,14 @@
         if (deps && typeof deps[name] === 'function') {
             return deps[name].apply(null, args || []);
         }
+        if (deps) warnMissingDep('DTUAfterDarkSettingsDeps.' + name);
         return fallback;
     }
 
     function getDepValue(name, fallback) {
         var deps = getDeps();
         if (deps && Object.prototype.hasOwnProperty.call(deps, name)) return deps[name];
+        if (deps) warnMissingDep('DTUAfterDarkSettingsDeps.' + name);
         return fallback;
     }
 
@@ -47,7 +61,7 @@
     }
 
     function saveUrlPausePatterns(patterns) {
-        callDep('saveUrlPausePatterns', [patterns], null);
+        return callDep('saveUrlPausePatterns', [patterns], Promise.resolve());
     }
 
     function getMatchingUrlPausePatterns(url) {
@@ -67,6 +81,7 @@
         return callDep('getSettingKeys', [], {
             busEnabled: 'dtuDarkModeBusEnabled',
             deadlinesEnabled: 'dtuDarkModeDeadlinesEnabled',
+            exchangeDeadlineEnabled: 'dtuDarkModeExchangeDeadlineEnabled',
             searchWidgetEnabled: 'dtuDarkModeSearchWidgetEnabled'
         }) || {};
     }
