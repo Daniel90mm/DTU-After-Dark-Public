@@ -53,17 +53,20 @@ DTU After Dark is unofficial and is not affiliated with or endorsed by DTU or an
 
 ## Version 9.2.0 release notes
 
-- Download course: the Lessons download now saves a whole course. Under the content sections, "Also save" adds Announcements (with attachments), Assignments (your submissions and the teacher's feedback, including pen marks written into your PDFs and the rubric), finished Quizzes, Discussions (with attached files) and Grades, each as a page that opens without DTU Learn; an "i" next to each says what it saves. Each section shows its videos and their size, and videos are saved as separate downloads.
+- Download course: the Lessons download now saves a whole course. Under the content sections, "Also save" adds Announcements (with attachments), Assignments (your submissions and the teacher's feedback, including pen marks written into your PDFs and the rubric), finished Quizzes, Discussions (with attached files) and Grades, each as a page that opens without DTU Learn; a short grey line under each option says what it saves. Each section shows its videos and their size, and videos are saved as separate downloads.
 - Deadlines: "Add to calendar" downloads the next 12 months of course and exam deadlines as calendar events. An optional Exchange Deadline row (Settings, off by default) shows the exchange application deadline from DTU Beyond Borders, and once it has passed, says when the next one is or that none is listed yet. When a DTU page fails, the widget keeps the last good copy and says how old it is.
 - CampusNet Grades: "Grade not on this page yet" lists each planned exam whose grading deadline has passed with no grade showing, and a new grade is marked "New".
-- kurser.dtu.dk: the Exam date row shows the date and period, with the exam table slot and DTU's grading deadline behind a small info button. Courses agreed with the teacher say so. The Grades widget now says how many registered students sat the exam, and the book bar uses a shipped list of each course's books for cleaner titles and authors.
+- kurser.dtu.dk: the Exam date row shows the date and period, with DTU's grading deadline behind a small info button (and the exam table slot when the page does not already show it). Oral exams, and written exams whose course page says so, note that the exam may run over several days. Courses agreed with the teacher say so. The Grades widget now says how many registered students sat the exam.
+- kurser.dtu.dk Course map: the row now shows a small picture of the map itself, with how many courses come before the course and how many build on it; click it to open the full map.
+- kurser.dtu.dk Course literature: DTU's own text stays as it is, with the book links added after it, using a shipped list of each course's books for cleaner titles and authors.
 - Study Planner: the exam schedule gives each exam DTU's grading deadline. The Register/Withdraw dialog no longer covers the page in grey, and DTU's loading spinner is visible in dark mode.
+- Course composition (CampusNet participants): the study line filter reads the participant list page only and never requests CampusNet's participant export, and the page buttons are hidden while a filter shows the whole study line.
 - Slow widgets show grey placeholder bars shaped like their content while they load.
 - Paused pages: a pause rule saved on one DTU site now works on every DTU site.
-- Dark mode reaches DTU Learn components as soon as they appear, without retries, and the older DTU Learn tools (Announcements, Classlist, Assignments) get dark dropdowns and tooltips.
+- Dark mode reaches DTU Learn components as soon as they appear, without retries; the older DTU Learn tools (Announcements, Classlist, Assignments) get dark dropdowns and tooltips; picture tiles in the navigation bar and classic pages inside Lessons are dark too.
 - Dates follow Danish time on every widget, so a computer set to another time zone no longer sees deadlines a day off around midnight.
 - A DTU server that does not answer now ends in an error message after 20 seconds (60 for library news and events) instead of loading forever.
-- Fixes: the Library panel is fully opaque in Firefox, DTU's evaluation reminder is no longer drawn under the deadlines timeline, course codes with letters count on CampusNet, old cached pages are cleared so storage cannot fill up, a red DTU header can no longer freeze the tab, and clicking a study line in Course composition shows every student in it.
+- Fixes: the Library panel is fully opaque in Firefox, DTU's evaluation reminder is no longer drawn under the deadlines timeline, course codes with letters count on CampusNet, old cached pages are cleared so storage cannot fill up, a red DTU header can no longer freeze the tab, clicking a study line in Course composition shows every student in it, and the menu arrow next to a DTU Learn homepage widget title no longer shows dark corners.
 
 ## Version 9.1.0 release notes
 
